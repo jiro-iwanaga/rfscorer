@@ -6,11 +6,11 @@
 
 | 用語 | 英語 / 記号 | 定義 |
 |------|------------|------|
-| 閲覧履歴 | interaction history | ユーザーが商品を閲覧した記録。`user`・`item`・`datetime` の3カラムで表現する |
+| 閲覧履歴 | interaction history | ユーザーが商品を閲覧した記録。コンストラクタにDataFrameとして渡す。カラム名は引数で指定し、内部では `user`・`item`・`datetime` に正規化される |
 | ユーザー | user | 閲覧履歴の主体。`user` カラムで識別する |
 | 商品 | item | 閲覧対象。`item` カラムで識別する |
-| 観測期間 | observation period | 最新度・頻度を算出するために使用する期間 |
-| 評価期間 | evaluation period | 再閲覧の有無を観測するために使用する期間。観測期間の直後に設定する |
+| 観測期間 | observation period / `observation_period` | 最新度・頻度を算出するために使用する期間。`fit()` に開始日・終了日の tuple で渡す |
+| 評価期間 | evaluation period / `evaluation_period` | 再閲覧の有無を観測するために使用する期間。観測期間の直後に設定する。`fit()` に開始日・終了日の tuple で渡す |
 
 ## アルゴリズム
 
@@ -32,8 +32,9 @@
 
 | 用語 | 定義 |
 |------|------|
-| `RecencyFrequencyScorer` | RF スコアリングの主クラス。`fit()` と `optimize()` を提供する |
-| `fit()` | 閲覧履歴を受け取り、経験的再閲覧確率を推定するメソッド |
+| `RecencyFrequencyScorer` | RF スコアリングの主クラス。コンストラクタで閲覧履歴 DataFrame とカラム名を受け取る |
+| `fit(observation_period, evaluation_period)` | 観測期間・評価期間を tuple で受け取り、経験的再閲覧確率を推定するメソッド |
 | `optimize()` | `fit()` の結果を用いて、RF 制約付きの最適化再閲覧確率を推定するメソッド |
+| `interaction_log` | コンストラクタで正規化した閲覧履歴。カラムは `user`・`item`・`datetime` |
 | `empirical_probability_` | `fit()` 後に参照できる経験的再閲覧確率。`pd.Series`（インデックス: `(r, f)`） |
 | `optimized_probability_` | `optimize()` 後に参照できる最適化再閲覧確率。`pd.Series`（インデックス: `(r, f)`） |

@@ -32,9 +32,12 @@ RF スコアリング手法を Python パッケージとして PyPI に公開し
 
 ### 入力
 
-- ユーザー × 商品のインタラクション履歴を表す DataFrame
-  - 必須カラム: `user`（ユーザー識別子）、`item`（商品識別子）、`datetime`（インタラクション日時）
+- ユーザー × 商品のインタラクション履歴を表す DataFrame（コンストラクタに渡す）
+  - カラム名は `user_col`・`item_col`・`datetime_col` 引数で指定する（デフォルト: `user`・`item`・`datetime`）
   - 同一ユーザー × 商品の組み合わせが複数行存在することを想定（リピート閲覧）
+- 観測期間・評価期間（`fit()` に渡す）
+  - `observation_period`: 観測期間の開始日・終了日の tuple
+  - `evaluation_period`: 評価期間の開始日・終了日の tuple
 
 ### 機能
 
@@ -53,13 +56,19 @@ RF スコアリング手法を Python パッケージとして PyPI に公開し
 ### API
 
 ```python
+import pandas as pd
 from rfscorer import RecencyFrequencyScorer
 
-scorer = RecencyFrequencyScorer()
-scorer.fit(df, observation_dates, evaluation_dates)   # 経験的再閲覧確率を推定
+df = pd.read_csv("examples/access_log.csv")
+scorer = RecencyFrequencyScorer(df, user_col="user_id", item_col="item_id", datetime_col="date")
+
+scorer.fit(
+    observation_period=("2015-07-02", "2015-07-06"),
+    evaluation_period=("2015-07-07", "2015-07-08"),
+)
 df_empirical = scorer.empirical_probability_.to_frame()
 
-scorer.optimize()                                     # 最適化再閲覧確率を推定
+scorer.optimize()
 df_optimized = scorer.optimized_probability_.to_frame()
 ```
 

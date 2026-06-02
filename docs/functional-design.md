@@ -54,6 +54,85 @@ $$\sum_{r\in R, f\in F} N_{r,f} \cdot(p_{r,f} - x_{r,f})^2$$
 #### コンストラクタ
 
 ```python
-RecencyFrequencyScorer()
+RecencyFrequencyScorer(df, user_col="user", item_col="item", datetime_col="datetime")
+```
+
+| パラメータ | 型 | デフォルト | 説明 |
+|-----------|-----|-----------|------|
+| `df` | `pd.DataFrame` | — | 閲覧履歴 |
+| `user_col` | `str` | `"user"` | ユーザー識別子のカラム名 |
+| `item_col` | `str` | `"item"` | 商品識別子のカラム名 |
+| `datetime_col` | `str` | `"datetime"` | 閲覧日時のカラム名 |
+
+内部では指定されたカラムを `user`・`item`・`datetime` に正規化して保持する（`interaction_log` 属性）。
+
+#### メソッド
+
+##### `fit(observation_period, evaluation_period)`
+
+観測期間・評価期間に基づき、$(r, f)$ 別の経験的再閲覧確率を推定する。
+
+| パラメータ | 型 | 説明 |
+|-----------|-----|------|
+| `observation_period` | `tuple[str \| datetime, str \| datetime]` | 観測期間の開始日・終了日 |
+| `evaluation_period` | `tuple[str \| datetime, str \| datetime]` | 評価期間の開始日・終了日 |
+
+戻り値: `self`
+
+##### `optimize()`
+
+RF 制約を満たす最適化再閲覧確率を推定する。`fit()` の後に呼び出す。
+
+戻り値: `self`
+
+#### 属性
+
+| 属性 | 型 | 説明 | 利用可能なタイミング |
+|------|-----|------|-----------------|
+| `interaction_log` | `pd.DataFrame` | 正規化済み閲覧履歴（カラム: `user`, `item`, `datetime`） | `__init__()` 後 |
+| `empirical_probability_` | `pd.Series` | 経験的再閲覧確率。インデックスは `(r, f)` | `fit()` 後 |
+| `optimized_probability_` | `pd.Series` | 最適化再閲覧確率。インデックスは `(r, f)` | `optimize()` 後 |
+
+## データフロー
+
+```
+入力 DataFrame (任意のカラム名)
+        │
+        ▼  __init__()
+user / item / datetime に正規化 → interaction_log
+        │
+        ▼  fit(observation_period, evaluation_period)
+観測期間・評価期間でフィルタ
+r（最新度ランク）・f（頻度）を算出
+(r, f) 別に n_{r,f}・N_{r,f} を集計
+p_{r,f} = n_{r,f} / N_{r,f}
+        ▼
+empirical_probability_  ─── to_frame() ─→ DataFrame で取得可能
+        │
+        ▼  optimize()
+RF 制約付き凸2次計画問題を求解
+        ▼
+optimized_probability_  ─── to_frame() ─→ DataFrame で取得可能
+```
+
+## 入出力例
+
+```python
+import pandas as pd
+from rfscorer import RecencyFrequencyScorer
+
+df = pd.read_csv("examples/access_log.csv")
+# access_log.csv のカラム: user_id, item_id, date
+
+scorer = RecencyFrequencyScorer(df, user_col="user_id", item_col="item_id", datetime_col="date")
+
+scorer.fit(
+    observation_period=("2015-07-02", "2015-07-06"),
+    evaluation_period=("2015-07-07", "2015-07-08"),
+)
+scorer.empirical_probability_.to_frame()
+
+scorer.optimize()
+scorer.optimized_probability_.to_frame()
 ```
 
