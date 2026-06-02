@@ -20,7 +20,7 @@ pip install rfscorer
 from rfscorer import RecencyFrequencyScorer
 
 # df is a user-item interaction history
-# df columns: user, item, timestamp 
+# df columns: user, item, datetime
 scorer = RecencyFrequencyScorer() 
 
 # Empirical probabilities estimated directly from observed interactions. 
