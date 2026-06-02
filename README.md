@@ -18,14 +18,25 @@ pip install rfscorer
 
 ```python
 from rfscorer import RecencyFrequencyScorer
+
+# df is a user-item interaction history
+# df columns: user, item, timestamp 
+scorer = RecencyFrequencyScorer() 
+
+# Empirical probabilities estimated directly from observed interactions. 
+scorer.fit(df) 
+df_empirical = scorer.empirical_probability_.to_frame()
+
+# Estimate optimized probabilities with additional RF constraints.
+scorer.optimize() 
+df_optimized = scorer.optimized_probability_.to_frame()
 ```
 
-<!--
-```python
-from rfscorer import RecencyFrequencyScorer, RecencyScorer, FrequencyScorer
-```
--->
+## References
+- [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
 
+- [Jiro Iwanaga, Kyota Ishihara, Naoki Nishimura, and Ikki Tanaka, *Pythonではじめる数理最適化 ―ケーススタディでモデリングのスキルを身につけよう―*(in Japanese), Ohmsha, 2021.](https://www.ohmsha.co.jp/book/9784274231759/)
+  - [Chapter 7: 商品推薦のための興味のスコアリング(in Japanese)](https://github.com/ohmsha/PyOptBook/tree/main/7.recommendation)
 
 ## License
 
