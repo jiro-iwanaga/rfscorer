@@ -138,9 +138,13 @@ class RecencyFrequencyScorer:
         else:
             df_recency2cv = df_ui2frc.groupby('recency')['cv'].sum().reset_index()
             df_recency2cv.sort_values('recency', inplace=True)
-            #print(df_recency2cv)
-            cv_sum = 0
             total_cv = df_recency2cv.cv.sum()
+            if total_cv == 0:
+                raise ValueError(
+                    "No revisits observed in evaluation_period. "
+                    "Cannot determine recency_limit automatically."
+                )
+            cv_sum = 0
             for row in df_recency2cv.itertuples():
                 cv_sum += row.cv
                 if cv_sum / total_cv >= self._RECENCY_LIMIT_RATE:
@@ -153,9 +157,13 @@ class RecencyFrequencyScorer:
         else:
             df_frequency2cv = df_ui2frc.groupby('frequency')['cv'].sum().reset_index()
             df_frequency2cv.sort_values('frequency', inplace=True)
-            #print(df_frequency2cv)
-            cv_sum = 0
             total_cv = df_frequency2cv.cv.sum()
+            if total_cv == 0:
+                raise ValueError(
+                    "No revisits observed in evaluation_period. "
+                    "Cannot determine frequency_limit automatically."
+                )
+            cv_sum = 0
             for row in df_frequency2cv.itertuples():
                 cv_sum += row.cv
                 if cv_sum / total_cv >= self._FREQUENCY_LIMIT_RATE:
