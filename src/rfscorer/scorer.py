@@ -440,6 +440,60 @@ class RecencyFrequencyScorer:
         df_rf[item_col] = df_rf[item_col].astype(df[item_col].dtype)
 
         return df_rf
+    
+    def evaluate(self, df_rec, UIrevisit, order=1, user_col=None, item_col=None):
+        """Evaluate recommendation quality at each order cutoff.
+
+        Parameters
+        ----------
+        df_rec : pd.DataFrame
+            Recommendation results from transform(). Must have an 'order' column.
+        UIrevisit : set
+            Ground truth set of (user, item) pairs that were actually revisited.
+        order : int, default 1
+            Maximum recommendation rank to evaluate. Results are computed for
+            each rank from 1 to order, plus the maximum order in df_rec.
+        user_col : str, optional
+            Column name for user in df_rec. Defaults to the first column.
+        item_col : str, optional
+            Column name for item in df_rec. Defaults to the second column.
+
+        Returns
+        -------
+        pd.DataFrame
+            Evaluation metrics for each order cutoff. Columns:
+            order, n_recommended, n_hit, precision, recall, f1,
+            recall_norm, f1_norm.
+        """
+        user_col = user_col or df_rec.columns[0]
+        item_col = item_col or df_rec.columns[1]
+        order_max = df_rec.order.max()
+
+        target_orders = list(range(1, order+1))
+        target_orders += [order_max] if order_max not in set(target_orders) else []
+        Rows = []
+        for ord in target_orders:
+            df_k = df_rec[df_rec['order'] <= ord]
+            UIrec = set(zip(df_k[user_col], df_k[item_col]))
+            n_hit = len(UIrec & UIrevisit)
+            n_recommended = len(UIrec)
+            precision = n_hit / n_recommended if n_recommended > 0 else 0.0
+            Rows.append((ord, n_recommended, n_hit, precision))
+        df_eval = pd.DataFrame(
+            Rows,
+            columns=['order', 'n_recommended', 'n_hit', 'precision']
+        )
+
+        total_hit = df_eval.n_hit.max()
+        df_eval['recall'] = df_eval.n_hit / len(UIrevisit)
+        denom = df_eval.precision + df_eval.recall
+        df_eval['f1'] = (2 * df_eval.precision * df_eval.recall).where(denom > 0, 0.0) / denom.where(denom > 0, 1.0)
+        df_eval['recall_norm'] = df_eval.n_hit / total_hit
+        denom_norm = df_eval.precision + df_eval.recall_norm
+        df_eval['f1_norm'] = (2 * df_eval.precision * df_eval.recall_norm).where(denom_norm > 0, 0.0) / denom_norm.where(denom_norm > 0, 1.0)
+
+        return df_eval
+
 
     def optimize(self):
         """Estimate optimized revisit probabilities under RF constraints.
@@ -493,8 +547,7 @@ if __name__ == "__main__":
         )
     
     print(df_rec)
-    UIrec = set([(row.user_id, row.item_id) for row in df_rec.itertuples() if row.order==1])
     UIrevisit = set([(row.user_id, row.item_id) for row in df_test_eval.itertuples()])
-    print(len(UIrec))
-    print(len(UIrevisit))
-    print(len(UIrec & UIrevisit))
+
+    df_eval = scorer.evaluate(df_rec, UIrevisit, order=10)
+    print(df_eval)
