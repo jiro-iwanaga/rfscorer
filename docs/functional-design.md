@@ -87,13 +87,30 @@ RF 制約を満たす最適化再閲覧確率を推定する。`fit()` の後に
 
 戻り値: `self`
 
+##### `show()`
+
+`fit()` 後の集計情報（レコード数・cv 数・期間・上限値）を標準出力に表示する。デバッグ・動作確認用。
+
+戻り値: なし
+
 #### 属性
 
 | 属性 | 型 | 説明 | 利用可能なタイミング |
 |------|-----|------|-----------------|
 | `interaction_log` | `pd.DataFrame` | 正規化済み閲覧履歴（カラム: `user`, `item`, `datetime`） | `__init__()` 後 |
-| `empirical_probability_` | `pd.Series` | 経験的再閲覧確率。インデックスは `(r, f)` | `fit()` 後 |
+| `recency_limit` | `int` | 最新度の上限値 | `fit()` 後 |
+| `frequency_limit` | `int` | 頻度の上限値 | `fit()` 後 |
+| `R` | `list[int]` | 最新度のリスト（`range(1, recency_limit+1)`） | `fit()` 後 |
+| `F` | `list[int]` | 頻度のリスト（`range(1, frequency_limit+1)`） | `fit()` 後 |
+| `empirical_probability_` | `pd.DataFrame` | 経験的再閲覧確率（カラム: `recency`, `frequency`, `N`, `cv`, `probability`） | `fit()` 後 |
 | `optimized_probability_` | `pd.Series` | 最適化再閲覧確率。インデックスは `(r, f)` | `optimize()` 後 |
+| `record_num` | `int` | 全閲覧履歴のレコード数 | `__init__()` 後 |
+| `record_num_obs` | `int` | 観測期間のレコード数 | `fit()` 後 |
+| `record_num_eval` | `int` | 評価期間のレコード数 | `fit()` 後 |
+| `record_num_target_org` | `int` | フィルタリング前の分析対象レコード数 | `fit()` 後 |
+| `record_num_target` | `int` | フィルタリング後の分析対象レコード数 | `fit()` 後 |
+| `total_cv_org` | `int` | フィルタリング前の cv 数 | `fit()` 後 |
+| `total_cv` | `int` | フィルタリング後の cv 数 | `fit()` 後 |
 
 ## データフロー
 
