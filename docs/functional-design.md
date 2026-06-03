@@ -5,10 +5,10 @@
 `rfscorer` は、ユーザー × 商品の閲覧履歴から商品の再閲覧確率を推定する。  
 推定には2段階のアプローチをとる。
 
-1. **経験的再閲覧確率の推定**: 観測期間に最新度 $r$、頻度 $f$の商品が評価期間で再閲覧される比率から直接推定する
+1. **経験的再閲覧確率の推定**: 観測期間に最新度 $r$、頻度 $f$の商品が、評価期間で再閲覧される割合とする
 2. **最適化再閲覧確率の推定**: 経験的再閲覧確率を用いて、RF 制約と最小二乗誤差を目的関数にもつ凸2次計画問題を解いて推定する
 
-## アルゴリズム
+## 数理モデル
 
 ### 用語定義
 
@@ -37,11 +37,11 @@ $$p_{r,f} := \frac{n_{r,f}}{N_{r,f}}\ \ \  (r\in R, f\in F)$$
 **RF制約**
 - **Recency 制約（最新度の単調性）**  
 最近閲覧した商品ほど再閲覧確率が高い。
-$$r < r' \implies x_{r,f} \geq x_{r',f}$$
+$$r < r' \implies x_{r,f} \geq x_{r',f}\ \ \ (r, r'\in R) $$
 - **Frequency 制約（頻度の単調性）**  
 頻度が高い（閲覧数が多い）商品ほど再閲覧確率が高い。
 
-$$f < f' \implies x_{r,f} \leq x_{r',f}$$
+$$f < f' \implies x_{r,f} \leq x_{r',f}\ \ \ (f, f'\in R) $$
 
 **目的関数(最小二乗誤差)**
 $$\sum_{r\in R, f\in F} N_{r,f} \cdot(p_{r,f} - x_{r,f})^2$$
@@ -62,7 +62,7 @@ RecencyFrequencyScorer(df, user_col="user", item_col="item", datetime_col="datet
 | `df` | `pd.DataFrame` | — | 閲覧履歴 |
 | `user_col` | `str` | `"user"` | ユーザー識別子のカラム名 |
 | `item_col` | `str` | `"item"` | 商品識別子のカラム名 |
-| `datetime_col` | `str` | `"datetime"` | 閲覧日時のカラム名 |
+| `datetime_col` | `str` | `"datetime"` | 閲覧日付のカラム名 |
 
 内部では指定されたカラムを `user`・`item`・`datetime` に正規化して保持する（`interaction_log` 属性）。
 
@@ -76,7 +76,7 @@ RecencyFrequencyScorer(df, user_col="user", item_col="item", datetime_col="datet
 |-----------|-----|-----------|------|
 | `observation_period` | `tuple[str \| datetime, str \| datetime]` | — | 観測期間の開始日・終了日 |
 | `evaluation_period` | `tuple[str \| datetime, str \| datetime]` | — | 評価期間の開始日・終了日 |
-| `recency_limit` | `int \| None` | `None` | 最大最新度ランク。`None` の場合、累積再閲覧数の分布から `RECENCY_LIMIT_RATE` に基づいて自動決定 |
+| `recency_limit` | `int \| None` | `None` | 最大最新度。`None` の場合、累積再閲覧数の分布から `RECENCY_LIMIT_RATE` に基づいて自動決定 |
 | `frequency_limit` | `int \| None` | `None` | 最大頻度。`None` の場合、累積再閲覧数の分布から `FREQUENCY_LIMIT_RATE` に基づいて自動決定 |
 
 戻り値: `self`
