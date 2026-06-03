@@ -85,8 +85,23 @@ class RecencyFrequencyScorer:
         """
 
         # 観測期間の開始日と終了日、評価期間の開始日と終了日を datetime 型に変換
-        obs_start, obs_end = pd.to_datetime(observation_period)
-        eval_start, eval_end = pd.to_datetime(evaluation_period)
+        if len(observation_period) != 2:
+            raise ValueError("observation_period must be a tuple of (start, end).")
+        try:
+            obs_start, obs_end = pd.to_datetime(observation_period)
+        except (ValueError, TypeError) as e:
+            raise ValueError(
+                f"observation_period could not be parsed as dates: {observation_period}"
+            ) from e
+
+        if len(evaluation_period) != 2:
+            raise ValueError("evaluation_period must be a tuple of (start, end).")
+        try:
+            eval_start, eval_end = pd.to_datetime(evaluation_period)
+        except (ValueError, TypeError) as e:
+            raise ValueError(
+                f"evaluation_period could not be parsed as dates: {evaluation_period}"
+            ) from e
 
         # 観測期間の開始日と終了日、評価期間の開始日と終了日のバリデーション
         if obs_start > obs_end:
@@ -329,12 +344,95 @@ class RecencyFrequencyScorer:
         r = min(r, self.recency_limit)
         f = min(f, self.frequency_limit)
         if kind == 'empirical':
-            prob = self.empirical_probability_dict[r, f]
+            prob = self.empirical_probability_dict.get((r, f), 0.0)
         else:
             pass
         return prob
 
+    def transform(self, df, target_date, user_col='user', item_col='item', datetime_col='datetime'):
+        """Add recency, frequency, and revisit probability columns to a DataFrame.
 
+        Computes recency rank (r) and frequency (f) for each user-item pair
+        relative to target_date, then appends the corresponding revisit
+        probability from fit() results.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            User-item interaction history to score.
+        target_date : str or datetime
+            Reference date for computing recency and frequency.
+            Rows after this date are excluded.
+        user_col : str, optional
+            Column name for user. Defaults to the value used in __init__.
+        item_col : str, optional
+            Column name for item. Defaults to the value used in __init__.
+        datetime_col : str, optional
+            Column name for datetime. Defaults to the value used in __init__.
+
+        Returns
+        -------
+        pd.DataFrame
+            Copy of df with added columns: recency, frequency, probability.
+        """
+        if self.empirical_probability_dict is None:
+            raise RuntimeError("fit() must be called before transform().")
+
+        user_col = user_col or self._USER_COL
+        item_col = item_col or self._ITEM_COL
+        datetime_col = datetime_col or self._DATETIME_COL
+
+        # 基準日を datetime 型に変換
+        try:
+            target_date = pd.to_datetime(target_date)
+        except (ValueError, TypeError) as e:
+            raise ValueError(
+                f"target_date could not be parsed as a date: {target_date}"
+            ) from e
+
+        df_log = df[[user_col, item_col, datetime_col]].copy()
+        df_log.columns = [self._USER_COL, self._ITEM_COL, self._DATETIME_COL]
+
+        if not is_string_dtype(df_log[self._USER_COL]):
+            df_log[self._USER_COL] = df_log[self._USER_COL].astype(str)
+        if not is_string_dtype(df_log[self._ITEM_COL]):
+            df_log[self._ITEM_COL] = df_log[self._ITEM_COL].astype(str)
+        if not is_datetime64_any_dtype(df_log[self._DATETIME_COL]):
+            df_log[self._DATETIME_COL] = pd.to_datetime(df_log[self._DATETIME_COL])
+
+        # 基準日(target_date)までのレコードに絞る
+        df_log = df_log[df_log[self._DATETIME_COL] <= target_date]
+
+        # user と item ごとに最新度を計算
+        U2I2Recensys = {}
+        for row in df_log.itertuples():
+            recency = (target_date - row.datetime).days + 1
+            U2I2Recensys.setdefault(row.user, {})
+            U2I2Recensys[row.user].setdefault(row.item, [])
+            U2I2Recensys[row.user][row.item].append(recency)
+
+        # 最新度と頻度を計算し、上限値でクランプしたうえで再閲覧確率を付与
+        RowsInteraction = []
+        for user, I2Recencys in U2I2Recensys.items():
+            for item, Recencys in I2Recencys.items():
+                freq = len(Recencys)
+                rcen = min(Recencys)
+                freq_adj = min(freq, self.frequency_limit)
+                rcen_adj = min(rcen, self.recency_limit)
+                prob = self.empirical_probability_dict.get((rcen_adj, freq_adj), 0.0)
+                RowsInteraction.append((user, item, rcen, freq, prob))
+        df_rf = pd.DataFrame(
+            RowsInteraction, 
+            columns=[self._USER_COL, self._ITEM_COL, 'recency', 'frequency', 'probability']
+            )
+        # タイブレイクは後に出てきたitem（行番号が大きい）を優先（後に出てきた商品 item の方が履歴上で最新となる場合が多いと考えられるため）
+        df_rf = df_rf.sort_values(
+            [self._USER_COL, 'probability', df_rf.index.to_series()],
+            ascending=[True, False, False],
+        )
+        df_rf['order'] = df_rf.groupby(self._USER_COL).cumcount() + 1
+        df_rf = df_rf.rename(columns={self._USER_COL: user_col, self._ITEM_COL: item_col})
+        return df_rf
 
     def optimize(self):
         """Estimate optimized revisit probabilities under RF constraints.
@@ -346,25 +444,26 @@ class RecencyFrequencyScorer:
         -------
         self
         """
-        raise NotImplementedError
+        raise NotImplementedError     
+
+
 
 if __name__ == "__main__":
     print('=== scorer.py ===')
 
     # サンプルデータの取得
     df = pd.read_csv("../../examples/access_log.csv")
+    df_train = df[df.user_id.map(lambda x: x % 10 < 8)] # hash関数で簡易的に学習データ8割を抽出
+    df_test = df[df.user_id.map(lambda x: x % 10 >= 8)] # hash関数で簡易的にテストデータ2割を抽出
 
     # スコアリングインスタンスの作成
     scorer = RecencyFrequencyScorer(
-        df,
+        df_train,
         user_col = "user_id",
         item_col = "item_id",
         datetime_col = "date",
         )
     #print(scorer.interaction_log.head())
-
-    scorer.show()
-
 
     # 経験的再閲覧確率の計算
     #observation_period = ('2015-07-01', '2015-07-06')
@@ -375,3 +474,13 @@ if __name__ == "__main__":
 
     scorer.show()
 
+    target_date = '2015-07-07'
+    df_rec = scorer.transform(
+        df_test, 
+        target_date,
+        user_col = 'user_id',
+        item_col = 'item_id',
+        datetime_col = 'date'
+        )
+    
+    print(df_rec)
