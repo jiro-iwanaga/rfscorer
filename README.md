@@ -17,25 +17,21 @@ pip install rfscorer
 ## Usage
 
 ```python
-import pandas as pd
 from rfscorer import RecencyFrequencyScorer
 
-# df is a user-item interaction history
-# Required columns: user, item, datetime (column names can be customized)
-df = pd.read_csv("access_log.csv")
-scorer = RecencyFrequencyScorer(df, user_col="user", item_col="item", datetime_col="datetime")
+df_train = ...  # training interaction log (columns: user, item, datetime)
+df_test  = ...  # test interaction log  (columns: user, item, datetime)
 
-# Estimate empirical revisit probabilities from observed interactions.
+scorer = RecencyFrequencyScorer(df_train)
+
+# Estimate empirical revisit probabilities
 scorer.fit(
     observation_period=("2026-07-01", "2026-07-07"),
     evaluation_period=("2026-07-08", "2026-07-08"),
 )
 
-# Access the full probability table
-df_empirical = scorer.empirical_probability_
-
-# Get revisit probability for a specific (recency, frequency) pair
-prob = scorer.predict(r=1, f=3)
+# Score users: returns DataFrame with recency, frequency, probability, order per user-item pair
+df_rec = scorer.transform(df_test, target_date="2026-07-07")
 ```
 
 ## References
