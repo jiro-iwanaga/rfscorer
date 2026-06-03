@@ -50,8 +50,8 @@ RF スコアリング手法を Python パッケージとして PyPI に公開し
 
 | 属性 | 説明 |
 |------|------|
-| `empirical_probability_` | 経験的再閲覧確率。`pd.Series`（インデックス: `(r, f)`）。`fit()` 後にアクセス可能 |
-| `optimized_probability_` | 最適化再閲覧確率。`pd.Series`（インデックス: `(r, f)`）。`optimize()` 後にアクセス可能 |
+| `empirical_probability_` | 経験的再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `N`, `cv`, `probability`）。`fit()` 後にアクセス可能 |
+| `optimized_probability_` | 最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize()` 後にアクセス可能 |
 
 ### API
 
@@ -69,7 +69,7 @@ scorer.fit(
 df_empirical = scorer.empirical_probability_
 
 scorer.optimize()
-df_optimized = scorer.optimized_probability_.to_frame()
+df_optimized = scorer.optimized_probability_
 ```
 
 ## 非機能要求

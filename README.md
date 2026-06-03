@@ -30,8 +30,15 @@ scorer.fit(
     evaluation_period=("2026-07-08", "2026-07-08"),
 )
 
-# Score users: returns DataFrame with recency, frequency, probability, order per user-item pair
-df_rec = scorer.transform(df_test, target_date="2026-07-07")
+# Score with empirical probabilities
+# Returns DataFrame with recency, frequency, probability, order per user-item pair
+df_rec_emp = scorer.transform(df_test, target_date="2026-07-07", kind="empirical")
+
+# Estimate optimized probabilities under RF monotonicity constraints (optional)
+scorer.optimize()
+
+# Score with optimized probabilities
+df_rec_opt = scorer.transform(df_test, target_date="2026-07-07", kind="optimized")
 ```
 
 ## References

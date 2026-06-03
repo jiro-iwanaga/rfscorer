@@ -35,14 +35,17 @@
 | `RecencyFrequencyScorer` | RF スコアリングの主クラス。コンストラクタで閲覧履歴 DataFrame とカラム名を受け取る |
 | `fit(observation_period, evaluation_period, recency_limit=None, frequency_limit=None)` | 観測期間・評価期間を tuple で受け取り、経験的再閲覧確率を推定するメソッド。`recency_limit`・`frequency_limit` は省略時に累積再閲覧数から自動決定 |
 | `predict(r, f, kind='empirical')` | 指定した最新度 `r`・頻度 `f` の再閲覧確率を返すメソッド。`fit()` 後に利用可能 |
-| `transform(df, target_date, ...)` | 入力 DataFrame の各 user×item ペアに最新度・頻度・再閲覧確率・順位を付与して返すメソッド。`fit()` 後に利用可能 |
-| `evaluate(df_rec, ui_revisit, order=1, ...)` | 推薦結果と正解データを比較し precision・recall・f1 等の評価指標を返すメソッド |
+| `transform(df, target_date, kind='empirical', ...)` | 入力 DataFrame の各 user×item ペアに最新度・頻度・再閲覧確率・順位を付与して返すメソッド。`fit()` 後に利用可能。`kind='optimized'` を指定すると `optimize()` の結果を使用 |
+| `evaluate(df_rec, UIrevisit, order=1, ...)` | 推薦結果と正解データを比較し precision・recall・f1 等の評価指標を返すメソッド |
+| `plot_probability_surface(kind='empirical', path=None)` | 再閲覧確率を3次元ワイヤーフレームで可視化し PNG ファイルに保存するメソッド。`fit()` 後（`kind='optimized'` の場合は `optimize()` 後）に利用可能 |
 | `optimize()` | `fit()` の結果を用いて、RF 制約付きの最適化再閲覧確率を推定するメソッド |
 | `show()` | `fit()` 後の集計情報（レコード数・cv 数・期間・上限値）を標準出力に表示するデバッグ用メソッド |
 | `interaction_log` | コンストラクタで正規化した閲覧履歴。カラムは `user`・`item`・`datetime` |
 | `R` | `fit()` 後に参照できる最新度のリスト |
 | `F` | `fit()` 後に参照できる頻度のリスト |
 | `empirical_probability_` | `fit()` 後に参照できる経験的再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `N`, `cv`, `probability`） |
-| `empirical_probability_table` | `fit()` 後に参照できる経験的再閲覧確率（横持ち）。`pd.DataFrame`（インデックス: `recency`、カラム: `frequency`） |
-| `empirical_probability_dict` | `fit()` 後に参照できる経験的再閲覧確率。`dict`（キー: `(r, f)`） |
-| `optimized_probability_` | `optimize()` 後に参照できる最適化再閲覧確率。`pd.Series`（インデックス: `(r, f)`） |
+| `empirical_probability_table_` | `fit()` 後に参照できる経験的再閲覧確率（横持ち）。`pd.DataFrame`（インデックス: `recency`、カラム: `frequency`） |
+| `empirical_probability_dict_` | `fit()` 後に参照できる経験的再閲覧確率。`dict`（キー: `(r, f)`） |
+| `optimized_probability_` | `optimize()` 後に参照できる最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`） |
+| `optimized_probability_table_` | `optimize()` 後に参照できる最適化再閲覧確率（横持ち）。`pd.DataFrame`（インデックス: `recency`、カラム: `frequency`） |
+| `optimized_probability_dict_` | `optimize()` 後に参照できる最適化再閲覧確率。`dict`（キー: `(r, f)`） |

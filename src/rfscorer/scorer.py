@@ -47,8 +47,12 @@ class RecencyFrequencyScorer:
         self.F = [] # 頻度のリスト
 
         self.empirical_probability_ = None # 経験的再閲覧確率データフレーム(縦持ち)
-        self.empirical_probability_table = None # 経験的再閲覧確率データフレーム(横持ち)
-        self.empirical_probability_dict = None # 経験的再閲覧確率データフレーム(辞書:キーは最新度と頻度のペア)
+        self.empirical_probability_table_ = None # 経験的再閲覧確率データフレーム(横持ち)
+        self.empirical_probability_dict_ = None # 経験的再閲覧確率データフレーム(辞書:キーは最新度と頻度のペア)
+
+        self.optimized_probability_ = None # 最適化再閲覧確率データフレーム(縦持ち)
+        self.optimized_probability_table_ = None # 最適化再閲覧確率データフレーム(横持ち)
+        self.optimized_probability_dict_ = None # 最適化再閲覧確率データフレーム(辞書:キーは最新度と頻度のペア)
 
         # データ解析用
         self.record_num = len(self.interaction_log) # レコード数
@@ -240,7 +244,7 @@ class RecencyFrequencyScorer:
                 RowsRF.append(row_rf)
 
         # 経験的再閲覧確率辞書の作成
-        self.empirical_probability_dict = {(r, f): prob for r, f, _, _, prob in RowsRF}
+        self.empirical_probability_dict_ = {(r, f): prob for r, f, _, _, prob in RowsRF}
 
         # 経験的再閲覧確率データフレーム(縦持ち)の作成
         self.empirical_probability_ = pd.DataFrame(
@@ -249,7 +253,7 @@ class RecencyFrequencyScorer:
             )
 
         # 経験的再閲覧確率データフレーム(横持ち)の作成
-        self.empirical_probability_table = self.empirical_probability_.pivot_table(
+        self.empirical_probability_table_ = self.empirical_probability_.pivot_table(
             index='recency', 
             columns='frequency', 
             values='probability',
@@ -285,9 +289,9 @@ class RecencyFrequencyScorer:
         if self.total_cv_org and self.total_cv:
             print('total_cv: {} -> {}'.format(self.total_cv_org, self.total_cv))
 
-        if self.empirical_probability_table is not None:
-            print('empirical_probability_table:')
-            print(self.empirical_probability_table.round(3).to_string())
+        if self.empirical_probability_table_ is not None:
+            print('empirical_probability_table_:')
+            print(self.empirical_probability_table_.round(3).to_string())
 
 
 
@@ -314,8 +318,10 @@ class RecencyFrequencyScorer:
 
         if kind not in ('empirical', 'optimized'):
             raise ValueError(f"kind must be 'empirical' or 'optimized', got '{kind}'.")
-        if kind == 'empirical' and self.empirical_probability_table is None:
+        if kind == 'empirical' and self.empirical_probability_table_ is None:
             raise RuntimeError("fit() must be called before plot_probability_surface().")
+        if kind == 'optimized' and self.optimized_probability_table_ is None:
+            raise RuntimeError("optimize() must be called before plot_probability_surface(kind='optimized').")
 
         from pathlib import Path
         default_filename = f'{kind}_probability_surface.png'
@@ -325,7 +331,11 @@ class RecencyFrequencyScorer:
             p = Path(path)
             output_path = p / default_filename if p.is_dir() else p
 
-        table = self.empirical_probability_table
+        table = (
+            self.empirical_probability_table_
+            if kind == 'empirical'
+            else self.optimized_probability_table_
+        )
 
         recency = table.index.tolist()
         frequency = table.columns.tolist()
@@ -354,7 +364,7 @@ class RecencyFrequencyScorer:
         f : int
             Frequency.
         kind : {'empirical', 'optimized'}, default 'empirical'
-            Which probability to use. 'empirical' uses empirical_probability_dict
+            Which probability to use. 'empirical' uses empirical_probability_dict_
             estimated by fit(). 'optimized' uses the result of optimize().
 
         Returns
@@ -370,23 +380,25 @@ class RecencyFrequencyScorer:
             raise TypeError("f must be a positive integer.")
         if kind not in ('empirical', 'optimized'):
             raise ValueError(f"kind must be 'empirical' or 'optimized', got '{kind}'.")
-        if kind == 'empirical' and self.empirical_probability_dict is None:
+        if kind == 'empirical' and self.empirical_probability_dict_ is None:
             raise RuntimeError("fit() must be called before predict().")
+        if kind == 'optimized' and self.optimized_probability_dict_ is None:
+            raise RuntimeError("optimize() must be called before predict(kind='optimized').")
 
         r = min(r, self.recency_limit)
         f = min(f, self.frequency_limit)
         if kind == 'empirical':
-            prob = self.empirical_probability_dict.get((r, f), 0.0)
+            prob = self.empirical_probability_dict_.get((r, f), 0.0)
         else:
-            pass
+            prob = self.optimized_probability_dict_.get((r, f), 0.0)
         return prob
 
-    def transform(self, df, target_date, user_col='user', item_col='item', datetime_col='datetime'):
+    def transform(self, df, target_date, kind='empirical', user_col='user', item_col='item', datetime_col='datetime'):
         """Add recency, frequency, and revisit probability columns to a DataFrame.
 
         Computes recency rank (r) and frequency (f) for each user-item pair
         relative to target_date, then appends the corresponding revisit
-        probability from fit() results.
+        probability from fit() or optimize() results.
 
         Parameters
         ----------
@@ -395,6 +407,8 @@ class RecencyFrequencyScorer:
         target_date : str or datetime
             Reference date for computing recency and frequency.
             Rows after this date are excluded.
+        kind : {'empirical', 'optimized'}, default 'empirical'
+            Which probability to use.
         user_col : str, optional
             Column name for user. Defaults to the value used in __init__.
         item_col : str, optional
@@ -407,8 +421,12 @@ class RecencyFrequencyScorer:
         pd.DataFrame
             Copy of df with added columns: recency, frequency, probability.
         """
-        if self.empirical_probability_dict is None:
+        if kind not in ('empirical', 'optimized'):
+            raise ValueError(f"kind must be 'empirical' or 'optimized', got '{kind}'.")
+        if self.empirical_probability_dict_ is None:
             raise RuntimeError("fit() must be called before transform().")
+        if kind == 'optimized' and self.optimized_probability_dict_ is None:
+            raise RuntimeError("optimize() must be called before transform(kind='optimized').")
 
         user_col = user_col or self._USER_COL
         item_col = item_col or self._ITEM_COL
@@ -451,7 +469,12 @@ class RecencyFrequencyScorer:
                 rcen = min(Recencys)
                 freq_adj = min(freq, self.frequency_limit)
                 rcen_adj = min(rcen, self.recency_limit)
-                prob = self.empirical_probability_dict.get((rcen_adj, freq_adj), 0.0)
+                prob_dict = (
+                    self.empirical_probability_dict_
+                    if kind == 'empirical'
+                    else self.optimized_probability_dict_
+                )
+                prob = prob_dict.get((rcen_adj, freq_adj), 0.0)
                 RowsInteraction.append((user, item, rcen, freq, prob))
         df_rf = pd.DataFrame(
             RowsInteraction, 
@@ -531,13 +554,73 @@ class RecencyFrequencyScorer:
         """Estimate optimized revisit probabilities under RF constraints.
 
         Solves a convex quadratic programming problem with recency and
-        frequency monotonicity constraints.
+        frequency monotonicity constraints (Recency constraint: lower recency
+        rank implies higher probability; Frequency constraint: higher frequency
+        implies higher probability). Uses weighted least squares as objective.
+
+        Requires fit() to be called first. Depends on cvxpy.
 
         Returns
         -------
         self
         """
-        raise NotImplementedError     
+        import cvxpy as cp
+
+        if self.empirical_probability_dict_ is None:
+            raise RuntimeError("fit() must be called before optimize().")
+
+        nr = len(self.R)
+        nf = len(self.F)
+
+        # 決定変数: x[r_idx, f_idx] (0-indexed)
+        x = cp.Variable((nr, nf))
+
+        constraints = []
+
+        # Recency 制約: r < r' => x[r,f] >= x[r',f]  (小さい r ほど高確率)
+        for r_idx in range(nr - 1):
+            for f_idx in range(nf):
+                constraints.append(x[r_idx, f_idx] >= x[r_idx + 1, f_idx])
+
+        # Frequency 制約: f < f' => x[r,f] <= x[r,f']  (大きい f ほど高確率)
+        for r_idx in range(nr):
+            for f_idx in range(nf - 1):
+                constraints.append(x[r_idx, f_idx] <= x[r_idx, f_idx + 1])
+
+        # 目的関数: Σ N_{r,f} * (x[r,f] - p_{r,f})^2
+        objectives = []
+        for r_idx, r in enumerate(self.R):
+            for f_idx, f in enumerate(self.F):
+                N = self.empirical_probability_[
+                    (self.empirical_probability_.recency == r)
+                    & (self.empirical_probability_.frequency == f)
+                ]['N'].values[0]
+                p = self.empirical_probability_dict_[(r, f)]
+                objectives.append(N * (x[r_idx, f_idx] - p) ** 2)
+
+        problem = cp.Problem(cp.Minimize(cp.sum(objectives)), constraints)
+        problem.solve()
+
+        # 結果を属性に格納
+        rows = []
+        opt_dict = {}
+        for r_idx, r in enumerate(self.R):
+            for f_idx, f in enumerate(self.F):
+                prob = float(x.value[r_idx, f_idx])
+                rows.append((r, f, prob))
+                opt_dict[(r, f)] = prob
+
+        self.optimized_probability_dict_ = opt_dict
+        self.optimized_probability_ = pd.DataFrame(
+            rows, columns=['recency', 'frequency', 'probability']
+        )
+        self.optimized_probability_table_ = self.optimized_probability_.pivot_table(
+            index='recency',
+            columns='frequency',
+            values='probability',
+        )
+
+        return self
 
 
 
@@ -566,21 +649,41 @@ if __name__ == "__main__":
     scorer.fit(observation_period, evaluation_period)
 
     scorer.show()
-    scorer.plot_probability_surface()
+    scorer.plot_probability_surface('empirical')
+
+    scorer.optimize()
+    scorer.plot_probability_surface('optimized')
 
     target_date = '2015-07-07'
     df_test_obs = df_test[df_test.date <= target_date]
     df_test_eval = df_test[df_test.date > target_date]
-    df_rec = scorer.transform(
+    UIrevisit = set([(row.user_id, row.item_id) for row in df_test_eval.itertuples()])
+
+    df_rec_emp = scorer.transform(
         df_test_obs, 
         target_date,
+        'empirical',
         user_col = 'user_id',
         item_col = 'item_id',
         datetime_col = 'date'
         )
     
-    print(df_rec)
-    UIrevisit = set([(row.user_id, row.item_id) for row in df_test_eval.itertuples()])
+    print('--- empirical ---')
+    #print(df_rec_emp)
+    df_eval_emp = scorer.evaluate(df_rec_emp, UIrevisit, order=10)
+    print(df_eval_emp)
 
-    df_eval = scorer.evaluate(df_rec, UIrevisit, order=10)
-    print(df_eval)
+    df_rec_opt = scorer.transform(
+        df_test_obs, 
+        target_date,
+        'optimized',
+        user_col = 'user_id',
+        item_col = 'item_id',
+        datetime_col = 'date'
+        )
+
+    print('--- optimized ---')
+    #print(df_rec_opt)
+    df_eval_opt = scorer.evaluate(df_rec_opt, UIrevisit, order=10)
+    print(df_eval_opt)
+

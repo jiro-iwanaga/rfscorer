@@ -32,7 +32,7 @@ $$p_{r,f} := \frac{n_{r,f}}{N_{r,f}}\ \ \  (r\in R, f\in F)$$
 
 ### 最適化再閲覧確率の推定
 
-経験的確率 $p_{ui}$ を基準として、以下の RF 単調性制約を満たす確率 $q_{ui}$ を求める。
+経験的確率 $p_{r,f}$ を基準として、以下の RF 単調性制約を満たす確率 $x_{r,f}$ を求める。
 
 **RF制約**
 - **Recency 制約（最新度の単調性）**  
@@ -93,7 +93,7 @@ RecencyFrequencyScorer(df, user_col="user", item_col="item", datetime_col="datet
 
 戻り値: `float`
 
-##### `transform(df, target_date, user_col=None, item_col=None, datetime_col=None)`
+##### `transform(df, target_date, kind='empirical', user_col=None, item_col=None, datetime_col=None)`
 
 入力 DataFrame の各 user×item ペアに最新度・頻度・再閲覧確率・順位を付与して返す。
 
@@ -101,29 +101,41 @@ RecencyFrequencyScorer(df, user_col="user", item_col="item", datetime_col="datet
 |-----------|-----|-----------|------|
 | `df` | `pd.DataFrame` | — | スコアリング対象の閲覧履歴 |
 | `target_date` | `str \| datetime` | — | 最新度・頻度の計算基準日 |
+| `kind` | `str` | `'empirical'` | `'empirical'` または `'optimized'` |
 | `user_col` | `str \| None` | `None` | ユーザーカラム名（省略時は `__init__` のデフォルト） |
 | `item_col` | `str \| None` | `None` | 商品カラム名（省略時は `__init__` のデフォルト） |
 | `datetime_col` | `str \| None` | `None` | 日付カラム名（省略時は `__init__` のデフォルト） |
 
 戻り値: `pd.DataFrame`（カラム: `user`, `item`, `recency`, `frequency`, `probability`, `order`）
 
-##### `evaluate(df_rec, ui_revisit, order=1, user_col=None, item_col=None)`
+##### `evaluate(df_rec, UIrevisit, order=1, user_col=None, item_col=None)`
 
 推薦結果と正解データを比較し、各順位カットオフでの評価指標を返す。
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
 | `df_rec` | `pd.DataFrame` | — | `transform()` の出力 |
-| `ui_revisit` | `set` | — | 実際に再閲覧された `(user, item)` ペアの集合 |
+| `UIrevisit` | `set` | — | 実際に再閲覧された `(user, item)` ペアの集合 |
 | `order` | `int` | `1` | 評価する最大推薦順位 |
 
 戻り値: `pd.DataFrame`（カラム: `order`, `n_recommended`, `n_hit`, `precision`, `recall`, `f1`, `recall_norm`, `f1_norm`）
 
 ##### `optimize()`
 
-RF 制約を満たす最適化再閲覧確率を推定する。`fit()` の後に呼び出す。
+RF 単調性制約（Recency・Frequency）を満たす最適化再閲覧確率を推定する。`fit()` の後に呼び出す。cvxpy を使用して凸2次計画問題を解く。
 
 戻り値: `self`
+
+##### `plot_probability_surface(kind='empirical', path=None)`
+
+再閲覧確率を3次元ワイヤーフレームで可視化し PNG ファイルに保存する。
+
+| パラメータ | 型 | デフォルト | 説明 |
+|-----------|-----|-----------|------|
+| `kind` | `str` | `'empirical'` | `'empirical'` または `'optimized'` |
+| `path` | `str \| None` | `None` | 出力先。`None` の場合カレントディレクトリに `{kind}_probability_surface.png` を出力。ディレクトリを指定した場合はそのディレクトリにデフォルトファイル名で出力 |
+
+戻り値: なし
 
 ##### `show()`
 
@@ -141,9 +153,11 @@ RF 制約を満たす最適化再閲覧確率を推定する。`fit()` の後に
 | `R` | `list[int]` | 最新度のリスト（`range(1, recency_limit+1)`） | `fit()` 後 |
 | `F` | `list[int]` | 頻度のリスト（`range(1, frequency_limit+1)`） | `fit()` 後 |
 | `empirical_probability_` | `pd.DataFrame` | 経験的再閲覧確率（カラム: `recency`, `frequency`, `N`, `cv`, `probability`） | `fit()` 後 |
-| `empirical_probability_table` | `pd.DataFrame` | 経験的再閲覧確率（横持ち。インデックス: `recency`、カラム: `frequency`） | `fit()` 後 |
-| `empirical_probability_dict` | `dict` | 経験的再閲覧確率（キー: `(r, f)`、値: `probability`） | `fit()` 後 |
-| `optimized_probability_` | `pd.Series` | 最適化再閲覧確率。インデックスは `(r, f)` | `optimize()` 後 |
+| `empirical_probability_table_` | `pd.DataFrame` | 経験的再閲覧確率（横持ち。インデックス: `recency`、カラム: `frequency`） | `fit()` 後 |
+| `empirical_probability_dict_` | `dict` | 経験的再閲覧確率（キー: `(r, f)`、値: `probability`） | `fit()` 後 |
+| `optimized_probability_` | `pd.DataFrame` | 最適化再閲覧確率（カラム: `recency`, `frequency`, `probability`） | `optimize()` 後 |
+| `optimized_probability_table_` | `pd.DataFrame` | 最適化再閲覧確率（横持ち。インデックス: `recency`、カラム: `frequency`） | `optimize()` 後 |
+| `optimized_probability_dict_` | `dict` | 最適化再閲覧確率（キー: `(r, f)`、値: `probability`） | `optimize()` 後 |
 | `record_num` | `int` | 全閲覧履歴のレコード数 | `__init__()` 後 |
 | `record_num_obs` | `int` | 観測期間のレコード数 | `fit()` 後 |
 | `record_num_eval` | `int` | 評価期間のレコード数 | `fit()` 後 |
@@ -166,16 +180,16 @@ r（最新度ランク）・f（頻度）を算出
 (r, f) 別に n_{r,f}・N_{r,f} を集計
 p_{r,f} = n_{r,f} / N_{r,f}
         ▼
-empirical_probability_ / empirical_probability_table / empirical_probability_dict
+empirical_probability_ / empirical_probability_table_ / empirical_probability_dict_
         │
-        ├─  predict(r, f)  ─→ 特定 (r, f) の再閲覧確率を返す
+        ├─  predict(r, f, kind)  ─→ 特定 (r, f) の再閲覧確率を返す
         │
-        ├─  transform(df, target_date)  ─→ user×item に r・f・確率・順位を付与
+        ├─  transform(df, target_date, kind)  ─→ user×item に r・f・確率・順位を付与
         │
         ▼  optimize()
 RF 制約付き凸2次計画問題を求解
         ▼
-optimized_probability_
+optimized_probability_ / optimized_probability_table_ / optimized_probability_dict_
 ```
 
 ## 入出力例
