@@ -66,7 +66,7 @@ scorer.fit(
     observation_period=("2015-07-02", "2015-07-06"),
     evaluation_period=("2015-07-07", "2015-07-08"),
 )
-df_empirical = scorer.empirical_probability_.to_frame()
+df_empirical = scorer.empirical_probability_
 
 scorer.optimize()
 df_optimized = scorer.optimized_probability_.to_frame()
