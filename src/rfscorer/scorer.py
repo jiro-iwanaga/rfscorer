@@ -49,6 +49,8 @@ class RecencyFrequencyScorer:
         self.F = [] # 頻度のリスト
 
         self.empirical_probability_ = None # 経験的再閲覧確率データフレーム(縦持ち)
+        self.empirical_probability_table = None # 経験的再閲覧確率データフレーム(横持ち)
+        self.empirical_probability_dict = None # 経験的再閲覧確率データフレーム(辞書:キーは最新度と頻度のペア)
 
         # データ解析用
         self.record_num = len(self.interaction_log) # レコード数
@@ -223,13 +225,23 @@ class RecencyFrequencyScorer:
                     prob = 0.0
                 row_rf = (r, f, RF2N[r,f], RF2CV[r,f], prob)
                 RowsRF.append(row_rf)
+
+        # 経験的再閲覧確率辞書の作成
+        self.empirical_probability_dict = {(r, f): prob for r, f, _, _, prob in RowsRF}
+
+        # 経験的再閲覧確率データフレーム(縦持ち)の作成
         self.empirical_probability_ = pd.DataFrame(
-            RowsRF, 
+            RowsRF,
             columns = ['recency', 'frequency', 'N', 'cv', 'probability']
             )
 
-        #print(self.empirical_probability_.shape)
-        #print(self.empirical_probability_)
+        # 経験的再閲覧確率データフレーム(横持ち)の作成
+        self.empirical_probability_table = self.empirical_probability_.pivot_table(
+            index='recency', 
+            columns='frequency', 
+            values='probability',
+            )        
+
         #self.df_table_empirical = self.empirical_probability_.pivot_table(index='recency', columns='frequency', values='probability')
         #print(self.df_table_empirical)
 
