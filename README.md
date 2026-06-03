@@ -27,14 +27,15 @@ scorer = RecencyFrequencyScorer(df, user_col="user", item_col="item", datetime_c
 
 # Estimate empirical revisit probabilities from observed interactions.
 scorer.fit(
-    observation_period=("2015-07-01", "2015-07-07"),
-    evaluation_period=("2015-07-08", "2015-07-08"),
+    observation_period=("2026-07-01", "2026-07-07"),
+    evaluation_period=("2026-07-08", "2026-07-08"),
 )
+
+# Access the full probability table
 df_empirical = scorer.empirical_probability_
 
-# Estimate optimized probabilities under RF monotonicity constraints.
-scorer.optimize()
-df_optimized = scorer.optimized_probability_.to_frame()
+# Get revisit probability for a specific (recency, frequency) pair
+prob = scorer.predict(r=1, f=3)
 ```
 
 ## References
