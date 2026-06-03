@@ -1,7 +1,5 @@
 import pandas as pd
 from pandas.api.types import is_datetime64_any_dtype, is_string_dtype
-#import numpy as np
-#import matplotlib.pyplot as plt
 
 class RecencyFrequencyScorer:
     """Recency-Frequency based recommendation scorer.
@@ -257,25 +255,6 @@ class RecencyFrequencyScorer:
             values='probability',
             )        
 
-        #self.df_table_empirical = self.empirical_probability_.pivot_table(index='recency', columns='frequency', values='probability')
-        #print(self.df_table_empirical)
-
-
-        #Frequency = df_rf['frequency'].unique().tolist()
-        #Recency = df_rf['recency'].unique().tolist()
-        #Z = [df_rf[(df_rf['frequency']==freq) & (df_rf['recency']==rcen)]['probability'].iloc[0] for freq in Frequency for rcen in Recency]
-        #Z = np.array(Z).reshape((len(Frequency), len(Recency)))
-        #X, Y = np.meshgrid(Recency, Frequency)  
-        #fig = plt.figure()
-        #ax = fig.add_subplot(
-        #    111, 
-        #    projection='3d',
-        #    xlabel='recency',
-        #    ylabel='frequency',
-        #    zlabel='probability',
-        #    )
-        #ax.plot_wireframe(X, Y, Z)        
-
         return self
     
     
@@ -311,6 +290,59 @@ class RecencyFrequencyScorer:
             print(self.empirical_probability_table.round(3).to_string())
 
 
+
+    def plot_probability_surface(self, kind='empirical', path=None):
+        """Plot revisit probabilities as a 3D surface and save to file.
+
+        Visualizes the probability table as a 3D wireframe with recency on
+        the x-axis, frequency on the y-axis, and probability on the z-axis.
+
+        Parameters
+        ----------
+        kind : {'empirical', 'optimized'}, default 'empirical'
+            Which probability to visualize.
+        path : str or None, default None
+            Output file path for the PNG image. If None, saves as
+            '{kind}_probability_surface.png' in the current directory.
+
+        Returns
+        -------
+        None
+        """
+        import numpy as np
+        import matplotlib.pyplot as plt
+
+        if kind not in ('empirical', 'optimized'):
+            raise ValueError(f"kind must be 'empirical' or 'optimized', got '{kind}'.")
+        if kind == 'empirical' and self.empirical_probability_table is None:
+            raise RuntimeError("fit() must be called before plot_probability_surface().")
+
+        from pathlib import Path
+        default_filename = f'{kind}_probability_surface.png'
+        if path is None:
+            output_path = Path(default_filename)
+        else:
+            p = Path(path)
+            output_path = p / default_filename if p.is_dir() else p
+
+        table = self.empirical_probability_table
+
+        recency = table.index.tolist()
+        frequency = table.columns.tolist()
+        X, Y = np.meshgrid(recency, frequency)
+        Z = table.values.T
+
+        fig = plt.figure()
+        ax = fig.add_subplot(
+            111,
+            projection='3d',
+            xlabel='recency',
+            ylabel='frequency',
+            zlabel='probability',
+        )
+        ax.plot_wireframe(X, Y, Z)
+        plt.savefig(output_path)
+        plt.close(fig)
 
     def predict(self, r, f, kind='empirical'):
         """Return the revisit probability for a given recency and frequency.
@@ -534,6 +566,7 @@ if __name__ == "__main__":
     scorer.fit(observation_period, evaluation_period)
 
     scorer.show()
+    scorer.plot_probability_surface()
 
     target_date = '2015-07-07'
     df_test_obs = df_test[df_test.date <= target_date]
