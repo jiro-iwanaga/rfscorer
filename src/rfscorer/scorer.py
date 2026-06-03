@@ -291,6 +291,10 @@ class RecencyFrequencyScorer:
         if self.total_cv_org and self.total_cv:
             print('total_cv: {} -> {}'.format(self.total_cv_org, self.total_cv))
 
+        if self.empirical_probability_table is not None:
+            print('empirical_probability_table:')
+            print(self.empirical_probability_table.round(3).to_string())
+
 
 
     def optimize(self):
