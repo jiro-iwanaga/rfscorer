@@ -297,6 +297,45 @@ class RecencyFrequencyScorer:
 
 
 
+    def predict(self, r, f, kind='empirical'):
+        """Return the revisit probability for a given recency and frequency.
+
+        Parameters
+        ----------
+        r : int
+            Recency rank.
+        f : int
+            Frequency.
+        kind : {'empirical', 'optimized'}, default 'empirical'
+            Which probability to use. 'empirical' uses empirical_probability_dict
+            estimated by fit(). 'optimized' uses the result of optimize().
+
+        Returns
+        -------
+        float
+            Revisit probability for the given (r, f).
+        """
+
+        # 最新度 r と頻度 f のバリデーション
+        if not isinstance(r, int) or r < 1:
+            raise TypeError("r must be a positive integer.")
+        if not isinstance(f, int) or f < 1:
+            raise TypeError("f must be a positive integer.")
+        if kind not in ('empirical', 'optimized'):
+            raise ValueError(f"kind must be 'empirical' or 'optimized', got '{kind}'.")
+        if kind == 'empirical' and self.empirical_probability_dict is None:
+            raise RuntimeError("fit() must be called before predict().")
+
+        r = min(r, self.recency_limit)
+        f = min(f, self.frequency_limit)
+        if kind == 'empirical':
+            prob = self.empirical_probability_dict[r, f]
+        else:
+            pass
+        return prob
+
+
+
     def optimize(self):
         """Estimate optimized revisit probabilities under RF constraints.
 
