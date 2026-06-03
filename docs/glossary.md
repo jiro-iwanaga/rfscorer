@@ -19,9 +19,9 @@
 | RF | Recency-Frequency | 最新度と頻度の2つの行動シグナルを指す。Random Forest ではない |
 | 最新度 | recency / $r$ | 観測期間における、ユーザーが最後に閲覧した日時の新しさをランクで表した値。1 が最も直近。$r \in R$（$R$ は観測されたすべての最新度ランクの集合） |
 | 頻度 | frequency / $f$ | 観測期間における、ユーザーによる商品の閲覧回数。$f \in F$（$F$ は観測されたすべての頻度の集合） |
-| 再閲覧確率 | re-view probability | 観測期間で最新度 $r$・頻度 $f$ であった商品が、評価期間に再閲覧される確率 |
-| 経験的再閲覧確率 | empirical re-view probability / $p_{r,f}$ | $p_{r,f} = n_{r,f} / N_{r,f}$。観測データから直接算出した再閲覧確率 |
-| 最適化再閲覧確率 | optimized re-view probability / $x_{r,f}$ | RF 制約（単調性制約）と最小二乗誤差を目的関数とする凸2次計画問題を解いて得られる再閲覧確率 |
+| 再閲覧確率 | revisit probability | 観測期間で最新度 $r$・頻度 $f$ であった商品が、評価期間に再閲覧される確率 |
+| 経験的再閲覧確率 | empirical revisit probability / $p_{r,f}$ | $p_{r,f} = n_{r,f} / N_{r,f}$。観測データから直接算出した再閲覧確率 |
+| 最適化再閲覧確率 | optimized revisit probability / $x_{r,f}$ | RF 制約（単調性制約）と最小二乗誤差を目的関数とする凸2次計画問題を解いて得られる再閲覧確率 |
 | $n_{r,f}$ | — | 観測期間で最新度 $r$・頻度 $f$ であった商品が、評価期間に再閲覧された回数の合計 |
 | $N_{r,f}$ | — | 観測期間で最新度 $r$・頻度 $f$ であった商品の閲覧回数の合計 |
 | RF 制約 | RF constraints | 最適化再閲覧確率に課す単調性制約の総称。Recency 制約と Frequency 制約からなる |

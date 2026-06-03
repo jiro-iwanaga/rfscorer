@@ -6,7 +6,7 @@ from pandas.api.types import is_datetime64_any_dtype
 class RecencyFrequencyScorer:
     """Recency-Frequency based recommendation scorer.
 
-    Estimates re-view probabilities from user-item interaction histories
+    Estimates revisit probabilities from user-item interaction histories
     using recency and frequency as behavioral signals.
     """
 
@@ -53,7 +53,7 @@ class RecencyFrequencyScorer:
 
 
     def fit(self, observation_period, evaluation_period, recency_limit=None, frequency_limit=None):
-        """Estimate empirical re-view probabilities from interaction history.
+        """Estimate empirical revisit probabilities from interaction history.
 
         Parameters
         ----------
@@ -220,7 +220,7 @@ class RecencyFrequencyScorer:
         return self
 
     def optimize(self):
-        """Estimate optimized re-view probabilities under RF constraints.
+        """Estimate optimized revisit probabilities under RF constraints.
 
         Solves a convex quadratic programming problem with recency and
         frequency monotonicity constraints.
