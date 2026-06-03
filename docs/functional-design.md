@@ -68,14 +68,16 @@ RecencyFrequencyScorer(df, user_col="user", item_col="item", datetime_col="datet
 
 #### メソッド
 
-##### `fit(observation_period, evaluation_period)`
+##### `fit(observation_period, evaluation_period, recency_limit=None, frequency_limit=None)`
 
 観測期間・評価期間に基づき、$(r, f)$ 別の経験的再閲覧確率を推定する。
 
-| パラメータ | 型 | 説明 |
-|-----------|-----|------|
-| `observation_period` | `tuple[str \| datetime, str \| datetime]` | 観測期間の開始日・終了日 |
-| `evaluation_period` | `tuple[str \| datetime, str \| datetime]` | 評価期間の開始日・終了日 |
+| パラメータ | 型 | デフォルト | 説明 |
+|-----------|-----|-----------|------|
+| `observation_period` | `tuple[str \| datetime, str \| datetime]` | — | 観測期間の開始日・終了日 |
+| `evaluation_period` | `tuple[str \| datetime, str \| datetime]` | — | 評価期間の開始日・終了日 |
+| `recency_limit` | `int \| None` | `None` | 最大最新度ランク。`None` の場合、累積再閲覧数の分布から `RECENCY_LIMIT_RATE` に基づいて自動決定 |
+| `frequency_limit` | `int \| None` | `None` | 最大頻度。`None` の場合、累積再閲覧数の分布から `FREQUENCY_LIMIT_RATE` に基づいて自動決定 |
 
 戻り値: `self`
 
