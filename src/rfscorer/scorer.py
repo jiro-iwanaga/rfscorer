@@ -426,12 +426,19 @@ class RecencyFrequencyScorer:
             columns=[self._USER_COL, self._ITEM_COL, 'recency', 'frequency', 'probability']
             )
         # タイブレイクは後に出てきたitem（行番号が大きい）を優先（後に出てきた商品 item の方が履歴上で最新となる場合が多いと考えられるため）
+        df_rf['_order'] = range(len(df_rf))
         df_rf = df_rf.sort_values(
-            [self._USER_COL, 'probability', df_rf.index.to_series()],
+            [self._USER_COL, 'probability', '_order'],
             ascending=[True, False, False],
         )
+        df_rf = df_rf.drop(columns='_order')
         df_rf['order'] = df_rf.groupby(self._USER_COL).cumcount() + 1
         df_rf = df_rf.rename(columns={self._USER_COL: user_col, self._ITEM_COL: item_col})
+
+        # 入力 df の元の dtype に戻す
+        df_rf[user_col] = df_rf[user_col].astype(df[user_col].dtype)
+        df_rf[item_col] = df_rf[item_col].astype(df[item_col].dtype)
+
         return df_rf
 
     def optimize(self):
@@ -475,8 +482,10 @@ if __name__ == "__main__":
     scorer.show()
 
     target_date = '2015-07-07'
+    df_test_obs = df_test[df_test.date <= target_date]
+    df_test_eval = df_test[df_test.date > target_date]
     df_rec = scorer.transform(
-        df_test, 
+        df_test_obs, 
         target_date,
         user_col = 'user_id',
         item_col = 'item_id',
@@ -484,3 +493,8 @@ if __name__ == "__main__":
         )
     
     print(df_rec)
+    UIrec = set([(row.user_id, row.item_id) for row in df_rec.itertuples() if row.order==1])
+    UIrevisit = set([(row.user_id, row.item_id) for row in df_test_eval.itertuples()])
+    print(len(UIrec))
+    print(len(UIrevisit))
+    print(len(UIrec & UIrevisit))
