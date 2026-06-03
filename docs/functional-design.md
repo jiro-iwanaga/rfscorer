@@ -41,7 +41,7 @@ $$r < r' \implies x_{r,f} \geq x_{r',f}\ \ \ (r, r'\in R) $$
 - **Frequency 制約（頻度の単調性）**  
 頻度が高い（閲覧数が多い）商品ほど再閲覧確率が高い。
 
-$$f < f' \implies x_{r,f} \leq x_{r',f}\ \ \ (f, f'\in R) $$
+$$f < f' \implies x_{r,f} \leq x_{r',f}\ \ \ (f, f'\in F) $$
 
 **目的関数(最小二乗誤差)**
 $$\sum_{r\in R, f\in F} N_{r,f} \cdot(p_{r,f} - x_{r,f})^2$$
@@ -81,6 +81,44 @@ RecencyFrequencyScorer(df, user_col="user", item_col="item", datetime_col="datet
 
 戻り値: `self`
 
+##### `predict(r, f, kind='empirical')`
+
+指定した最新度 $r$・頻度 $f$ の再閲覧確率を返す。
+
+| パラメータ | 型 | デフォルト | 説明 |
+|-----------|-----|-----------|------|
+| `r` | `int` | — | 最新度ランク（1以上） |
+| `f` | `int` | — | 頻度（1以上） |
+| `kind` | `str` | `'empirical'` | `'empirical'` または `'optimized'` |
+
+戻り値: `float`
+
+##### `transform(df, target_date, user_col=None, item_col=None, datetime_col=None)`
+
+入力 DataFrame の各 user×item ペアに最新度・頻度・再閲覧確率・順位を付与して返す。
+
+| パラメータ | 型 | デフォルト | 説明 |
+|-----------|-----|-----------|------|
+| `df` | `pd.DataFrame` | — | スコアリング対象の閲覧履歴 |
+| `target_date` | `str \| datetime` | — | 最新度・頻度の計算基準日 |
+| `user_col` | `str \| None` | `None` | ユーザーカラム名（省略時は `__init__` のデフォルト） |
+| `item_col` | `str \| None` | `None` | 商品カラム名（省略時は `__init__` のデフォルト） |
+| `datetime_col` | `str \| None` | `None` | 日付カラム名（省略時は `__init__` のデフォルト） |
+
+戻り値: `pd.DataFrame`（カラム: `user`, `item`, `recency`, `frequency`, `probability`, `order`）
+
+##### `evaluate(df_rec, ui_revisit, order=1, user_col=None, item_col=None)`
+
+推薦結果と正解データを比較し、各順位カットオフでの評価指標を返す。
+
+| パラメータ | 型 | デフォルト | 説明 |
+|-----------|-----|-----------|------|
+| `df_rec` | `pd.DataFrame` | — | `transform()` の出力 |
+| `ui_revisit` | `set` | — | 実際に再閲覧された `(user, item)` ペアの集合 |
+| `order` | `int` | `1` | 評価する最大推薦順位 |
+
+戻り値: `pd.DataFrame`（カラム: `order`, `n_recommended`, `n_hit`, `precision`, `recall`, `f1`, `recall_norm`, `f1_norm`）
+
 ##### `optimize()`
 
 RF 制約を満たす最適化再閲覧確率を推定する。`fit()` の後に呼び出す。
@@ -103,6 +141,8 @@ RF 制約を満たす最適化再閲覧確率を推定する。`fit()` の後に
 | `R` | `list[int]` | 最新度のリスト（`range(1, recency_limit+1)`） | `fit()` 後 |
 | `F` | `list[int]` | 頻度のリスト（`range(1, frequency_limit+1)`） | `fit()` 後 |
 | `empirical_probability_` | `pd.DataFrame` | 経験的再閲覧確率（カラム: `recency`, `frequency`, `N`, `cv`, `probability`） | `fit()` 後 |
+| `empirical_probability_table` | `pd.DataFrame` | 経験的再閲覧確率（横持ち。インデックス: `recency`、カラム: `frequency`） | `fit()` 後 |
+| `empirical_probability_dict` | `dict` | 経験的再閲覧確率（キー: `(r, f)`、値: `probability`） | `fit()` 後 |
 | `optimized_probability_` | `pd.Series` | 最適化再閲覧確率。インデックスは `(r, f)` | `optimize()` 後 |
 | `record_num` | `int` | 全閲覧履歴のレコード数 | `__init__()` 後 |
 | `record_num_obs` | `int` | 観測期間のレコード数 | `fit()` 後 |
@@ -126,12 +166,16 @@ r（最新度ランク）・f（頻度）を算出
 (r, f) 別に n_{r,f}・N_{r,f} を集計
 p_{r,f} = n_{r,f} / N_{r,f}
         ▼
-empirical_probability_  ─── to_frame() ─→ DataFrame で取得可能
+empirical_probability_ / empirical_probability_table / empirical_probability_dict
+        │
+        ├─  predict(r, f)  ─→ 特定 (r, f) の再閲覧確率を返す
+        │
+        ├─  transform(df, target_date)  ─→ user×item に r・f・確率・順位を付与
         │
         ▼  optimize()
 RF 制約付き凸2次計画問題を求解
         ▼
-optimized_probability_  ─── to_frame() ─→ DataFrame で取得可能
+optimized_probability_
 ```
 
 ## 入出力例
@@ -149,9 +193,9 @@ scorer.fit(
     observation_period=("2015-07-02", "2015-07-06"),
     evaluation_period=("2015-07-07", "2015-07-08"),
 )
-scorer.empirical_probability_.to_frame()
+scorer.empirical_probability_
 
-scorer.optimize()
-scorer.optimized_probability_.to_frame()
+df_rec = scorer.transform(df, target_date="2015-07-06")
+prob = scorer.predict(r=1, f=3)
 ```
 
