@@ -45,6 +45,9 @@ class RecencyFrequencyScorer:
         self.frequency_limit = None # 頻度の上限値(デフォルトでは _FREQUENCY_LIMIT_RATE を用いて自動計算)
         self.R = [] # 最新度のリスト
         self.F = [] # 頻度のリスト
+        self.RF2N = {}
+        self.RF2CV = {}
+        self.RF2Prob = {}
 
         self.empirical_probability_ = None # 経験的再閲覧確率データフレーム(縦持ち)
         self.empirical_probability_table_ = None # 経験的再閲覧確率データフレーム(横持ち)
@@ -152,19 +155,17 @@ class RecencyFrequencyScorer:
         RowsInteraction = []
         for user, I2Recencys in U2I2Recensys.items():
             for item, Recencys in I2Recencys.items():
-                freq = len(Recencys)
-                rcen = min(Recencys)
+                frequency = len(Recencys)
+                recency = min(Recencys)
                 cv = 1 if (user, item) in UIcv else 0 # 評価期間における cv(0/1) を追加
-                new_row = (user, item, rcen, freq, cv)
+                new_row = (user, item, recency, frequency, cv)
                 RowsInteraction.append(new_row)
-        df_ui2frc = pd.DataFrame(RowsInteraction, columns=[self._USER_COL, self._ITEM_COL, 'recency', 'frequency', 'cv'])
+        df_ui2frc = pd.DataFrame(
+            RowsInteraction, 
+            columns=[self._USER_COL, self._ITEM_COL, 'recency', 'frequency', 'cv']
+            )
         self.record_num_target_org = len(df_ui2frc) # レコード数の計測(フィルタリング前)
         self.total_cv_org = df_ui2frc.cv.sum() # cv数の計測(フィルタリング前)
-
-        #print(df_ui2frc.shape)
-        #print(df_ui2frc.head())
-        #print(df_ui2frc.recency.unique())
-        #print(df_ui2frc.frequency.unique())
 
         # 最新度の最大値の決定
         # 365日前のデータまで考える必要はない
@@ -210,6 +211,7 @@ class RecencyFrequencyScorer:
                     break
             self.frequency_limit = frequency_limit
 
+        # 最新度上限値と頻度上限値でフィルタリング
         df_ui2frc = df_ui2frc[
             (df_ui2frc.recency <= self.recency_limit) # 最新度上限値以下のレコードをフィルタリング
               & (df_ui2frc.frequency <= self.frequency_limit) # 頻度上限値以下のレコードをフィルタリング
@@ -221,26 +223,26 @@ class RecencyFrequencyScorer:
         self.R = list(range(1, self.recency_limit+1))
         self.F = list(range(1, self.frequency_limit+1))
 
-
         # 最新度と頻度のペアに対して、閲覧数、CV数、経験的再閲覧確率を初期化
-        RF2N = {(r,f):0.0 for r in self.R for f in self.F}
-        RF2CV = {(r,f):0.0 for r in self.R for f in self.F}
+        self.RF2N = {(r,f):0.0 for r in self.R for f in self.F}
+        self.RF2CV = {(r,f):0.0 for r in self.R for f in self.F}
 
         # 最新度と頻度のペアに対して、閲覧数、CV数の集計
         for row in df_ui2frc.itertuples():
-            RF2N[row.recency, row.frequency] += 1
+            self.RF2N[row.recency, row.frequency] += 1
             if row.cv == 1:
-                RF2CV[row.recency, row.frequency] += 1
+                self.RF2CV[row.recency, row.frequency] += 1
         
         # 経験的再閲覧確率の計算
         RowsRF = []
         for r in self.R:
             for f in self.F:
-                if RF2N[r,f]>0:
-                    prob = RF2CV[r,f] / RF2N[r,f]
+                if self.RF2N[r,f]>0:
+                    prob = self.RF2CV[r,f] / self.RF2N[r,f]
                 else:
                     prob = 0.0
-                row_rf = (r, f, RF2N[r,f], RF2CV[r,f], prob)
+                self.RF2Prob[r,f] = prob
+                row_rf = (r, f, self.RF2N[r,f], self.RF2CV[r,f], prob)
                 RowsRF.append(row_rf)
 
         # 経験的再閲覧確率辞書の作成
@@ -354,6 +356,50 @@ class RecencyFrequencyScorer:
         plt.savefig(output_path)
         plt.close(fig)
 
+    def export_probability_csv(self, kind='empirical', path=None):
+        """Export revisit probabilities to a CSV file.
+
+        Parameters
+        ----------
+        kind : {'empirical', 'optimized', 'all'}, default 'empirical'
+            Which probability to export. 'all' merges both empirical and
+            optimized into a single file with columns
+            empirical_probability and optimized_probability.
+        path : str or None, default None
+            Output file path for the CSV. If None, saves as
+            '{kind}_probability.csv' in the current directory.
+            If a directory, saves '{kind}_probability.csv' inside it.
+
+        Returns
+        -------
+        None
+        """
+        if kind not in ('empirical', 'optimized', 'all'):
+            raise ValueError(f"kind must be 'empirical', 'optimized', or 'all', got '{kind}'.")
+        if kind in ('empirical', 'all') and self.empirical_probability_ is None:
+            raise RuntimeError("fit() must be called before export_probability_csv().")
+        if kind in ('optimized', 'all') and self.optimized_probability_ is None:
+            raise RuntimeError("optimize() must be called before export_probability_csv(kind='optimized').")
+
+        from pathlib import Path
+        default_filename = f'{kind}_probability.csv'
+        if path is None:
+            output_path = Path(default_filename)
+        else:
+            p = Path(path)
+            output_path = p / default_filename if p.is_dir() else p
+
+        if kind == 'all':
+            df = self.empirical_probability_.rename(columns={'probability': 'empirical_probability'}).merge(
+                self.optimized_probability_.rename(columns={'probability': 'optimized_probability'}),
+                on=['recency', 'frequency'],
+            )
+        elif kind == 'empirical':
+            df = self.empirical_probability_
+        else:
+            df = self.optimized_probability_
+        df.to_csv(output_path, index=False)
+
     def predict(self, r, f, kind='empirical'):
         """Return the revisit probability for a given recency and frequency.
 
@@ -465,35 +511,29 @@ class RecencyFrequencyScorer:
         RowsInteraction = []
         for user, I2Recencys in U2I2Recensys.items():
             for item, Recencys in I2Recencys.items():
-                freq = len(Recencys)
-                rcen = min(Recencys)
-                freq_adj = min(freq, self.frequency_limit)
-                rcen_adj = min(rcen, self.recency_limit)
-                prob_dict = (
-                    self.empirical_probability_dict_
-                    if kind == 'empirical'
-                    else self.optimized_probability_dict_
-                )
-                prob = prob_dict.get((rcen_adj, freq_adj), 0.0)
-                RowsInteraction.append((user, item, rcen, freq, prob))
+                frequency = len(Recencys)
+                recency = min(Recencys)
+                frequency_adj = min(frequency, self.frequency_limit)
+                recency_adj = min(recency, self.recency_limit)
+                if kind == 'empirical':
+                    prob = self.empirical_probability_dict_.get((recency_adj, frequency_adj), 0.0)
+                elif kind == 'optimized':
+                    prob = self.optimized_probability_dict_.get((recency_adj, frequency_adj), 0.0)
+                else:
+                    raise ValueError(f"kind must be 'empirical' or 'optimized', got '{kind}'")
+                RowsInteraction.append((user, item, recency, frequency, prob))
         df_rf = pd.DataFrame(
             RowsInteraction, 
             columns=[self._USER_COL, self._ITEM_COL, 'recency', 'frequency', 'probability']
             )
-        # タイブレイクは後に出てきたitem（行番号が大きい）を優先（後に出てきた商品 item の方が履歴上で最新となる場合が多いと考えられるため）
-        df_rf['_order'] = range(len(df_rf))
-        df_rf = df_rf.sort_values(
-            [self._USER_COL, 'probability', '_order'],
-            ascending=[True, False, False],
-        )
-        df_rf = df_rf.drop(columns='_order')
+        df_rf = df_rf.sort_values([self._USER_COL, 'probability'], ascending=[True, False])
         df_rf['order'] = df_rf.groupby(self._USER_COL).cumcount() + 1
         df_rf = df_rf.rename(columns={self._USER_COL: user_col, self._ITEM_COL: item_col})
 
         # 入力 df の元の dtype に戻す
         df_rf[user_col] = df_rf[user_col].astype(df[user_col].dtype)
         df_rf[item_col] = df_rf[item_col].astype(df[item_col].dtype)
-
+        
         return df_rf
     
     def evaluate(self, df_rec, UIrevisit, order=1, user_col=None, item_col=None):
@@ -522,6 +562,12 @@ class RecencyFrequencyScorer:
         """
         user_col = user_col or df_rec.columns[0]
         item_col = item_col or df_rec.columns[1]
+
+        df_rec = df_rec.copy()
+        df_rec[user_col] = df_rec[user_col].astype(str)
+        df_rec[item_col] = df_rec[item_col].astype(str)
+        UIrevisit = {(str(u), str(i)) for u, i in UIrevisit}
+
         order_max = df_rec.order.max()
 
         target_orders = list(range(1, order+1))
@@ -564,53 +610,22 @@ class RecencyFrequencyScorer:
         -------
         self
         """
-        import cvxpy as cp
+        try:
+            from .optimizer import RFOptimizer
+        except ImportError:
+            from rfscorer.optimizer import RFOptimizer
 
         if self.empirical_probability_dict_ is None:
             raise RuntimeError("fit() must be called before optimize().")
 
-        nr = len(self.R)
-        nf = len(self.F)
+        optimizer = RFOptimizer()
+        optimizer.set_data(self.R, self.F, self.RF2N, self.RF2Prob)
+        optimizer.build_model()
+        optimizer.solve()
+        optimizer.postprocess()
 
-        # 決定変数: x[r_idx, f_idx] (0-indexed)
-        x = cp.Variable((nr, nf))
-
-        constraints = []
-
-        # Recency 制約: r < r' => x[r,f] >= x[r',f]  (小さい r ほど高確率)
-        for r_idx in range(nr - 1):
-            for f_idx in range(nf):
-                constraints.append(x[r_idx, f_idx] >= x[r_idx + 1, f_idx])
-
-        # Frequency 制約: f < f' => x[r,f] <= x[r,f']  (大きい f ほど高確率)
-        for r_idx in range(nr):
-            for f_idx in range(nf - 1):
-                constraints.append(x[r_idx, f_idx] <= x[r_idx, f_idx + 1])
-
-        # 目的関数: Σ N_{r,f} * (x[r,f] - p_{r,f})^2
-        objectives = []
-        for r_idx, r in enumerate(self.R):
-            for f_idx, f in enumerate(self.F):
-                N = self.empirical_probability_[
-                    (self.empirical_probability_.recency == r)
-                    & (self.empirical_probability_.frequency == f)
-                ]['N'].values[0]
-                p = self.empirical_probability_dict_[(r, f)]
-                objectives.append(N * (x[r_idx, f_idx] - p) ** 2)
-
-        problem = cp.Problem(cp.Minimize(cp.sum(objectives)), constraints)
-        problem.solve()
-
-        # 結果を属性に格納
-        rows = []
-        opt_dict = {}
-        for r_idx, r in enumerate(self.R):
-            for f_idx, f in enumerate(self.F):
-                prob = float(x.value[r_idx, f_idx])
-                rows.append((r, f, prob))
-                opt_dict[(r, f)] = prob
-
-        self.optimized_probability_dict_ = opt_dict
+        self.optimized_probability_dict_ = optimizer.RF2X
+        rows = [(r, f, optimizer.RF2X[(r, f)]) for r in self.R for f in self.F]
         self.optimized_probability_ = pd.DataFrame(
             rows, columns=['recency', 'frequency', 'probability']
         )
@@ -628,7 +643,8 @@ if __name__ == "__main__":
     print('=== scorer.py ===')
 
     # サンプルデータの取得
-    df = pd.read_csv("../../examples/access_log.csv")
+    from pathlib import Path
+    df = pd.read_csv(Path(__file__).parents[2] / "examples" / "access_log.csv")
     df_train = df[df.user_id.map(lambda x: x % 10 < 8)] # hash関数で簡易的に学習データ8割を抽出
     df_test = df[df.user_id.map(lambda x: x % 10 >= 8)] # hash関数で簡易的にテストデータ2割を抽出
 
@@ -649,9 +665,12 @@ if __name__ == "__main__":
     scorer.fit(observation_period, evaluation_period)
 
     scorer.show()
+    scorer.export_probability_csv('empirical')
     scorer.plot_probability_surface('empirical')
 
     scorer.optimize()
+    scorer.export_probability_csv('optimized')
+    scorer.export_probability_csv('all')
     scorer.plot_probability_surface('optimized')
 
     target_date = '2015-07-07'

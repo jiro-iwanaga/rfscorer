@@ -18,7 +18,8 @@ rfscorer/
 ├── src/
 │   └── rfscorer/
 │       ├── __init__.py               # 公開 API のエクスポート
-│       └── scorer.py                 # RecencyFrequencyScorer
+│       ├── scorer.py                 # RecencyFrequencyScorer
+│       └── optimizer.py              # RFOptimizer
 ├── tests/
 │   └── test_scorer.py
 ├── examples/
@@ -50,6 +51,7 @@ rfscorer/
 |------|------|
 | `__init__.py` | `RecencyFrequencyScorer` を公開 API としてエクスポートする |
 | `scorer.py` | `RecencyFrequencyScorer` クラスを実装する |
+| `optimizer.py` | `RFOptimizer` クラスを実装する。RF 単調性制約付き凸2次計画問題のモデル構築・求解を担う |
 
 ### `tests/`
 
