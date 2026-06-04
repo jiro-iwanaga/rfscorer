@@ -19,7 +19,19 @@ class RFOptimizer:
         self.RF2N = RF2N
         self.RF2P = RF2P
 
-    def build_model(self):
+    def build_model(self, kind='mono'):
+        """Build the optimization model.
+
+        Parameters
+        ----------
+        kind : {'mono', 'mcc'}, default 'mono'
+            'mono' applies monotonicity constraints only.
+            'mcc' additionally applies convexity in recency and concavity in
+            frequency (diminishing marginal returns).
+        """
+        if kind not in ('mono', 'mcc'):
+            raise ValueError(f"kind must be 'mono' or 'mcc', got '{kind}'")
+
         nr = len(self.R)
         nf = len(self.F)
 
@@ -27,15 +39,30 @@ class RFOptimizer:
 
         self.constraints = []
 
-        # Recency 制約: r < r' => x[r,f] >= x[r',f]
+        # Recency 単調性: r < r' => x[r,f] >= x[r',f]
         for r_idx in range(nr - 1):
             for f_idx in range(nf):
                 self.constraints.append(self.x[r_idx, f_idx] >= self.x[r_idx + 1, f_idx])
 
-        # Frequency 制約: f < f' => x[r,f] <= x[r,f']
+        # Frequency 単調性: f < f' => x[r,f] <= x[r,f']
         for r_idx in range(nr):
             for f_idx in range(nf - 1):
                 self.constraints.append(self.x[r_idx, f_idx] <= self.x[r_idx, f_idx + 1])
+
+        if kind == 'mcc':
+            # Recency 凸性: 新しいほど効果が大きい（二階差分 >= 0）
+            for r_idx in range(nr - 2):
+                for f_idx in range(nf):
+                    self.constraints.append(
+                        self.x[r_idx, f_idx] - 2 * self.x[r_idx + 1, f_idx] + self.x[r_idx + 2, f_idx] >= 0
+                    )
+
+            # Frequency 凹性: 限界効用逓減（二階差分 <= 0）
+            for r_idx in range(nr):
+                for f_idx in range(nf - 2):
+                    self.constraints.append(
+                        self.x[r_idx, f_idx] - 2 * self.x[r_idx, f_idx + 1] + self.x[r_idx, f_idx + 2] <= 0
+                    )
 
         self.objectives = []
         for r_idx, r in enumerate(self.R):

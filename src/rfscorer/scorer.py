@@ -53,9 +53,13 @@ class RecencyFrequencyScorer:
         self.empirical_probability_table_ = None # 経験的再閲覧確率データフレーム(横持ち)
         self.empirical_probability_dict_ = None # 経験的再閲覧確率データフレーム(辞書:キーは最新度と頻度のペア)
 
-        self.optimized_probability_ = None # 最適化再閲覧確率データフレーム(縦持ち)
-        self.optimized_probability_table_ = None # 最適化再閲覧確率データフレーム(横持ち)
-        self.optimized_probability_dict_ = None # 最適化再閲覧確率データフレーム(辞書:キーは最新度と頻度のペア)
+        self.mono_probability_ = None
+        self.mono_probability_table_ = None
+        self.mono_probability_dict_ = None
+
+        self.mcc_probability_ = None
+        self.mcc_probability_table_ = None
+        self.mcc_probability_dict_ = None
 
         # データ解析用
         self.record_num = len(self.interaction_log) # レコード数
@@ -318,12 +322,14 @@ class RecencyFrequencyScorer:
         import numpy as np
         import matplotlib.pyplot as plt
 
-        if kind not in ('empirical', 'optimized'):
-            raise ValueError(f"kind must be 'empirical' or 'optimized', got '{kind}'.")
+        if kind not in ('empirical', 'mono', 'mcc'):
+            raise ValueError(f"kind must be 'empirical', 'mono', or 'mcc', got '{kind}'.")
         if kind == 'empirical' and self.empirical_probability_table_ is None:
             raise RuntimeError("fit() must be called before plot_probability_surface().")
-        if kind == 'optimized' and self.optimized_probability_table_ is None:
-            raise RuntimeError("optimize() must be called before plot_probability_surface(kind='optimized').")
+        if kind == 'mono' and self.mono_probability_table_ is None:
+            raise RuntimeError("optimize(kind='mono') must be called before plot_probability_surface(kind='mono').")
+        if kind == 'mcc' and self.mcc_probability_table_ is None:
+            raise RuntimeError("optimize(kind='mcc') must be called before plot_probability_surface(kind='mcc').")
 
         from pathlib import Path
         default_filename = f'{kind}_probability_surface.png'
@@ -333,11 +339,12 @@ class RecencyFrequencyScorer:
             p = Path(path)
             output_path = p / default_filename if p.is_dir() else p
 
-        table = (
-            self.empirical_probability_table_
-            if kind == 'empirical'
-            else self.optimized_probability_table_
-        )
+        if kind == 'empirical':
+            table = self.empirical_probability_table_
+        elif kind == 'mono':
+            table = self.mono_probability_table_
+        else:
+            table = self.mcc_probability_table_
 
         recency = table.index.tolist()
         frequency = table.columns.tolist()
@@ -374,12 +381,14 @@ class RecencyFrequencyScorer:
         -------
         None
         """
-        if kind not in ('empirical', 'optimized', 'all'):
-            raise ValueError(f"kind must be 'empirical', 'optimized', or 'all', got '{kind}'.")
+        if kind not in ('empirical', 'mono', 'mcc', 'all'):
+            raise ValueError(f"kind must be 'empirical', 'mono', 'mcc', or 'all', got '{kind}'.")
         if kind in ('empirical', 'all') and self.empirical_probability_ is None:
             raise RuntimeError("fit() must be called before export_probability_csv().")
-        if kind in ('optimized', 'all') and self.optimized_probability_ is None:
-            raise RuntimeError("optimize() must be called before export_probability_csv(kind='optimized').")
+        if kind in ('mono', 'all') and self.mono_probability_ is None:
+            raise RuntimeError("optimize(kind='mono') must be called before export_probability_csv(kind='mono').")
+        if kind in ('mcc', 'all') and self.mcc_probability_ is None:
+            raise RuntimeError("optimize(kind='mcc') must be called before export_probability_csv(kind='mcc').")
 
         from pathlib import Path
         default_filename = f'{kind}_probability.csv'
@@ -390,14 +399,24 @@ class RecencyFrequencyScorer:
             output_path = p / default_filename if p.is_dir() else p
 
         if kind == 'all':
-            df = self.empirical_probability_.rename(columns={'probability': 'empirical_probability'}).merge(
-                self.optimized_probability_.rename(columns={'probability': 'optimized_probability'}),
-                on=['recency', 'frequency'],
+            df = (
+                self.empirical_probability_
+                .rename(columns={'probability': 'empirical_probability'})
+                .merge(
+                    self.mono_probability_.rename(columns={'probability': 'mono_probability'}),
+                    on=['recency', 'frequency'],
+                )
+                .merge(
+                    self.mcc_probability_.rename(columns={'probability': 'mcc_probability'}),
+                    on=['recency', 'frequency'],
+                )
             )
         elif kind == 'empirical':
             df = self.empirical_probability_
+        elif kind == 'mono':
+            df = self.mono_probability_
         else:
-            df = self.optimized_probability_
+            df = self.mcc_probability_
         df.to_csv(output_path, index=False)
 
     def predict(self, r, f, kind='empirical'):
@@ -424,19 +443,23 @@ class RecencyFrequencyScorer:
             raise TypeError("r must be a positive integer.")
         if not isinstance(f, int) or f < 1:
             raise TypeError("f must be a positive integer.")
-        if kind not in ('empirical', 'optimized'):
-            raise ValueError(f"kind must be 'empirical' or 'optimized', got '{kind}'.")
+        if kind not in ('empirical', 'mono', 'mcc'):
+            raise ValueError(f"kind must be 'empirical', 'mono', or 'mcc', got '{kind}'.")
         if kind == 'empirical' and self.empirical_probability_dict_ is None:
             raise RuntimeError("fit() must be called before predict().")
-        if kind == 'optimized' and self.optimized_probability_dict_ is None:
-            raise RuntimeError("optimize() must be called before predict(kind='optimized').")
+        if kind == 'mono' and self.mono_probability_dict_ is None:
+            raise RuntimeError("optimize(kind='mono') must be called before predict(kind='mono').")
+        if kind == 'mcc' and self.mcc_probability_dict_ is None:
+            raise RuntimeError("optimize(kind='mcc') must be called before predict(kind='mcc').")
 
         r = min(r, self.recency_limit)
         f = min(f, self.frequency_limit)
         if kind == 'empirical':
             prob = self.empirical_probability_dict_.get((r, f), 0.0)
+        elif kind == 'mono':
+            prob = self.mono_probability_dict_.get((r, f), 0.0)
         else:
-            prob = self.optimized_probability_dict_.get((r, f), 0.0)
+            prob = self.mcc_probability_dict_.get((r, f), 0.0)
         return prob
 
     def transform(self, df, target_date, kind='empirical', user_col='user', item_col='item', datetime_col='datetime'):
@@ -467,12 +490,14 @@ class RecencyFrequencyScorer:
         pd.DataFrame
             Copy of df with added columns: recency, frequency, probability.
         """
-        if kind not in ('empirical', 'optimized'):
-            raise ValueError(f"kind must be 'empirical' or 'optimized', got '{kind}'.")
+        if kind not in ('empirical', 'mono', 'mcc'):
+            raise ValueError(f"kind must be 'empirical', 'mono', or 'mcc', got '{kind}'.")
         if self.empirical_probability_dict_ is None:
             raise RuntimeError("fit() must be called before transform().")
-        if kind == 'optimized' and self.optimized_probability_dict_ is None:
-            raise RuntimeError("optimize() must be called before transform(kind='optimized').")
+        if kind == 'mono' and self.mono_probability_dict_ is None:
+            raise RuntimeError("optimize(kind='mono') must be called before transform(kind='mono').")
+        if kind == 'mcc' and self.mcc_probability_dict_ is None:
+            raise RuntimeError("optimize(kind='mcc') must be called before transform(kind='mcc').")
 
         user_col = user_col or self._USER_COL
         item_col = item_col or self._ITEM_COL
@@ -517,10 +542,10 @@ class RecencyFrequencyScorer:
                 recency_adj = min(recency, self.recency_limit)
                 if kind == 'empirical':
                     prob = self.empirical_probability_dict_.get((recency_adj, frequency_adj), 0.0)
-                elif kind == 'optimized':
-                    prob = self.optimized_probability_dict_.get((recency_adj, frequency_adj), 0.0)
+                elif kind == 'mono':
+                    prob = self.mono_probability_dict_.get((recency_adj, frequency_adj), 0.0)
                 else:
-                    raise ValueError(f"kind must be 'empirical' or 'optimized', got '{kind}'")
+                    prob = self.mcc_probability_dict_.get((recency_adj, frequency_adj), 0.0)
                 RowsInteraction.append((user, item, recency, frequency, prob))
         df_rf = pd.DataFrame(
             RowsInteraction, 
@@ -596,15 +621,22 @@ class RecencyFrequencyScorer:
         return df_eval
 
 
-    def optimize(self):
+    def optimize(self, kind='mono'):
         """Estimate optimized revisit probabilities under RF constraints.
 
-        Solves a convex quadratic programming problem with recency and
-        frequency monotonicity constraints (Recency constraint: lower recency
-        rank implies higher probability; Frequency constraint: higher frequency
-        implies higher probability). Uses weighted least squares as objective.
+        Solves a convex quadratic programming problem with monotonicity
+        constraints (and optionally convexity/concavity constraints).
+        Uses weighted least squares as objective.
 
         Requires fit() to be called first. Depends on cvxpy.
+
+        Parameters
+        ----------
+        kind : {'mono', 'mcc'}, default 'mono'
+            Optimization model to use.
+            'mono' applies monotonicity constraints only.
+            'mcc' additionally applies convexity in recency and concavity
+            in frequency (diminishing marginal returns).
 
         Returns
         -------
@@ -620,20 +652,22 @@ class RecencyFrequencyScorer:
 
         optimizer = RFOptimizer()
         optimizer.set_data(self.R, self.F, self.RF2N, self.RF2Prob)
-        optimizer.build_model()
+        optimizer.build_model(kind=kind)
         optimizer.solve()
         optimizer.postprocess()
 
-        self.optimized_probability_dict_ = optimizer.RF2X
         rows = [(r, f, optimizer.RF2X[(r, f)]) for r in self.R for f in self.F]
-        self.optimized_probability_ = pd.DataFrame(
-            rows, columns=['recency', 'frequency', 'probability']
-        )
-        self.optimized_probability_table_ = self.optimized_probability_.pivot_table(
-            index='recency',
-            columns='frequency',
-            values='probability',
-        )
+        df_opt = pd.DataFrame(rows, columns=['recency', 'frequency', 'probability'])
+        table = df_opt.pivot_table(index='recency', columns='frequency', values='probability')
+
+        if kind == 'mono':
+            self.mono_probability_dict_ = optimizer.RF2X
+            self.mono_probability_ = df_opt
+            self.mono_probability_table_ = table
+        else:
+            self.mcc_probability_dict_ = optimizer.RF2X
+            self.mcc_probability_ = df_opt
+            self.mcc_probability_table_ = table
 
         return self
 
@@ -668,10 +702,13 @@ if __name__ == "__main__":
     scorer.export_probability_csv('empirical')
     scorer.plot_probability_surface('empirical')
 
-    scorer.optimize()
-    scorer.export_probability_csv('optimized')
+    scorer.optimize(kind='mono')
+    scorer.optimize(kind='mcc')
+    scorer.export_probability_csv('mono')
+    scorer.export_probability_csv('mcc')
     scorer.export_probability_csv('all')
-    scorer.plot_probability_surface('optimized')
+    scorer.plot_probability_surface('mono')
+    scorer.plot_probability_surface('mcc')
 
     target_date = '2015-07-07'
     df_test_obs = df_test[df_test.date <= target_date]
@@ -679,30 +716,23 @@ if __name__ == "__main__":
     UIrevisit = set([(row.user_id, row.item_id) for row in df_test_eval.itertuples()])
 
     df_rec_emp = scorer.transform(
-        df_test_obs, 
-        target_date,
-        'empirical',
-        user_col = 'user_id',
-        item_col = 'item_id',
-        datetime_col = 'date'
-        )
-    
+        df_test_obs, target_date, 'empirical',
+        user_col='user_id', item_col='item_id', datetime_col='date',
+    )
     print('--- empirical ---')
-    #print(df_rec_emp)
-    df_eval_emp = scorer.evaluate(df_rec_emp, UIrevisit, order=10)
-    print(df_eval_emp)
+    print(scorer.evaluate(df_rec_emp, UIrevisit, order=10))
 
-    df_rec_opt = scorer.transform(
-        df_test_obs, 
-        target_date,
-        'optimized',
-        user_col = 'user_id',
-        item_col = 'item_id',
-        datetime_col = 'date'
-        )
+    df_rec_mono = scorer.transform(
+        df_test_obs, target_date, 'mono',
+        user_col='user_id', item_col='item_id', datetime_col='date',
+    )
+    print('--- mono ---')
+    print(scorer.evaluate(df_rec_mono, UIrevisit, order=10))
 
-    print('--- optimized ---')
-    #print(df_rec_opt)
-    df_eval_opt = scorer.evaluate(df_rec_opt, UIrevisit, order=10)
-    print(df_eval_opt)
+    df_rec_mcc = scorer.transform(
+        df_test_obs, target_date, 'mcc',
+        user_col='user_id', item_col='item_id', datetime_col='date',
+    )
+    print('--- mcc ---')
+    print(scorer.evaluate(df_rec_mcc, UIrevisit, order=10))
 
