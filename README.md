@@ -10,6 +10,12 @@ The package is designed for product recommendation and repeat-purchase modeling,
 
 ## Features
 
+- **scikit-learn-style API** — familiar `fit()` / `transform()` interface makes it easy to integrate into existing data science workflows
+- **Minimal data requirements** — works with any interaction log that has three columns: `user`, `item`, and `datetime`; no ratings or explicit feedback needed
+- **Explainable scoring** — probabilities are derived through mathematical optimization under RF monotonicity constraints, making every score fully traceable and auditable; 3D surface visualization further supports intuitive understanding
+- **Probabilistic output** — revisit probabilities serve as preference scores, enabling expected value calculations and probabilistic ranking of recommendations
+- **Extensible** — the user–item probability matrix produced by `transform()` can be directly used as input to collaborative filtering or other downstream recommendation models
+
 ## Installation
 
 ```bash
