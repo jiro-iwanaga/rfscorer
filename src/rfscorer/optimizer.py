@@ -5,6 +5,22 @@ import cvxpy as cp
 
 
 class RFOptimizer:
+    """Convex quadratic optimizer for RF monotonicity-constrained revisit probabilities.
+
+    Minimizes weighted least-squares deviation from empirical probabilities
+    over a recency-frequency grid under RF constraints. Intended to be called
+    from RecencyFrequencyScorer.optimize().
+
+    Typical call sequence::
+
+        optimizer = RFOptimizer()
+        optimizer.set_data(R, F, RF2N, RF2Prob)
+        optimizer.build_model(kind='mono')
+        optimizer.solve()
+        optimizer.postprocess()
+        # optimizer.RF2X holds the optimized probabilities
+    """
+
     def __init__(self):
         # 集合と定数
         self.R = []
@@ -28,6 +44,19 @@ class RFOptimizer:
         self.RF2X = {}
 
     def set_data(self, R, F, RF2N, RF2Prob):
+        """Load recency-frequency data before building the model.
+
+        Parameters
+        ----------
+        R : list[int]
+            Unique recency values (1 = most recent).
+        F : list[int]
+            Unique frequency values.
+        RF2N : dict[tuple[int, int], float]
+            Number of observations for each (recency, frequency) pair.
+        RF2Prob : dict[tuple[int, int], float]
+            Empirical revisit probability for each (recency, frequency) pair.
+        """
         if len(R) == 0:
             raise ValueError("R must not be empty")
         if len(set(R)) != len(R):
@@ -152,6 +181,11 @@ class RFOptimizer:
         self.RF2X = {}
 
     def solve(self):
+        """Solve the optimization problem built by build_model().
+
+        Sets status, objective_value, and elapsed_time.
+        Raises RuntimeError if build_model() has not been called.
+        """
         if self.problem is None:
             raise RuntimeError("build_model() must be called before solve()")
 
@@ -163,6 +197,11 @@ class RFOptimizer:
         self.objective_value = self.problem.value
 
     def postprocess(self):
+        """Extract optimized probabilities from the solver solution into RF2X.
+
+        Must be called after solve(). Raises RuntimeError if the solver did
+        not find a feasible solution.
+        """
         if self.status is None:
             raise RuntimeError("solve() must be called before postprocess()")
         if self.x.value is None:
@@ -183,6 +222,7 @@ class RFOptimizer:
             print(f"{r:>{row_w}}{cells}")
 
     def show_input(self):
+        """Print R, F, RF2N, and RF2Prob to stdout."""
         if len(self.R) == 0 or len(self.F) == 0:
             raise RuntimeError("set_data() must be called before show_input()")
         print("=== show input ===")
@@ -200,6 +240,7 @@ class RFOptimizer:
         self._print_pivot(self.RF2Prob, fmt=".4f")
 
     def show_solve_info(self):
+        """Print solver status, objective value, elapsed time, and problem size to stdout."""
         if self.status is None:
             raise RuntimeError("solve() must be called before show_solve_info()")
         obj_val = self.objective_value
@@ -217,6 +258,7 @@ class RFOptimizer:
         print(f"num_constraints: {self.num_constraints}")
 
     def show_result(self):
+        """Print the optimized probability table (RF2X) to stdout."""
         if not self.RF2X:
             raise RuntimeError("postprocess() must be called before show_result()")
         print("=== show result ===")
