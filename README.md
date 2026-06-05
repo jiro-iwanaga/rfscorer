@@ -26,27 +26,50 @@ pip install rfscorer
 
 ```python
 from rfscorer import RecencyFrequencyScorer
+```
 
+Prepare an interaction log with at least three columns: user ID, item ID, and timestamp.
+Split it into a training set and a test set.
+
+```python
 df_train = ...  # training interaction log (columns: user, item, datetime)
 df_test  = ...  # test interaction log  (columns: user, item, datetime)
+```
 
+Instantiate the scorer, specifying the column names if they differ from the defaults (`user`, `item`, `datetime`).
+
+```python
 scorer = RecencyFrequencyScorer()
+```
 
-# Estimate empirical revisit probabilities
+Call `fit()` to estimate empirical revisit probabilities from the training log.
+Specify the observation period (from which recency and frequency are computed) and the evaluation period (which provides the ground-truth revisit labels).
+
+```python
 scorer.fit(
     df_train,
     observation_period=("2026-07-01", "2026-07-07"),
     evaluation_period=("2026-07-08", "2026-07-08"),
 )
+```
 
-# Score with empirical probabilities
-# Returns DataFrame with user, item, recency, frequency, probability, order
+Call `transform()` to score each user-item pair in the test log.
+It returns a DataFrame with columns `user`, `item`, `recency`, `frequency`, `probability`, and `order` (rank within each user, sorted by probability descending).
+
+```python
 df_rec_emp = scorer.transform(df_test, target_date="2026-07-07", kind="empirical")
+```
 
-# Estimate optimized probabilities under RF monotonicity constraints (optional)
+Optionally, call `optimize()` to smooth the empirical probabilities under RF monotonicity constraints using convex quadratic programming.
+`kind="mono"` enforces recency and frequency monotonicity; `kind="mcc"` additionally adds convexity in recency and concavity in frequency.
+
+```python
 scorer.optimize(kind="mono")
+```
 
-# Score with optimized probabilities
+Pass `kind="mono"` (or `kind="mcc"`) to `transform()` to use the optimized probabilities instead.
+
+```python
 df_rec_mono = scorer.transform(df_test, target_date="2026-07-07", kind="mono")
 ```
 
