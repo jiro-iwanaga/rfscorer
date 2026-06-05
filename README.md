@@ -1,5 +1,9 @@
 # rfscorer
 
+[![CI](https://github.com/jiro-iwanaga/rfscorer/actions/workflows/ci.yml/badge.svg)](https://github.com/jiro-iwanaga/rfscorer/actions/workflows/ci.yml)
+[![PyPI version](https://badge.fury.io/py/rfscorer.svg)](https://badge.fury.io/py/rfscorer)
+[![Python Versions](https://img.shields.io/pypi/pyversions/rfscorer.svg)](https://pypi.org/project/rfscorer/)
+
 `rfscorer` is a Python package for Recency-Frequency based recommendation scoring.
 
 It estimates **revisit probabilities** — the preference score for each user-item pair, forming a matrix analogous to a rating matrix — from interaction histories, using two simple but powerful behavioral signals: **recency**, which captures how recently a user interacted with an item, and **frequency**, which captures how often the user has interacted with it.
@@ -65,7 +69,7 @@ scorer.fit(
 
 The empirical surface reflects raw revisit rates and may be irregular due to sparse data.
 
-![empirical probability surface](img/surface_empirical_probability.png)
+![empirical probability surface](img/empirical_probability_surface.png)
 
 Optionally, call `optimize()` to smooth the surface under RF monotonicity constraints using convex quadratic programming.
 `kind="mono"` enforces recency and frequency monotonicity.
@@ -74,7 +78,7 @@ Optionally, call `optimize()` to smooth the surface under RF monotonicity constr
 scorer.optimize(kind="mono")
 ```
 
-![mono probability surface](img/surface_mono_probability.png)
+![mono probability surface](img/mono_probability_surface.png)
 
 `kind="mcc"` additionally adds convexity in recency and concavity in frequency, yielding a smoother surface.
 
@@ -82,7 +86,7 @@ scorer.optimize(kind="mono")
 scorer.optimize(kind="mcc")
 ```
 
-![mcc probability surface](img/surface_mcc_probability.png)
+![mcc probability surface](img/mcc_probability_surface.png)
 
 Call `transform()` to score each user-item pair in the test log.
 It returns a DataFrame with columns `user`, `item`, `recency`, `frequency`, `probability`, and `order` (rank within each user, sorted by probability descending).
@@ -101,6 +105,10 @@ df_rec_mcc = scorer.transform(df_test, target_date="2026-07-07", kind="mcc")
 | u_002  | i_058  |       4 |         1 |      0.0182 |     2 |
 
 Within each user, rows are sorted by `probability` descending; `order` represents the recommendation rank.
+
+## Examples
+
+- [examples/basic_usage.ipynb](examples/basic_usage.ipynb) — end-to-end walkthrough: load data, fit, optimize, transform, and evaluate
 
 ## References
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)

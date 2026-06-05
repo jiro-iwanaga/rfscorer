@@ -24,6 +24,7 @@ rfscorer/
 │   ├── test_scorer.py
 │   └── test_optimizer.py
 ├── examples/
+│   ├── README.md                         # サンプルデータのライセンス表記
 │   ├── access_log.csv
 │   └── basic_usage.ipynb
 └── docs/                             # 永続的ドキュメント
@@ -65,7 +66,8 @@ rfscorer/
 
 | パス | 説明 |
 |------|------|
-| `access_log.csv` | サンプルデータ（閲覧履歴） |
+| `README.md` | サンプルデータのライセンス表記 |
+| `access_log.csv` | サンプルデータ（閲覧履歴）。ohmsha/PyOptBook より MIT ライセンスで利用 |
 | `basic_usage.ipynb` | 基本的な使用例を示す Jupyter ノートブック |
 
 ### `docs/`
