@@ -48,6 +48,7 @@ packages = ["src/rfscorer"]
 
 [tool.ruff]
 src = ["src"]
+line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]

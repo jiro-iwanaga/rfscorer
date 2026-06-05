@@ -257,9 +257,7 @@ class TestFitResult:
             assert f <= _AUTO_FREQUENCY_LIMIT
 
     def test_custom_column_names(self):
-        df_custom = _make_df().rename(
-            columns={"user": "uid", "item": "iid", "datetime": "ts"}
-        )
+        df_custom = _make_df().rename(columns={"user": "uid", "item": "iid", "datetime": "ts"})
         s = RecencyFrequencyScorer(user_col="uid", item_col="iid", datetime_col="ts")
         s.fit(
             df_custom,
@@ -328,9 +326,7 @@ class TestOptimize:
     def test_mono_sets_probability_dict(self, scorer_optimized_mono):
         d = scorer_optimized_mono.mono_probability_dict_
         assert d is not None
-        expected = {
-            (r, f) for r in scorer_optimized_mono.R for f in scorer_optimized_mono.F
-        }
+        expected = {(r, f) for r in scorer_optimized_mono.R for f in scorer_optimized_mono.F}
         assert set(d.keys()) == expected
 
     def test_mono_sets_probability_table(self, scorer_optimized_mono):
@@ -355,9 +351,7 @@ class TestOptimize:
     def test_mcc_sets_probability_dict(self, scorer_optimized_mcc):
         d = scorer_optimized_mcc.mcc_probability_dict_
         assert d is not None
-        expected = {
-            (r, f) for r in scorer_optimized_mcc.R for f in scorer_optimized_mcc.F
-        }
+        expected = {(r, f) for r in scorer_optimized_mcc.R for f in scorer_optimized_mcc.F}
         assert set(d.keys()) == expected
 
     def test_mcc_probability_values_in_bounds(self, scorer_optimized_mcc):

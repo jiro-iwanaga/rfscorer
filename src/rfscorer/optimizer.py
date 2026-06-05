@@ -68,16 +68,12 @@ class RFOptimizer:
         missing_N = [(r, f) for r in R for f in F if (r, f) not in RF2N]
         if missing_N:
             suffix = "..." if len(missing_N) > 3 else ""
-            raise ValueError(
-                f"RF2N is missing {len(missing_N)} key(s): {missing_N[:3]}{suffix}"
-            )
+            raise ValueError(f"RF2N is missing {len(missing_N)} key(s): {missing_N[:3]}{suffix}")
         missing_Prob = [(r, f) for r in R for f in F if (r, f) not in RF2Prob]
         if missing_Prob:
             n = len(missing_Prob)
             suffix = "..." if n > 3 else ""
-            raise ValueError(
-                f"RF2Prob is missing {n} key(s): {missing_Prob[:3]}{suffix}"
-            )
+            raise ValueError(f"RF2Prob is missing {n} key(s): {missing_Prob[:3]}{suffix}")
 
         self.R = list(R)
         self.F = list(F)
@@ -128,16 +124,12 @@ class RFOptimizer:
         # Recency 単調性: r < r' => x[r,f] >= x[r',f]
         for r_idx in range(nr - 1):
             for f_idx in range(nf):
-                self.constraints.append(
-                    self.x[r_idx, f_idx] >= self.x[r_idx + 1, f_idx]
-                )
+                self.constraints.append(self.x[r_idx, f_idx] >= self.x[r_idx + 1, f_idx])
 
         # Frequency 単調性: f < f' => x[r,f] <= x[r,f']
         for r_idx in range(nr):
             for f_idx in range(nf - 1):
-                self.constraints.append(
-                    self.x[r_idx, f_idx] <= self.x[r_idx, f_idx + 1]
-                )
+                self.constraints.append(self.x[r_idx, f_idx] <= self.x[r_idx, f_idx + 1])
 
         if kind == "mcc":
             # Recency 凸性: 新しいほど効果が大きい（二階差分 >= 0）
@@ -167,9 +159,7 @@ class RFOptimizer:
                 p = self.RF2Prob[r, f]
                 self.objectives.append(N * (self.x[r_idx, f_idx] - p) ** 2)
 
-        self.problem = cp.Problem(
-            cp.Minimize(cp.sum(self.objectives)), self.constraints
-        )
+        self.problem = cp.Problem(cp.Minimize(cp.sum(self.objectives)), self.constraints)
 
         self.num_variables = sum(v.size for v in self.problem.variables())
         self.num_constraints = sum(c.size for c in self.constraints)
@@ -216,9 +206,7 @@ class RFOptimizer:
         col_w = max(9, max(len(str(f)) for f in self.F) + 1)
         print(f"{'':>{row_w}}" + "".join(f"{f:>{col_w}}" for f in self.F))
         for r in self.R:
-            cells = "".join(
-                format(float(RF2Val[r, f]), f">{col_w}{fmt}") for f in self.F
-            )
+            cells = "".join(format(float(RF2Val[r, f]), f">{col_w}{fmt}") for f in self.F)
             print(f"{r:>{row_w}}{cells}")
 
     def show_input(self):
@@ -244,11 +232,7 @@ class RFOptimizer:
         if self.status is None:
             raise RuntimeError("solve() must be called before show_solve_info()")
         obj_val = self.objective_value
-        obj_str = (
-            f"{obj_val:.4f}"
-            if (obj_val is not None and math.isfinite(obj_val))
-            else "N/A"
-        )
+        obj_str = f"{obj_val:.4f}" if (obj_val is not None and math.isfinite(obj_val)) else "N/A"
         print("=== show solve info ===")
         print(f"kind: {self.kind}")
         print(f"status: {self.status}")

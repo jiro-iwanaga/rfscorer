@@ -9,9 +9,15 @@ _R = [1, 2, 3]
 _F = [1, 2, 3]
 _RF2N = {(r, f): 100 for r in _R for f in _F}
 _RF2Prob = {
-    (1, 1): 0.80, (1, 2): 0.75, (1, 3): 0.90,
-    (2, 1): 0.70, (2, 2): 0.65, (2, 3): 0.60,
-    (3, 1): 0.50, (3, 2): 0.55, (3, 3): 0.40,
+    (1, 1): 0.80,
+    (1, 2): 0.75,
+    (1, 3): 0.90,
+    (2, 1): 0.70,
+    (2, 2): 0.65,
+    (2, 3): 0.60,
+    (3, 1): 0.50,
+    (3, 2): 0.55,
+    (3, 3): 0.40,
 }
 _TOL = 1e-4
 
@@ -132,10 +138,7 @@ class TestSetData:
     def test_missing_RF2N_truncates_long_list(self, opt):
         # r=1 の 3 キーと (2,1) を除去して 4 件欠損させ "..." が付くことを確認
         RF2N_incomplete = {
-            (r, f): 100
-            for r in _R
-            for f in _F
-            if not (r == 1 or (r == 2 and f == 1))
+            (r, f): 100 for r in _R for f in _F if not (r == 1 or (r == 2 and f == 1))
         }
         with pytest.raises(ValueError, match=r"\.\.\.$"):
             opt.set_data(_R, _F, RF2N_incomplete, _RF2Prob)
@@ -248,19 +251,13 @@ class TestMonoConstraints:
         for f in _F:
             for i in range(len(_R) - 1):
                 r, r_next = _R[i], _R[i + 1]
-                assert (
-                    opt_solved_mono.RF2X[r, f]
-                    >= opt_solved_mono.RF2X[r_next, f] - _TOL
-                )
+                assert opt_solved_mono.RF2X[r, f] >= opt_solved_mono.RF2X[r_next, f] - _TOL
 
     def test_frequency_monotonicity(self, opt_solved_mono):
         for r in _R:
             for j in range(len(_F) - 1):
                 f, f_next = _F[j], _F[j + 1]
-                assert (
-                    opt_solved_mono.RF2X[r, f]
-                    <= opt_solved_mono.RF2X[r, f_next] + _TOL
-                )
+                assert opt_solved_mono.RF2X[r, f] <= opt_solved_mono.RF2X[r, f_next] + _TOL
 
 
 # ---------------------------------------------------------------------------
@@ -271,19 +268,13 @@ class TestMCCConstraints:
         for f in _F:
             for i in range(len(_R) - 1):
                 r, r_next = _R[i], _R[i + 1]
-                assert (
-                    opt_solved_mcc.RF2X[r, f]
-                    >= opt_solved_mcc.RF2X[r_next, f] - _TOL
-                )
+                assert opt_solved_mcc.RF2X[r, f] >= opt_solved_mcc.RF2X[r_next, f] - _TOL
 
     def test_frequency_monotonicity(self, opt_solved_mcc):
         for r in _R:
             for j in range(len(_F) - 1):
                 f, f_next = _F[j], _F[j + 1]
-                assert (
-                    opt_solved_mcc.RF2X[r, f]
-                    <= opt_solved_mcc.RF2X[r, f_next] + _TOL
-                )
+                assert opt_solved_mcc.RF2X[r, f] <= opt_solved_mcc.RF2X[r, f_next] + _TOL
 
     def test_recency_convexity(self, opt_solved_mcc):
         for f in _F:
