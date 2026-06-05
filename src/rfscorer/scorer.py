@@ -673,6 +673,7 @@ class RecencyFrequencyScorer:
         optimizer.set_data(self.R, self.F, self.RF2N, self.RF2Prob)
         optimizer.build_model(kind=kind)
         optimizer.solve()
+        optimizer.show_solve_info()
         optimizer.postprocess()
 
         rows = [(r, f, optimizer.RF2X[(r, f)]) for r in self.R for f in self.F]
