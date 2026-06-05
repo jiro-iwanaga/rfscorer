@@ -30,23 +30,24 @@ from rfscorer import RecencyFrequencyScorer
 df_train = ...  # training interaction log (columns: user, item, datetime)
 df_test  = ...  # test interaction log  (columns: user, item, datetime)
 
-scorer = RecencyFrequencyScorer(df_train)
+scorer = RecencyFrequencyScorer()
 
 # Estimate empirical revisit probabilities
 scorer.fit(
+    df_train,
     observation_period=("2026-07-01", "2026-07-07"),
     evaluation_period=("2026-07-08", "2026-07-08"),
 )
 
 # Score with empirical probabilities
-# Returns DataFrame with recency, frequency, probability, order per user-item pair
+# Returns DataFrame with user, item, recency, frequency, probability, order
 df_rec_emp = scorer.transform(df_test, target_date="2026-07-07", kind="empirical")
 
 # Estimate optimized probabilities under RF monotonicity constraints (optional)
-scorer.optimize()
+scorer.optimize(kind="mono")
 
 # Score with optimized probabilities
-df_rec_opt = scorer.transform(df_test, target_date="2026-07-07", kind="optimized")
+df_rec_mono = scorer.transform(df_test, target_date="2026-07-07", kind="mono")
 ```
 
 ## References
