@@ -155,15 +155,7 @@ class RecencyFrequencyScorer:
         # 評価期間に cv がある user と item のペアを作成
         UIcv = {(row.user, row.item) for row in df_eval.itertuples()}
 
-        U2I2Recensys = {}
-        for row in df_obs.itertuples():
-            # 最新度計算
-            recency = (self.observation_end_date_ - row.datetime).days + 1
-            U2I2Recensys.setdefault(row.user, {})
-            U2I2Recensys[row.user].setdefault(row.item, [])
-            U2I2Recensys[row.user][row.item].append(recency)
-        #print(U2I2Recensys['2497'])
-        #print(U2I2Recensys)
+        U2I2Recensys = self._build_u2i2recencies(df_obs, self.observation_end_date_)
 
         # 閲覧履歴に最新度、頻度、cv の情報を追加
         RowsInteraction = []
@@ -535,12 +527,7 @@ class RecencyFrequencyScorer:
         df_log = df_log[df_log[self._DATETIME_COL] <= target_date]
 
         # user と item ごとに最新度を計算
-        U2I2Recensys = {}
-        for row in df_log.itertuples():
-            recency = (target_date - row.datetime).days + 1
-            U2I2Recensys.setdefault(row.user, {})
-            U2I2Recensys[row.user].setdefault(row.item, [])
-            U2I2Recensys[row.user][row.item].append(recency)
+        U2I2Recensys = self._build_u2i2recencies(df_log, target_date)
 
         # 最新度と頻度を計算し、上限値でクランプしたうえで再閲覧確率を付与
         RowsInteraction = []
@@ -646,6 +633,13 @@ class RecencyFrequencyScorer:
 
         return df_eval
 
+
+    def _build_u2i2recencies(self, df, ref_date):
+        result = {}
+        for row in df.itertuples():
+            recency = (ref_date - row.datetime).days + 1
+            result.setdefault(row.user, {}).setdefault(row.item, []).append(recency)
+        return result
 
     def optimize(self, kind='mono'):
         """Estimate optimized revisit probabilities under RF constraints.
