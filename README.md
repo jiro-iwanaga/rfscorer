@@ -8,6 +8,8 @@ The package is designed for product recommendation and repeat-purchase modeling,
 
 > Note: In this package, **RF** stands for **Recency-Frequency**, not Random Forest.
 
+## Features
+
 ## Installation
 
 ```bash
@@ -46,6 +48,26 @@ df_rec_opt = scorer.transform(df_test, target_date="2026-07-07", kind="optimized
 
 - [Jiro Iwanaga, Kyota Ishihara, Naoki Nishimura, and Ikki Tanaka, *Pythonではじめる数理最適化 ―ケーススタディでモデリングのスキルを身につけよう―*(in Japanese), Ohmsha, 2021.](https://www.ohmsha.co.jp/book/9784274231759/)
   - [Chapter 7: 商品推薦のための興味のスコアリング(in Japanese)](https://github.com/ohmsha/PyOptBook/tree/main/7.recommendation)
+
+## Citing
+
+If you use `rfscorer` in academic work, please cite the following paper:
+
+Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano,
+"Estimating product-choice probabilities from recency and frequency of page views,"
+*Knowledge-Based Systems*, Volume 99, 2016, Pages 157–167.
+
+```bibtex
+@article{Iwanaga2016,
+  author  = {Jiro Iwanaga and Naoki Nishimura and Noriyoshi Sukegawa and Yuichi Takano},
+  title   = {Estimating product-choice probabilities from recency and frequency of page views},
+  journal = {Knowledge-Based Systems},
+  volume  = {99},
+  pages   = {157--167},
+  year    = {2016},
+  url     = {https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848}
+}
+```
 
 ## License
 
