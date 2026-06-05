@@ -748,9 +748,9 @@ class RecencyFrequencyScorer:
 
 if __name__ == "__main__":
     # データの読み込み（オーム社『Pythonではじめる数理最適化』サポートデータより引用）
-    #url = "https://raw.githubusercontent.com/ohmsha/PyOptBook/main/7.recommendation/access_log.csv"
-    #df = pd.read_csv(url)
-    df = pd.read_csv('examples/access_log.csv')
+    # url = "https://raw.githubusercontent.com/ohmsha/PyOptBook/main/7.recommendation/access_log.csv"
+    # df = pd.read_csv(url)
+    df = pd.read_csv("examples/access_log.csv")
     df_train = df[
         df.user_id.map(lambda x: hash(x) % 10 < 8)
     ]  # hash関数で簡易的に学習データ8割を抽出
@@ -780,7 +780,7 @@ if __name__ == "__main__":
     scorer.export_probability_csv("all")
 
     # テストの実施
-    target_date = '2015-07-07'
+    target_date = "2015-07-07"
     df_test_obs = df_test[df_test.date <= target_date]  # テストの観測期間データ
     df_test_eval = df_test[df_test.date > target_date]  # テストの評価期間データ(正解データ)
     UIrevisit = set([(row.user_id, row.item_id) for row in df_test_eval.itertuples()])  # 正解データ
