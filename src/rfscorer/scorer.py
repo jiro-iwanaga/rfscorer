@@ -1,6 +1,7 @@
 import pandas as pd
 from pandas.api.types import is_datetime64_any_dtype, is_string_dtype
 
+
 class RecencyFrequencyScorer:
     """Recency-Frequency based recommendation scorer.
 
@@ -14,28 +15,10 @@ class RecencyFrequencyScorer:
     _FREQUENCY_LIMIT_RATE = 0.95 # 最新度上限値自動計算の際に利用する割合
     _RECENCY_LIMIT_RATE = 0.95 # 頻度上限値自動計算の際に利用する割合
         
-    def __init__(self, df, user_col="user", item_col='item', datetime_col='datetime'):
-        if not isinstance(df, pd.DataFrame):
-            raise TypeError("df must be a pandas DataFrame.")
-
-        required_columns = [user_col, item_col, datetime_col]
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            raise ValueError(f"Missing required columns: {missing_columns}")
-   
-        # カラム名を内部処理用に変換
-        self.interaction_log = df[[user_col, item_col, datetime_col]].copy() # dfへの影響を与えないため copy を実施
-        self.interaction_log.columns = [self._USER_COL, self._ITEM_COL, self._DATETIME_COL]
-
-        # 各カラムのキャストの実施（user:str, item:str, datetime:datetime）
-        if not is_string_dtype(self.interaction_log[self._USER_COL]):
-            self.interaction_log[self._USER_COL] = self.interaction_log[self._USER_COL].astype(str)
-        if not is_string_dtype(self.interaction_log[self._ITEM_COL]):
-            self.interaction_log[self._ITEM_COL] = self.interaction_log[self._ITEM_COL].astype(str)
-        if not is_datetime64_any_dtype(self.interaction_log[self._DATETIME_COL]):
-            self.interaction_log[self._DATETIME_COL] = pd.to_datetime(
-                self.interaction_log[self._DATETIME_COL]
-            )
+    def __init__(self, user_col="user", item_col='item', datetime_col='datetime'):
+        self.user_col = user_col
+        self.item_col = item_col
+        self.datetime_col = datetime_col
 
         self.observation_start_date_ = None
         self.observation_end_date_ = None
@@ -43,26 +26,30 @@ class RecencyFrequencyScorer:
         self.evaluation_end_date_ = None
         self.recency_limit = None # 最新度の上限値(デフォルトでは _RECENCY_LIMIT_RATE を用いて自動計算)
         self.frequency_limit = None # 頻度の上限値(デフォルトでは _FREQUENCY_LIMIT_RATE を用いて自動計算)
+
         self.R = [] # 最新度のリスト
         self.F = [] # 頻度のリスト
         self.RF2N = {} # 最新度と頻度に対して閲覧数合計を紐づける辞書
         self.RF2CV = {} # 最新度と頻度に対して再閲覧数合計を紐づける辞書
         self.RF2Prob = {} # 最新度と頻度に対して経験的再閲覧確率を紐づける辞書
 
+        # empirical
         self.empirical_probability_ = None # 経験的再閲覧確率データフレーム(縦持ち)
         self.empirical_probability_table_ = None # 経験的再閲覧確率データフレーム(横持ち)
         self.empirical_probability_dict_ = None # 経験的再閲覧確率データフレーム(辞書:キーは最新度と頻度のペア)
 
+        # mono
         self.mono_probability_ = None
         self.mono_probability_table_ = None
         self.mono_probability_dict_ = None
 
+        # mcc
         self.mcc_probability_ = None
         self.mcc_probability_table_ = None
         self.mcc_probability_dict_ = None
 
         # データ解析用
-        self.record_num = len(self.interaction_log) # レコード数
+        self.record_num = None # レコード数（fit() 後に設定）
         self.record_num_obs = None # 観測期間レコード数
         self.record_num_eval = None # 評価期間レコード数
         self.record_num_target_org = None # 分析対象フィルタリング前レコード数
@@ -71,11 +58,13 @@ class RecencyFrequencyScorer:
         self.total_cv = None # cv 数
 
 
-    def fit(self, observation_period, evaluation_period, recency_limit=None, frequency_limit=None):
+    def fit(self, df, observation_period, evaluation_period, recency_limit=None, frequency_limit=None):
         """Estimate empirical revisit probabilities from interaction history.
 
         Parameters
         ----------
+        df : pd.DataFrame
+            Interaction log containing user, item, and datetime columns.
         observation_period : tuple[str | datetime, str | datetime]
             Start and end dates of the observation period.
         evaluation_period : tuple[str | datetime, str | datetime]
@@ -92,6 +81,29 @@ class RecencyFrequencyScorer:
         -------
         self
         """
+
+        # df のバリデーションと内部形式への変換
+        if not isinstance(df, pd.DataFrame):
+            raise TypeError("df must be a pandas DataFrame.")
+
+        required_columns = [self.user_col, self.item_col, self.datetime_col]
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+
+        interaction_log = df[[self.user_col, self.item_col, self.datetime_col]].copy()
+        interaction_log.columns = [self._USER_COL, self._ITEM_COL, self._DATETIME_COL]
+
+        if not is_string_dtype(interaction_log[self._USER_COL]):
+            interaction_log[self._USER_COL] = interaction_log[self._USER_COL].astype(str)
+        if not is_string_dtype(interaction_log[self._ITEM_COL]):
+            interaction_log[self._ITEM_COL] = interaction_log[self._ITEM_COL].astype(str)
+        if not is_datetime64_any_dtype(interaction_log[self._DATETIME_COL]):
+            interaction_log[self._DATETIME_COL] = pd.to_datetime(
+                interaction_log[self._DATETIME_COL]
+            )
+
+        self.record_num = len(interaction_log)
 
         # 観測期間の開始日と終了日、評価期間の開始日と終了日を datetime 型に変換
         if len(observation_period) != 2:
@@ -127,23 +139,21 @@ class RecencyFrequencyScorer:
         self.evaluation_end_date_ = eval_end
 
         # 観測期間のデータフレームの作成
-        df_obs = self.interaction_log[
-            (self.observation_start_date_ <= self.interaction_log.datetime)
-            & (self.interaction_log.datetime <= self.observation_end_date_)
+        df_obs = interaction_log[
+            (self.observation_start_date_ <= interaction_log.datetime)
+            & (interaction_log.datetime <= self.observation_end_date_)
             ]
         # 評価期間のデータフレームの作成
-        df_eval = self.interaction_log[
-            (self.evaluation_start_date_ <= self.interaction_log.datetime)
-            & (self.interaction_log.datetime <= self.evaluation_end_date_)
+        df_eval = interaction_log[
+            (self.evaluation_start_date_ <= interaction_log.datetime)
+            & (interaction_log.datetime <= self.evaluation_end_date_)
             ]
 
         self.record_num_obs = len(df_obs)
         self.record_num_eval = len(df_eval)
 
         # 評価期間に cv がある user と item のペアを作成
-        UIcv = set()
-        for row in df_eval.itertuples():
-            UIcv.add((row.user, row.item))
+        UIcv = {(row.user, row.item) for row in df_eval.itertuples()}
 
         U2I2Recensys = {}
         for row in df_obs.itertuples():
@@ -319,8 +329,8 @@ class RecencyFrequencyScorer:
         -------
         None
         """
-        import numpy as np
         import matplotlib.pyplot as plt
+        import numpy as np
 
         if kind not in ('empirical', 'mono', 'mcc'):
             raise ValueError(f"kind must be 'empirical', 'mono', or 'mcc', got '{kind}'.")
@@ -332,7 +342,7 @@ class RecencyFrequencyScorer:
             raise RuntimeError("optimize(kind='mcc') must be called before plot_probability_surface(kind='mcc').")
 
         from pathlib import Path
-        default_filename = f'{kind}_probability_surface.png'
+        default_filename = f'surface_{kind}_probability.png'
         if path is None:
             output_path = Path(default_filename)
         else:
@@ -698,25 +708,20 @@ if __name__ == "__main__":
 
     # サンプルデータの取得
     from pathlib import Path
-    df = pd.read_csv(Path(__file__).parents[2] / "examples" / "access_log.csv")
-    df_train = df[df.user_id.map(lambda x: x % 10 < 8)] # hash関数で簡易的に学習データ8割を抽出
-    df_test = df[df.user_id.map(lambda x: x % 10 >= 8)] # hash関数で簡易的にテストデータ2割を抽出
+    df = pd.read_csv('../../examples/access_log.csv')
+    df_train = df[df.user_id.map(lambda x: hash(x) % 10 < 8)] # hash関数で簡易的に学習データ8割を抽出
+    df_test = df[df.user_id.map(lambda x: hash(x) % 10 >= 8)] # hash関数で簡易的にテストデータ2割を抽出
 
     # スコアリングインスタンスの作成
-    scorer = RecencyFrequencyScorer(
-        df_train,
-        user_col = "user_id",
-        item_col = "item_id",
-        datetime_col = "date",
-        )
-    #print(scorer.interaction_log.head())
+    scorer = RecencyFrequencyScorer(user_col = "user_id", item_col = "item_id", datetime_col = "date")
+
 
     # 経験的再閲覧確率の計算
-    #observation_period = ('2015-07-01', '2015-07-06')
-    #evaluation_period = ('2015-07-07', '2015-07-08')
-    observation_period = ('2015-07-01', '2015-07-07')
-    evaluation_period = ('2015-07-08', '2015-07-08')
-    scorer.fit(observation_period, evaluation_period)
+    observation_period = ('2015-07-01', '2015-07-06')
+    evaluation_period = ('2015-07-07', '2015-07-08')
+    #observation_period = ('2015-07-01', '2015-07-07')
+    #evaluation_period = ('2015-07-08', '2015-07-08')
+    scorer.fit(df_train, observation_period, evaluation_period)
     scorer.plot_probability_surface('empirical')
     scorer.show()
 
