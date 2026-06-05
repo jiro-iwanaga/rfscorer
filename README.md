@@ -69,7 +69,7 @@ scorer.fit(
 
 The empirical surface reflects raw revisit rates and may be irregular due to sparse data.
 
-![empirical probability surface](img/empirical_probability_surface.png)
+![empirical probability surface](https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/empirical_probability_surface.png)
 
 Optionally, call `optimize()` to smooth the surface under RF monotonicity constraints using convex quadratic programming.
 `kind="mono"` enforces recency and frequency monotonicity.
@@ -78,7 +78,7 @@ Optionally, call `optimize()` to smooth the surface under RF monotonicity constr
 scorer.optimize(kind="mono")
 ```
 
-![mono probability surface](img/mono_probability_surface.png)
+![mono probability surface](https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/mono_probability_surface.png)
 
 `kind="mcc"` additionally adds convexity in recency and concavity in frequency, yielding a smoother surface.
 
@@ -86,7 +86,7 @@ scorer.optimize(kind="mono")
 scorer.optimize(kind="mcc")
 ```
 
-![mcc probability surface](img/mcc_probability_surface.png)
+![mcc probability surface](https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/mcc_probability_surface.png)
 
 Call `transform()` to score each user-item pair in the test log.
 It returns a DataFrame with columns `user`, `item`, `recency`, `frequency`, `probability`, and `order` (rank within each user, sorted by probability descending).
