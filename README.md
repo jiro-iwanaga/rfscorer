@@ -53,13 +53,6 @@ scorer.fit(
 )
 ```
 
-Call `transform()` to score each user-item pair in the test log.
-It returns a DataFrame with columns `user`, `item`, `recency`, `frequency`, `probability`, and `order` (rank within each user, sorted by probability descending).
-
-```python
-df_rec_emp = scorer.transform(df_test, target_date="2026-07-07", kind="empirical")
-```
-
 Optionally, call `optimize()` to smooth the empirical probabilities under RF monotonicity constraints using convex quadratic programming.
 `kind="mono"` enforces recency and frequency monotonicity; `kind="mcc"` additionally adds convexity in recency and concavity in frequency.
 
@@ -67,7 +60,8 @@ Optionally, call `optimize()` to smooth the empirical probabilities under RF mon
 scorer.optimize(kind="mono")
 ```
 
-Pass `kind="mono"` (or `kind="mcc"`) to `transform()` to use the optimized probabilities instead.
+Call `transform()` to score each user-item pair in the test log.
+It returns a DataFrame with columns `user`, `item`, `recency`, `frequency`, `probability`, and `order` (rank within each user, sorted by probability descending).
 
 ```python
 df_rec_mono = scorer.transform(df_test, target_date="2026-07-07", kind="mono")
