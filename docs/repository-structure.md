@@ -21,7 +21,8 @@ rfscorer/
 │       ├── scorer.py                 # RecencyFrequencyScorer
 │       └── optimizer.py              # RFOptimizer
 ├── tests/
-│   └── test_scorer.py
+│   ├── test_scorer.py
+│   └── test_optimizer.py
 ├── examples/
 │   ├── access_log.csv
 │   └── basic_usage.ipynb
@@ -58,6 +59,7 @@ rfscorer/
 | パス | 説明 |
 |------|------|
 | `test_scorer.py` | `RecencyFrequencyScorer` のユニットテスト |
+| `test_optimizer.py` | `RFOptimizer` のユニットテスト |
 
 ### `examples/`
 

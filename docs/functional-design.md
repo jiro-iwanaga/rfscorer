@@ -57,26 +57,24 @@ $$\sum_{r\in R, f\in F} N_{r,f} \cdot(p_{r,f} - x_{r,f})^2$$
 #### コンストラクタ
 
 ```python
-RecencyFrequencyScorer(df, user_col="user", item_col="item", datetime_col="datetime")
+RecencyFrequencyScorer(user_col="user", item_col="item", datetime_col="datetime")
 ```
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
-| `df` | `pd.DataFrame` | — | 閲覧履歴 |
 | `user_col` | `str` | `"user"` | ユーザー識別子のカラム名 |
 | `item_col` | `str` | `"item"` | 商品識別子のカラム名 |
 | `datetime_col` | `str` | `"datetime"` | 閲覧日付のカラム名 |
 
-内部では指定されたカラムを `user`・`item`・`datetime` に正規化して保持する（`interaction_log` 属性）。
-
 #### メソッド
 
-##### `fit(observation_period, evaluation_period, recency_limit=None, frequency_limit=None)`
+##### `fit(df, observation_period, evaluation_period, recency_limit=None, frequency_limit=None)`
 
 観測期間・評価期間に基づき、$(r, f)$ 別の経験的再閲覧確率を推定する。
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
+| `df` | `pd.DataFrame` | — | 閲覧履歴 |
 | `observation_period` | `tuple[str \| datetime, str \| datetime]` | — | 観測期間の開始日・終了日 |
 | `evaluation_period` | `tuple[str \| datetime, str \| datetime]` | — | 評価期間の開始日・終了日 |
 | `recency_limit` | `int \| None` | `None` | 最大最新度。`None` の場合、累積再閲覧数の分布から `RECENCY_LIMIT_RATE` に基づいて自動決定 |
@@ -168,7 +166,6 @@ RF 制約を満たす最適化再閲覧確率を推定する。`fit()` の後に
 
 | 属性 | 型 | 説明 | 利用可能なタイミング |
 |------|-----|------|-----------------|
-| `interaction_log` | `pd.DataFrame` | 正規化済み閲覧履歴（カラム: `user`, `item`, `datetime`） | `__init__()` 後 |
 | `recency_limit` | `int` | 最新度の上限値 | `fit()` 後 |
 | `frequency_limit` | `int` | 頻度の上限値 | `fit()` 後 |
 | `R` | `list[int]` | 最新度のリスト（`range(1, recency_limit+1)`） | `fit()` 後 |
@@ -185,7 +182,7 @@ RF 制約を満たす最適化再閲覧確率を推定する。`fit()` の後に
 | `mcc_probability_` | `pd.DataFrame` | mcc モデル最適化再閲覧確率（カラム: `recency`, `frequency`, `probability`） | `optimize(kind='mcc')` 後 |
 | `mcc_probability_table_` | `pd.DataFrame` | mcc モデル最適化再閲覧確率（横持ち） | `optimize(kind='mcc')` 後 |
 | `mcc_probability_dict_` | `dict` | mcc モデル最適化再閲覧確率（キー: `(r, f)`、値: `probability`） | `optimize(kind='mcc')` 後 |
-| `record_num` | `int` | 全閲覧履歴のレコード数 | `__init__()` 後 |
+| `record_num` | `int` | 全閲覧履歴のレコード数 | `fit()` 後 |
 | `record_num_obs` | `int` | 観測期間のレコード数 | `fit()` 後 |
 | `record_num_eval` | `int` | 評価期間のレコード数 | `fit()` 後 |
 | `record_num_target_org` | `int` | フィルタリング前の分析対象レコード数 | `fit()` 後 |
@@ -198,10 +195,8 @@ RF 制約を満たす最適化再閲覧確率を推定する。`fit()` の後に
 ```
 入力 DataFrame (任意のカラム名)
         │
-        ▼  __init__()
-user / item / datetime に正規化 → interaction_log
-        │
-        ▼  fit(observation_period, evaluation_period)
+        ▼  fit(df, observation_period, evaluation_period)
+user / item / datetime に正規化（fit() 内のローカル変数）
 観測期間・評価期間でフィルタ
 r（最新度ランク）・f（頻度）を算出
 (r, f) 別に n_{r,f}・N_{r,f} を集計
@@ -238,9 +233,10 @@ from rfscorer import RecencyFrequencyScorer
 df = pd.read_csv("examples/access_log.csv")
 # access_log.csv のカラム: user_id, item_id, date
 
-scorer = RecencyFrequencyScorer(df, user_col="user_id", item_col="item_id", datetime_col="date")
+scorer = RecencyFrequencyScorer(user_col="user_id", item_col="item_id", datetime_col="date")
 
 scorer.fit(
+    df,
     observation_period=("2015-07-02", "2015-07-06"),
     evaluation_period=("2015-07-07", "2015-07-08"),
 )
