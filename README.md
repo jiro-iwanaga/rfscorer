@@ -4,7 +4,7 @@
 
 It estimates **revisit probabilities** — the preference score for each user-item pair, forming a matrix analogous to a rating matrix — from interaction histories, using two simple but powerful behavioral signals: **recency**, which captures how recently a user interacted with an item, and **frequency**, which captures how often the user has interacted with it.
 
-The package is designed for product recommendation and repeat-purchase modeling, especially in settings where interpretable scoring based on interaction history is preferred over black-box recommendation models.
+The package is designed for product recommendation and revisit modeling, especially in settings where interpretable scoring based on interaction history is preferred over black-box recommendation models.
 
 > Note: In this package, **RF** stands for **Recency-Frequency**, not Random Forest.
 
