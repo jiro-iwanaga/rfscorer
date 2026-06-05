@@ -102,6 +102,10 @@ df_rec_mcc = scorer.transform(df_test, target_date="2026-07-07", kind="mcc")
 
 Within each user, rows are sorted by `probability` descending; `order` represents the recommendation rank.
 
+## Examples
+
+- [examples/basic_usage.ipynb](examples/basic_usage.ipynb) — end-to-end walkthrough: load data, fit, optimize, transform, and evaluate
+
 ## References
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
 
