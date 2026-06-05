@@ -220,7 +220,7 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# 
+# for development
 src/rfscorer/*.csv
 src/rfscorer/*.png
 workspace/
