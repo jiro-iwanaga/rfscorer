@@ -32,10 +32,10 @@ RF スコアリング手法を Python パッケージとして PyPI に公開し
 
 ### 入力
 
-- ユーザー × 商品のインタラクション履歴を表す DataFrame（コンストラクタに渡す）
-  - カラム名は `user_col`・`item_col`・`datetime_col` 引数で指定する（デフォルト: `user`・`item`・`datetime`）
-  - 同一ユーザー × 商品の組み合わせが複数行存在することを想定（リピート閲覧）
-- 観測期間・評価期間（`fit()` に渡す）
+- コンストラクタ
+  - カラム名を `user_col`・`item_col`・`datetime_col` で指定する（デフォルト: `user`・`item`・`datetime`）
+- `fit()` に渡す引数
+  - `df`: ユーザー × 商品のインタラクション履歴 DataFrame。同一ユーザー × 商品の組み合わせが複数行存在することを想定（リピート閲覧）
   - `observation_period`: 観測期間の開始日・終了日の tuple
   - `evaluation_period`: 評価期間の開始日・終了日の tuple
 
@@ -51,7 +51,8 @@ RF スコアリング手法を Python パッケージとして PyPI に公開し
 | 属性 | 説明 |
 |------|------|
 | `empirical_probability_` | 経験的再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `N`, `cv`, `probability`）。`fit()` 後にアクセス可能 |
-| `optimized_probability_` | 最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize()` 後にアクセス可能 |
+| `mono_probability_` | mono モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mono')` 後にアクセス可能 |
+| `mcc_probability_` | mcc モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mcc')` 後にアクセス可能 |
 
 ### API
 
@@ -60,16 +61,20 @@ import pandas as pd
 from rfscorer import RecencyFrequencyScorer
 
 df = pd.read_csv("examples/access_log.csv")
-scorer = RecencyFrequencyScorer(df, user_col="user_id", item_col="item_id", datetime_col="date")
+scorer = RecencyFrequencyScorer(user_col="user_id", item_col="item_id", datetime_col="date")
 
 scorer.fit(
+    df,
     observation_period=("2015-07-02", "2015-07-06"),
     evaluation_period=("2015-07-07", "2015-07-08"),
 )
 df_empirical = scorer.empirical_probability_
 
-scorer.optimize()
-df_optimized = scorer.optimized_probability_
+scorer.optimize(kind="mono")
+df_mono = scorer.mono_probability_
+
+scorer.optimize(kind="mcc")
+df_mcc = scorer.mcc_probability_
 ```
 
 ## 非機能要求
