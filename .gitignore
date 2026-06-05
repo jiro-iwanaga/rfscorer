@@ -226,3 +226,10 @@ src/rfscorer/*.csv
 src/rfscorer/*.png
 workspace/
 examples/*.png
+all_probability.csv
+df_recommend_emp.csv
+df_recommend_mcc.csv
+df_recommend_mono.csv
+surface_empirical_probability.png
+surface_mcc_probability.png
+surface_mono_probability.png
