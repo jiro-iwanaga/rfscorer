@@ -239,13 +239,9 @@ class RecencyFrequencyScorer:
         RowsRF = []
         for r in self.R:
             for f in self.F:
-                if self.RF2N[r,f]>0:
-                    prob = self.RF2CV[r,f] / self.RF2N[r,f]
-                else:
-                    prob = 0.0
-                self.RF2Prob[r,f] = prob
-                row_rf = (r, f, self.RF2N[r,f], self.RF2CV[r,f], prob)
-                RowsRF.append(row_rf)
+                prob = self.RF2CV[r, f] / self.RF2N[r, f] if self.RF2N[r, f] > 0 else 0.0
+                self.RF2Prob[r, f] = prob
+                RowsRF.append((r, f, self.RF2N[r, f], self.RF2CV[r, f], prob))
 
         # 経験的再閲覧確率辞書の作成
         self.empirical_probability_dict_ = {(r, f): prob for r, f, _, _, prob in RowsRF}
