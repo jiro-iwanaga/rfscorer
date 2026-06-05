@@ -36,6 +36,16 @@ df_train = ...  # training interaction log (columns: user, item, datetime)
 df_test  = ...  # test interaction log  (columns: user, item, datetime)
 ```
 
+| user  | item  | datetime            |
+|-------|-------|---------------------|
+| u_001 | i_032 | 2026-07-01 09:12:00 |
+| u_001 | i_017 | 2026-07-03 14:35:00 |
+| u_001 | i_032 | 2026-07-05 11:20:00 |
+| u_002 | i_011 | 2026-07-02 08:45:00 |
+| u_002 | i_058 | 2026-07-04 16:00:00 |
+
+The same user-item pair may appear multiple times, representing repeat visits.
+
 Instantiate the scorer, specifying the column names if they differ from the defaults (`user`, `item`, `datetime`).
 
 ```python
