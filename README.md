@@ -1,5 +1,9 @@
 # rfscorer
 
+[![CI](https://github.com/jiro-iwanaga/rfscorer/actions/workflows/ci.yml/badge.svg)](https://github.com/jiro-iwanaga/rfscorer/actions/workflows/ci.yml)
+[![PyPI version](https://badge.fury.io/py/rfscorer.svg)](https://badge.fury.io/py/rfscorer)
+[![Python Versions](https://img.shields.io/pypi/pyversions/rfscorer.svg)](https://pypi.org/project/rfscorer/)
+
 `rfscorer` is a Python package for Recency-Frequency based recommendation scoring.
 
 It estimates **revisit probabilities** — the preference score for each user-item pair, forming a matrix analogous to a rating matrix — from interaction histories, using two simple but powerful behavioral signals: **recency**, which captures how recently a user interacted with an item, and **frequency**, which captures how often the user has interacted with it.
