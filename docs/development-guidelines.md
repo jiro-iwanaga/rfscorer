@@ -17,6 +17,7 @@
 | フォーマット | `uv run ruff format .` |
 | パッケージビルド | `uv build` |
 | PyPI 公開 | `uv publish` |
+| JupyterLab 起動 | `uv run jupyter lab --no-browser --ServerApp.token='' --ServerApp.password=''` |
 
 ## コーディング規約
 

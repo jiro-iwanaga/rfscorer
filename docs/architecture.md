@@ -15,6 +15,8 @@
 |-----------|------|
 | `pytest` | テスト |
 | `ruff` | リント・フォーマット |
+| `jupyterlab` | `examples/` の Jupyter ノートブック実行環境 |
+| `ipykernel` | JupyterLab 用 Python カーネル |
 
 ## ビルド・配布
 
