@@ -21,6 +21,8 @@ Repository = "https://github.com/erdos-the-book/rfscorer"
 
 [dependency-groups]
 dev = [
+    "ipykernel>=7.2.0",
+    "jupyterlab>=4.5.8",
     "pytest",
     "ruff",
 ]
