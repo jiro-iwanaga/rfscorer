@@ -16,6 +16,17 @@ class RecencyFrequencyScorer:
     _RECENCY_LIMIT_RATE = 0.95 # 頻度上限値自動計算の際に利用する割合
         
     def __init__(self, user_col="user", item_col='item', datetime_col='datetime'):
+        """Initialize the scorer with column name mappings.
+
+        Parameters
+        ----------
+        user_col : str, default 'user'
+            Column name for user IDs in the interaction log.
+        item_col : str, default 'item'
+            Column name for item IDs in the interaction log.
+        datetime_col : str, default 'datetime'
+            Column name for interaction timestamps in the interaction log.
+        """
         self.user_col = user_col
         self.item_col = item_col
         self.datetime_col = datetime_col
@@ -263,6 +274,7 @@ class RecencyFrequencyScorer:
     
     
     def show(self):
+        """Print a summary of fit() results to stdout."""
         print('=== profiling ===')
 
         if self.record_num:
@@ -303,11 +315,12 @@ class RecencyFrequencyScorer:
 
         Parameters
         ----------
-        kind : {'empirical', 'optimized'}, default 'empirical'
-            Which probability to visualize.
+        kind : {'empirical', 'mono', 'mcc'}, default 'empirical'
+            Which probability to visualize. 'empirical' uses fit() results;
+            'mono' and 'mcc' use optimize() results.
         path : str or None, default None
             Output file path for the PNG image. If None, saves as
-            '{kind}_probability_surface.png' in the current directory.
+            'surface_{kind}_probability.png' in the current directory.
 
         Returns
         -------
@@ -362,10 +375,11 @@ class RecencyFrequencyScorer:
 
         Parameters
         ----------
-        kind : {'empirical', 'optimized', 'all'}, default 'empirical'
-            Which probability to export. 'all' merges both empirical and
-            optimized into a single file with columns
-            empirical_probability and optimized_probability.
+        kind : {'empirical', 'mono', 'mcc', 'all'}, default 'empirical'
+            Which probability to export. 'empirical' uses fit() results;
+            'mono' and 'mcc' use optimize() results; 'all' merges empirical,
+            mono, and mcc into a single file with columns
+            empirical_probability, mono_probability, and mcc_probability.
         path : str or None, default None
             Output file path for the CSV. If None, saves as
             '{kind}_probability.csv' in the current directory.
@@ -422,9 +436,9 @@ class RecencyFrequencyScorer:
             Recency rank.
         f : int
             Frequency.
-        kind : {'empirical', 'optimized'}, default 'empirical'
-            Which probability to use. 'empirical' uses empirical_probability_dict_
-            estimated by fit(). 'optimized' uses the result of optimize().
+        kind : {'empirical', 'mono', 'mcc'}, default 'empirical'
+            Which probability to use. 'empirical' uses fit() results;
+            'mono' and 'mcc' use optimize() results.
 
         Returns
         -------
@@ -470,19 +484,22 @@ class RecencyFrequencyScorer:
         target_date : str or datetime
             Reference date for computing recency and frequency.
             Rows after this date are excluded.
-        kind : {'empirical', 'optimized'}, default 'empirical'
-            Which probability to use.
-        user_col : str, optional
-            Column name for user. Defaults to the value used in __init__.
-        item_col : str, optional
-            Column name for item. Defaults to the value used in __init__.
-        datetime_col : str, optional
-            Column name for datetime. Defaults to the value used in __init__.
+        kind : {'empirical', 'mono', 'mcc'}, default 'empirical'
+            Which probability to use. 'empirical' uses fit() results;
+            'mono' and 'mcc' use optimize() results.
+        user_col : str, default 'user'
+            Column name for user IDs in df.
+        item_col : str, default 'item'
+            Column name for item IDs in df.
+        datetime_col : str, default 'datetime'
+            Column name for interaction timestamps in df.
 
         Returns
         -------
         pd.DataFrame
-            Copy of df with added columns: recency, frequency, probability.
+            One row per user-item pair observed in df (up to target_date).
+            Columns: user_col, item_col, recency, frequency, probability, order.
+            Sorted by user ascending and probability descending; order starts at 1.
         """
         if kind not in ('empirical', 'mono', 'mcc'):
             raise ValueError(f"kind must be 'empirical', 'mono', or 'mcc', got '{kind}'.")
