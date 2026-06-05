@@ -11,8 +11,8 @@ class RecencyFrequencyScorer:
     _USER_COL = "user"
     _ITEM_COL = "item"
     _DATETIME_COL = "datetime"
-    _FREQUENCY_LIMIT_RATE = 0.95
-    _RECENCY_LIMIT_RATE = 0.95
+    _FREQUENCY_LIMIT_RATE = 0.95 # 最新度上限値自動計算の際に利用する割合
+    _RECENCY_LIMIT_RATE = 0.95 # 頻度上限値自動計算の際に利用する割合
         
     def __init__(self, df, user_col="user", item_col='item', datetime_col='datetime'):
         if not isinstance(df, pd.DataFrame):
@@ -45,9 +45,9 @@ class RecencyFrequencyScorer:
         self.frequency_limit = None # 頻度の上限値(デフォルトでは _FREQUENCY_LIMIT_RATE を用いて自動計算)
         self.R = [] # 最新度のリスト
         self.F = [] # 頻度のリスト
-        self.RF2N = {}
-        self.RF2CV = {}
-        self.RF2Prob = {}
+        self.RF2N = {} # 最新度と頻度に対して閲覧数合計を紐づける辞書
+        self.RF2CV = {} # 最新度と頻度に対して再閲覧数合計を紐づける辞書
+        self.RF2Prob = {} # 最新度と頻度に対して経験的再閲覧確率を紐づける辞書
 
         self.empirical_probability_ = None # 経験的再閲覧確率データフレーム(縦持ち)
         self.empirical_probability_table_ = None # 経験的再閲覧確率データフレーム(横持ち)
@@ -589,22 +589,38 @@ class RecencyFrequencyScorer:
         item_col = item_col or df_rec.columns[1]
 
         df_rec = df_rec.copy()
-        df_rec[user_col] = df_rec[user_col].astype(str)
-        df_rec[item_col] = df_rec[item_col].astype(str)
-        UIrevisit = {(str(u), str(i)) for u, i in UIrevisit}
+        try:
+            df_rec[user_col] = df_rec[user_col].astype(str)
+        except Exception as e:
+            raise ValueError(
+                f"Failed to cast column '{user_col}' to str: {e}"
+            ) from e
+        try:
+            df_rec[item_col] = df_rec[item_col].astype(str)
+        except Exception as e:
+            raise ValueError(
+                f"Failed to cast column '{item_col}' to str: {e}"
+            ) from e
+        try:
+            UIrevisit = {(str(u), str(i)) for u, i in UIrevisit}
+        except (TypeError, ValueError) as e:
+            raise ValueError(
+                "UIrevisit must be a set of (user, item) 2-tuples. "
+                f"Failed to convert: {e}"
+            ) from e
 
         order_max = df_rec.order.max()
 
         target_orders = list(range(1, order+1))
         target_orders += [order_max] if order_max not in set(target_orders) else []
         Rows = []
-        for ord in target_orders:
-            df_k = df_rec[df_rec['order'] <= ord]
+        for recommend_num in target_orders:
+            df_k = df_rec[df_rec['order'] <= recommend_num]
             UIrec = set(zip(df_k[user_col], df_k[item_col]))
             n_hit = len(UIrec & UIrevisit)
             n_recommended = len(UIrec)
             precision = n_hit / n_recommended if n_recommended > 0 else 0.0
-            Rows.append((ord, n_recommended, n_hit, precision))
+            Rows.append((recommend_num, n_recommended, n_hit, precision))
         df_eval = pd.DataFrame(
             Rows,
             columns=['order', 'n_recommended', 'n_hit', 'precision']
@@ -642,6 +658,9 @@ class RecencyFrequencyScorer:
         -------
         self
         """
+        if kind not in ('mono', 'mcc'):
+            raise ValueError(f"kind must be 'mono' or 'mcc', got '{kind}'.")
+
         try:
             from .optimizer import RFOptimizer
         except ImportError:
@@ -697,42 +716,47 @@ if __name__ == "__main__":
     observation_period = ('2015-07-01', '2015-07-07')
     evaluation_period = ('2015-07-08', '2015-07-08')
     scorer.fit(observation_period, evaluation_period)
-
-    scorer.show()
-    scorer.export_probability_csv('empirical')
     scorer.plot_probability_surface('empirical')
+    scorer.show()
 
+    # 最適化(Mono)
     scorer.optimize(kind='mono')
-    scorer.optimize(kind='mcc')
-    scorer.export_probability_csv('mono')
-    scorer.export_probability_csv('mcc')
-    scorer.export_probability_csv('all')
     scorer.plot_probability_surface('mono')
+
+    # 最適化(MCC)
+    scorer.optimize(kind='mcc')
     scorer.plot_probability_surface('mcc')
 
-    target_date = '2015-07-07'
-    df_test_obs = df_test[df_test.date <= target_date]
-    df_test_eval = df_test[df_test.date > target_date]
-    UIrevisit = set([(row.user_id, row.item_id) for row in df_test_eval.itertuples()])
+    # 全確率テーブルの出力
+    scorer.export_probability_csv('all')
 
+    # テストの実施
+    target_date = '2015-07-07'
+    df_test_obs = df_test[df_test.date <= target_date] # テストの観測期間データ
+    df_test_eval = df_test[df_test.date > target_date] # テストの評価期間データ(正解データ)
+    UIrevisit = set([(row.user_id, row.item_id) for row in df_test_eval.itertuples()]) # 正解データ
+
+    print('--- empirical ---')
     df_rec_emp = scorer.transform(
         df_test_obs, target_date, 'empirical',
         user_col='user_id', item_col='item_id', datetime_col='date',
     )
-    print('--- empirical ---')
+    df_rec_emp.to_csv('df_recommend_emp.csv', index=False)
     print(scorer.evaluate(df_rec_emp, UIrevisit, order=10))
 
+    print('--- mono ---')
     df_rec_mono = scorer.transform(
         df_test_obs, target_date, 'mono',
         user_col='user_id', item_col='item_id', datetime_col='date',
     )
-    print('--- mono ---')
+    df_rec_mono.to_csv('df_recommend_mono.csv', index=False)
     print(scorer.evaluate(df_rec_mono, UIrevisit, order=10))
 
+    print('--- mcc ---')
     df_rec_mcc = scorer.transform(
         df_test_obs, target_date, 'mcc',
         user_col='user_id', item_col='item_id', datetime_col='date',
     )
-    print('--- mcc ---')
+    df_rec_mcc.to_csv('df_recommend_mcc.csv', index=False)
     print(scorer.evaluate(df_rec_mcc, UIrevisit, order=10))
 
