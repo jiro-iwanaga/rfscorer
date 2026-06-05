@@ -2,9 +2,9 @@
 
 `rfscorer` is a Python package for Recency-Frequency based recommendation scoring.
 
-It estimates recommendation scores and purchase probabilities from user-item interaction histories by using two simple but powerful behavioral signals: **recency**, which captures how recently a user interacted with an item, and **frequency**, which captures how often the user has interacted with it.
+It estimates **revisit probabilities** — the preference score for each user-item pair, forming a matrix analogous to a rating matrix — from interaction histories, using two simple but powerful behavioral signals: **recency**, which captures how recently a user interacted with an item, and **frequency**, which captures how often the user has interacted with it.
 
-The package is designed for product recommendation and repeat-purchase modeling, especially in settings where interpretable scoring based on purchase or interaction history is preferred over black-box recommendation models.
+The package is designed for product recommendation and repeat-purchase modeling, especially in settings where interpretable scoring based on interaction history is preferred over black-box recommendation models.
 
 > Note: In this package, **RF** stands for **Recency-Frequency**, not Random Forest.
 
@@ -26,34 +26,90 @@ pip install rfscorer
 
 ```python
 from rfscorer import RecencyFrequencyScorer
+```
 
+Prepare an interaction log with at least three columns: user ID, item ID, and timestamp.
+Split it into a training set and a test set.
+
+```python
 df_train = ...  # training interaction log (columns: user, item, datetime)
 df_test  = ...  # test interaction log  (columns: user, item, datetime)
+```
 
-scorer = RecencyFrequencyScorer(df_train)
+| user  | item  | datetime            |
+|-------|-------|---------------------|
+| u_001 | i_032 | 2026-07-01 09:12:00 |
+| u_001 | i_017 | 2026-07-03 14:35:00 |
+| u_001 | i_032 | 2026-07-05 11:20:00 |
+| u_002 | i_011 | 2026-07-02 08:45:00 |
+| u_002 | i_058 | 2026-07-04 16:00:00 |
 
-# Estimate empirical revisit probabilities
+The same user-item pair may appear multiple times, representing repeat visits.
+
+Instantiate the scorer, specifying the column names if they differ from the defaults (`user`, `item`, `datetime`).
+
+```python
+scorer = RecencyFrequencyScorer()
+```
+
+Call `fit()` to estimate empirical revisit probabilities from the training log.
+Specify the observation period (from which recency and frequency are computed) and the evaluation period (which provides the ground-truth revisit labels).
+
+```python
 scorer.fit(
+    df_train,
     observation_period=("2026-07-01", "2026-07-07"),
     evaluation_period=("2026-07-08", "2026-07-08"),
 )
-
-# Score with empirical probabilities
-# Returns DataFrame with recency, frequency, probability, order per user-item pair
-df_rec_emp = scorer.transform(df_test, target_date="2026-07-07", kind="empirical")
-
-# Estimate optimized probabilities under RF monotonicity constraints (optional)
-scorer.optimize()
-
-# Score with optimized probabilities
-df_rec_opt = scorer.transform(df_test, target_date="2026-07-07", kind="optimized")
 ```
+
+The empirical surface reflects raw revisit rates and may be irregular due to sparse data.
+
+![empirical probability surface](img/surface_empirical_probability.png)
+
+Optionally, call `optimize()` to smooth the surface under RF monotonicity constraints using convex quadratic programming.
+`kind="mono"` enforces recency and frequency monotonicity.
+
+```python
+scorer.optimize(kind="mono")
+```
+
+![mono probability surface](img/surface_mono_probability.png)
+
+`kind="mcc"` additionally adds convexity in recency and concavity in frequency, yielding a smoother surface.
+
+```python
+scorer.optimize(kind="mcc")
+```
+
+![mcc probability surface](img/surface_mcc_probability.png)
+
+Call `transform()` to score each user-item pair in the test log.
+It returns a DataFrame with columns `user`, `item`, `recency`, `frequency`, `probability`, and `order` (rank within each user, sorted by probability descending).
+Pass `kind="empirical"`, `kind="mono"`, or `kind="mcc"` to select which probabilities to use.
+
+```python
+df_rec_mcc = scorer.transform(df_test, target_date="2026-07-07", kind="mcc")
+```
+
+| user   | item   | recency | frequency | probability | order |
+|--------|--------|--------:|----------:|------------:|------:|
+| u_001  | i_032  |       1 |         4 |      0.1167 |     1 |
+| u_001  | i_017  |       2 |         3 |      0.0789 |     2 |
+| u_001  | i_045  |       3 |         1 |      0.0248 |     3 |
+| u_002  | i_011  |       1 |         2 |      0.0621 |     1 |
+| u_002  | i_058  |       4 |         1 |      0.0182 |     2 |
+
+Within each user, rows are sorted by `probability` descending; `order` represents the recommendation rank.
 
 ## References
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
 
 - [Jiro Iwanaga, Kyota Ishihara, Naoki Nishimura, and Ikki Tanaka, *Pythonではじめる数理最適化 ―ケーススタディでモデリングのスキルを身につけよう―*(in Japanese), Ohmsha, 2021.](https://www.ohmsha.co.jp/book/9784274231759/)
   - [Chapter 7: 商品推薦のための興味のスコアリング(in Japanese)](https://github.com/ohmsha/PyOptBook/tree/main/7.recommendation)
+
+- [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Improving collaborative filtering recommendations by estimating user preferences from clickstream data,” Electronic Commerce Research and Applications, Volume 37, Article 100877, 2019.](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)
+
 
 ## Citing
 
@@ -72,6 +128,24 @@ Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano,
   pages   = {157--167},
   year    = {2016},
   url     = {https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848}
+}
+```
+
+If you additionally use the probability matrix as input to a collaborative filtering model, please also cite:
+
+Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano,
+"Improving collaborative filtering recommendations by estimating user preferences from clickstream data,"
+*Electronic Commerce Research and Applications*, Volume 37, Article 100877, 2019.
+
+```bibtex
+@article{Iwanaga2019,
+  author  = {Jiro Iwanaga and Naoki Nishimura and Noriyoshi Sukegawa and Yuichi Takano},
+  title   = {Improving collaborative filtering recommendations by estimating user preferences from clickstream data},
+  journal = {Electronic Commerce Research and Applications},
+  volume  = {37},
+  pages   = {100877},
+  year    = {2019},
+  url     = {https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547}
 }
 ```
 

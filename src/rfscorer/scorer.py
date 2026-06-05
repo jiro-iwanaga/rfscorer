@@ -16,6 +16,17 @@ class RecencyFrequencyScorer:
     _RECENCY_LIMIT_RATE = 0.95 # 頻度上限値自動計算の際に利用する割合
         
     def __init__(self, user_col="user", item_col='item', datetime_col='datetime'):
+        """Initialize the scorer with column name mappings.
+
+        Parameters
+        ----------
+        user_col : str, default 'user'
+            Column name for user IDs in the interaction log.
+        item_col : str, default 'item'
+            Column name for item IDs in the interaction log.
+        datetime_col : str, default 'datetime'
+            Column name for interaction timestamps in the interaction log.
+        """
         self.user_col = user_col
         self.item_col = item_col
         self.datetime_col = datetime_col
@@ -155,29 +166,17 @@ class RecencyFrequencyScorer:
         # 評価期間に cv がある user と item のペアを作成
         UIcv = {(row.user, row.item) for row in df_eval.itertuples()}
 
-        U2I2Recensys = {}
-        for row in df_obs.itertuples():
-            # 最新度計算
-            recency = (self.observation_end_date_ - row.datetime).days + 1
-            U2I2Recensys.setdefault(row.user, {})
-            U2I2Recensys[row.user].setdefault(row.item, [])
-            U2I2Recensys[row.user][row.item].append(recency)
-        #print(U2I2Recensys['2497'])
-        #print(U2I2Recensys)
+        U2I2Recensys = self._build_u2i2recencies(df_obs, self.observation_end_date_)
 
         # 閲覧履歴に最新度、頻度、cv の情報を追加
-        RowsInteraction = []
-        for user, I2Recencys in U2I2Recensys.items():
-            for item, Recencys in I2Recencys.items():
-                frequency = len(Recencys)
-                recency = min(Recencys)
-                cv = 1 if (user, item) in UIcv else 0 # 評価期間における cv(0/1) を追加
-                new_row = (user, item, recency, frequency, cv)
-                RowsInteraction.append(new_row)
+        rows = [
+            (user, item, recency, frequency, int((user, item) in UIcv))
+            for user, item, recency, frequency in self._iter_u2i_rf(U2I2Recensys)
+        ]
         df_ui2frc = pd.DataFrame(
-            RowsInteraction, 
+            rows,
             columns=[self._USER_COL, self._ITEM_COL, 'recency', 'frequency', 'cv']
-            )
+        )
         self.record_num_target_org = len(df_ui2frc) # レコード数の計測(フィルタリング前)
         self.total_cv_org = df_ui2frc.cv.sum() # cv数の計測(フィルタリング前)
 
@@ -251,13 +250,9 @@ class RecencyFrequencyScorer:
         RowsRF = []
         for r in self.R:
             for f in self.F:
-                if self.RF2N[r,f]>0:
-                    prob = self.RF2CV[r,f] / self.RF2N[r,f]
-                else:
-                    prob = 0.0
-                self.RF2Prob[r,f] = prob
-                row_rf = (r, f, self.RF2N[r,f], self.RF2CV[r,f], prob)
-                RowsRF.append(row_rf)
+                prob = self.RF2CV[r, f] / self.RF2N[r, f] if self.RF2N[r, f] > 0 else 0.0
+                self.RF2Prob[r, f] = prob
+                RowsRF.append((r, f, self.RF2N[r, f], self.RF2CV[r, f], prob))
 
         # 経験的再閲覧確率辞書の作成
         self.empirical_probability_dict_ = {(r, f): prob for r, f, _, _, prob in RowsRF}
@@ -279,6 +274,7 @@ class RecencyFrequencyScorer:
     
     
     def show(self):
+        """Print a summary of fit() results to stdout."""
         print('=== profiling ===')
 
         if self.record_num:
@@ -319,11 +315,12 @@ class RecencyFrequencyScorer:
 
         Parameters
         ----------
-        kind : {'empirical', 'optimized'}, default 'empirical'
-            Which probability to visualize.
+        kind : {'empirical', 'mono', 'mcc'}, default 'empirical'
+            Which probability to visualize. 'empirical' uses fit() results;
+            'mono' and 'mcc' use optimize() results.
         path : str or None, default None
             Output file path for the PNG image. If None, saves as
-            '{kind}_probability_surface.png' in the current directory.
+            'surface_{kind}_probability.png' in the current directory.
 
         Returns
         -------
@@ -378,10 +375,11 @@ class RecencyFrequencyScorer:
 
         Parameters
         ----------
-        kind : {'empirical', 'optimized', 'all'}, default 'empirical'
-            Which probability to export. 'all' merges both empirical and
-            optimized into a single file with columns
-            empirical_probability and optimized_probability.
+        kind : {'empirical', 'mono', 'mcc', 'all'}, default 'empirical'
+            Which probability to export. 'empirical' uses fit() results;
+            'mono' and 'mcc' use optimize() results; 'all' merges empirical,
+            mono, and mcc into a single file with columns
+            empirical_probability, mono_probability, and mcc_probability.
         path : str or None, default None
             Output file path for the CSV. If None, saves as
             '{kind}_probability.csv' in the current directory.
@@ -438,9 +436,9 @@ class RecencyFrequencyScorer:
             Recency rank.
         f : int
             Frequency.
-        kind : {'empirical', 'optimized'}, default 'empirical'
-            Which probability to use. 'empirical' uses empirical_probability_dict_
-            estimated by fit(). 'optimized' uses the result of optimize().
+        kind : {'empirical', 'mono', 'mcc'}, default 'empirical'
+            Which probability to use. 'empirical' uses fit() results;
+            'mono' and 'mcc' use optimize() results.
 
         Returns
         -------
@@ -486,19 +484,22 @@ class RecencyFrequencyScorer:
         target_date : str or datetime
             Reference date for computing recency and frequency.
             Rows after this date are excluded.
-        kind : {'empirical', 'optimized'}, default 'empirical'
-            Which probability to use.
-        user_col : str, optional
-            Column name for user. Defaults to the value used in __init__.
-        item_col : str, optional
-            Column name for item. Defaults to the value used in __init__.
-        datetime_col : str, optional
-            Column name for datetime. Defaults to the value used in __init__.
+        kind : {'empirical', 'mono', 'mcc'}, default 'empirical'
+            Which probability to use. 'empirical' uses fit() results;
+            'mono' and 'mcc' use optimize() results.
+        user_col : str, default 'user'
+            Column name for user IDs in df.
+        item_col : str, default 'item'
+            Column name for item IDs in df.
+        datetime_col : str, default 'datetime'
+            Column name for interaction timestamps in df.
 
         Returns
         -------
         pd.DataFrame
-            Copy of df with added columns: recency, frequency, probability.
+            One row per user-item pair observed in df (up to target_date).
+            Columns: user_col, item_col, recency, frequency, probability, order.
+            Sorted by user ascending and probability descending; order starts at 1.
         """
         if kind not in ('empirical', 'mono', 'mcc'):
             raise ValueError(f"kind must be 'empirical', 'mono', or 'mcc', got '{kind}'.")
@@ -535,32 +536,19 @@ class RecencyFrequencyScorer:
         df_log = df_log[df_log[self._DATETIME_COL] <= target_date]
 
         # user と item ごとに最新度を計算
-        U2I2Recensys = {}
-        for row in df_log.itertuples():
-            recency = (target_date - row.datetime).days + 1
-            U2I2Recensys.setdefault(row.user, {})
-            U2I2Recensys[row.user].setdefault(row.item, [])
-            U2I2Recensys[row.user][row.item].append(recency)
+        U2I2Recensys = self._build_u2i2recencies(df_log, target_date)
 
         # 最新度と頻度を計算し、上限値でクランプしたうえで再閲覧確率を付与
-        RowsInteraction = []
-        for user, I2Recencys in U2I2Recensys.items():
-            for item, Recencys in I2Recencys.items():
-                frequency = len(Recencys)
-                recency = min(Recencys)
-                frequency_adj = min(frequency, self.frequency_limit)
-                recency_adj = min(recency, self.recency_limit)
-                if kind == 'empirical':
-                    prob = self.empirical_probability_dict_.get((recency_adj, frequency_adj), 0.0)
-                elif kind == 'mono':
-                    prob = self.mono_probability_dict_.get((recency_adj, frequency_adj), 0.0)
-                else:
-                    prob = self.mcc_probability_dict_.get((recency_adj, frequency_adj), 0.0)
-                RowsInteraction.append((user, item, recency, frequency, prob))
+        prob_dict = self._probability_dict(kind)
+        rows = []
+        for user, item, recency, frequency in self._iter_u2i_rf(U2I2Recensys):
+            r_adj = min(recency, self.recency_limit)
+            f_adj = min(frequency, self.frequency_limit)
+            rows.append((user, item, recency, frequency, prob_dict.get((r_adj, f_adj), 0.0)))
         df_rf = pd.DataFrame(
-            RowsInteraction, 
+            rows,
             columns=[self._USER_COL, self._ITEM_COL, 'recency', 'frequency', 'probability']
-            )
+        )
         df_rf = df_rf.sort_values([self._USER_COL, 'probability'], ascending=[True, False])
         df_rf['order'] = df_rf.groupby(self._USER_COL).cumcount() + 1
         df_rf = df_rf.rename(columns={self._USER_COL: user_col, self._ITEM_COL: item_col})
@@ -646,6 +634,25 @@ class RecencyFrequencyScorer:
 
         return df_eval
 
+
+    def _build_u2i2recencies(self, df, ref_date):
+        result = {}
+        for row in df.itertuples():
+            recency = (ref_date - row.datetime).days + 1
+            result.setdefault(row.user, {}).setdefault(row.item, []).append(recency)
+        return result
+
+    def _iter_u2i_rf(self, U2I2Recensys):
+        for user, I2Recencys in U2I2Recensys.items():
+            for item, Recencys in I2Recencys.items():
+                yield user, item, min(Recencys), len(Recencys)
+
+    def _probability_dict(self, kind):
+        if kind == 'mono':
+            return self.mono_probability_dict_
+        if kind == 'mcc':
+            return self.mcc_probability_dict_
+        return self.empirical_probability_dict_
 
     def optimize(self, kind='mono'):
         """Estimate optimized revisit probabilities under RF constraints.
