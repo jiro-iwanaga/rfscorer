@@ -82,6 +82,16 @@ Pass `kind="empirical"`, `kind="mono"`, or `kind="mcc"` to select which probabil
 df_rec_mcc = scorer.transform(df_test, target_date="2026-07-07", kind="mcc")
 ```
 
+| user   | item   | recency | frequency | probability | order |
+|--------|--------|--------:|----------:|------------:|------:|
+| u_001  | i_032  |       1 |         4 |      0.1167 |     1 |
+| u_001  | i_017  |       2 |         3 |      0.0789 |     2 |
+| u_001  | i_045  |       3 |         1 |      0.0248 |     3 |
+| u_002  | i_011  |       1 |         2 |      0.0621 |     1 |
+| u_002  | i_058  |       4 |         1 |      0.0182 |     2 |
+
+Within each user, rows are sorted by `probability` descending; `order` represents the recommendation rank.
+
 ## References
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
 
