@@ -158,18 +158,14 @@ class RecencyFrequencyScorer:
         U2I2Recensys = self._build_u2i2recencies(df_obs, self.observation_end_date_)
 
         # 閲覧履歴に最新度、頻度、cv の情報を追加
-        RowsInteraction = []
-        for user, I2Recencys in U2I2Recensys.items():
-            for item, Recencys in I2Recencys.items():
-                frequency = len(Recencys)
-                recency = min(Recencys)
-                cv = 1 if (user, item) in UIcv else 0 # 評価期間における cv(0/1) を追加
-                new_row = (user, item, recency, frequency, cv)
-                RowsInteraction.append(new_row)
+        rows = [
+            (user, item, recency, frequency, int((user, item) in UIcv))
+            for user, item, recency, frequency in self._iter_u2i_rf(U2I2Recensys)
+        ]
         df_ui2frc = pd.DataFrame(
-            RowsInteraction, 
+            rows,
             columns=[self._USER_COL, self._ITEM_COL, 'recency', 'frequency', 'cv']
-            )
+        )
         self.record_num_target_org = len(df_ui2frc) # レコード数の計測(フィルタリング前)
         self.total_cv_org = df_ui2frc.cv.sum() # cv数の計測(フィルタリング前)
 
@@ -530,24 +526,16 @@ class RecencyFrequencyScorer:
         U2I2Recensys = self._build_u2i2recencies(df_log, target_date)
 
         # 最新度と頻度を計算し、上限値でクランプしたうえで再閲覧確率を付与
-        RowsInteraction = []
-        for user, I2Recencys in U2I2Recensys.items():
-            for item, Recencys in I2Recencys.items():
-                frequency = len(Recencys)
-                recency = min(Recencys)
-                frequency_adj = min(frequency, self.frequency_limit)
-                recency_adj = min(recency, self.recency_limit)
-                if kind == 'empirical':
-                    prob = self.empirical_probability_dict_.get((recency_adj, frequency_adj), 0.0)
-                elif kind == 'mono':
-                    prob = self.mono_probability_dict_.get((recency_adj, frequency_adj), 0.0)
-                else:
-                    prob = self.mcc_probability_dict_.get((recency_adj, frequency_adj), 0.0)
-                RowsInteraction.append((user, item, recency, frequency, prob))
+        prob_dict = self._probability_dict(kind)
+        rows = []
+        for user, item, recency, frequency in self._iter_u2i_rf(U2I2Recensys):
+            r_adj = min(recency, self.recency_limit)
+            f_adj = min(frequency, self.frequency_limit)
+            rows.append((user, item, recency, frequency, prob_dict.get((r_adj, f_adj), 0.0)))
         df_rf = pd.DataFrame(
-            RowsInteraction, 
+            rows,
             columns=[self._USER_COL, self._ITEM_COL, 'recency', 'frequency', 'probability']
-            )
+        )
         df_rf = df_rf.sort_values([self._USER_COL, 'probability'], ascending=[True, False])
         df_rf['order'] = df_rf.groupby(self._USER_COL).cumcount() + 1
         df_rf = df_rf.rename(columns={self._USER_COL: user_col, self._ITEM_COL: item_col})
@@ -640,6 +628,18 @@ class RecencyFrequencyScorer:
             recency = (ref_date - row.datetime).days + 1
             result.setdefault(row.user, {}).setdefault(row.item, []).append(recency)
         return result
+
+    def _iter_u2i_rf(self, U2I2Recensys):
+        for user, I2Recencys in U2I2Recensys.items():
+            for item, Recencys in I2Recencys.items():
+                yield user, item, min(Recencys), len(Recencys)
+
+    def _probability_dict(self, kind):
+        if kind == 'mono':
+            return self.mono_probability_dict_
+        if kind == 'mcc':
+            return self.mcc_probability_dict_
+        return self.empirical_probability_dict_
 
     def optimize(self, kind='mono'):
         """Estimate optimized revisit probabilities under RF constraints.
