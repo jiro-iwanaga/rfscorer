@@ -52,10 +52,11 @@ df_rec_opt = scorer.transform(df_test, target_date="2026-07-07", kind="optimized
 ## References
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
 
-- [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Improving collaborative filtering recommendations by estimating user preferences from clickstream data,” Electronic Commerce Research and Applications, Volume 37, Article 100877, 2019.](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)
-
 - [Jiro Iwanaga, Kyota Ishihara, Naoki Nishimura, and Ikki Tanaka, *Pythonではじめる数理最適化 ―ケーススタディでモデリングのスキルを身につけよう―*(in Japanese), Ohmsha, 2021.](https://www.ohmsha.co.jp/book/9784274231759/)
   - [Chapter 7: 商品推薦のための興味のスコアリング(in Japanese)](https://github.com/ohmsha/PyOptBook/tree/main/7.recommendation)
+
+- [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Improving collaborative filtering recommendations by estimating user preferences from clickstream data,” Electronic Commerce Research and Applications, Volume 37, Article 100877, 2019.](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)
+
 
 ## Citing
 
@@ -74,6 +75,24 @@ Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano,
   pages   = {157--167},
   year    = {2016},
   url     = {https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848}
+}
+```
+
+If you additionally use the probability matrix as input to a collaborative filtering model, please also cite:
+
+Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano,
+"Improving collaborative filtering recommendations by estimating user preferences from clickstream data,"
+*Electronic Commerce Research and Applications*, Volume 37, Article 100877, 2019.
+
+```bibtex
+@article{Iwanaga2019,
+  author  = {Jiro Iwanaga and Naoki Nishimura and Noriyoshi Sukegawa and Yuichi Takano},
+  title   = {Improving collaborative filtering recommendations by estimating user preferences from clickstream data},
+  journal = {Electronic Commerce Research and Applications},
+  volume  = {37},
+  pages   = {100877},
+  year    = {2019},
+  url     = {https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547}
 }
 ```
 
