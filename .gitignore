@@ -225,3 +225,4 @@ CLAUDE.md
 src/rfscorer/*.csv
 src/rfscorer/*.png
 workspace/
+!workspace/create_dummy_data/generate.py

@@ -715,19 +715,24 @@ if __name__ == "__main__":
 
     # サンプルデータの取得
     from pathlib import Path
-    df = pd.read_csv('../../examples/access_log.csv')
+    # データの読み込み（オーム社『Pythonではじめる数理最適化』サポートデータより引用）
+    url = "https://raw.githubusercontent.com/ohmsha/PyOptBook/main/7.recommendation/access_log.csv"
+    df = pd.read_csv(url)    
+    #df = pd.read_csv('../../examples/access_log.csv')
+    #df = pd.read_csv('../../workspace/create_dummy_data/dummy_data.csv')
     df_train = df[df.user_id.map(lambda x: hash(x) % 10 < 8)] # hash関数で簡易的に学習データ8割を抽出
     df_test = df[df.user_id.map(lambda x: hash(x) % 10 >= 8)] # hash関数で簡易的にテストデータ2割を抽出
 
     # スコアリングインスタンスの作成
     scorer = RecencyFrequencyScorer(user_col = "user_id", item_col = "item_id", datetime_col = "date")
 
-
     # 経験的再閲覧確率の計算
-    observation_period = ('2015-07-01', '2015-07-06')
-    evaluation_period = ('2015-07-07', '2015-07-08')
-    #observation_period = ('2015-07-01', '2015-07-07')
-    #evaluation_period = ('2015-07-08', '2015-07-08')
+    #observation_period = ('2015-07-01', '2015-07-06')
+    #evaluation_period = ('2015-07-07', '2015-07-08')
+    observation_period = ('2015-07-01', '2015-07-07')
+    evaluation_period = ('2015-07-08', '2015-07-08')
+    #observation_period = ('2026-06-01', '2026-06-28')
+    #evaluation_period = ('2026-06-29', '2026-06-30')
     scorer.fit(df_train, observation_period, evaluation_period)
     scorer.plot_probability_surface('empirical')
     scorer.show()
@@ -744,7 +749,8 @@ if __name__ == "__main__":
     scorer.export_probability_csv('all')
 
     # テストの実施
-    target_date = '2015-07-07'
+    #target_date = '2015-07-07'
+    target_date = '2026-06-28'
     df_test_obs = df_test[df_test.date <= target_date] # テストの観測期間データ
     df_test_eval = df_test[df_test.date > target_date] # テストの評価期間データ(正解データ)
     UIrevisit = set([(row.user_id, row.item_id) for row in df_test_eval.itertuples()]) # 正解データ
