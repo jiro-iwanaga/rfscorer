@@ -830,9 +830,8 @@ class RecencyFrequencyScorer:
 
 if __name__ == "__main__":
     # データの読み込み（オーム社『Pythonではじめる数理最適化』サポートデータより引用）
-    # url = "https://raw.githubusercontent.com/ohmsha/PyOptBook/main/7.recommendation/access_log.csv"
-    # df = pd.read_csv(url)
-    df = pd.read_csv("../../examples/access_log100.csv")
+    url = "https://raw.githubusercontent.com/ohmsha/PyOptBook/main/7.recommendation/access_log.csv"
+    df = pd.read_csv(url)
     df_train = df[df.user_id.map(lambda x: hash(x) % 10 < 8)]  # hash関数で学習データ8割を抽出
     df_test = df[df.user_id.map(lambda x: hash(x) % 10 >= 8)]  # hash関数でテストデータ2割を抽出
 
