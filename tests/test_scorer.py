@@ -566,3 +566,61 @@ class TestPredict:
         assert isinstance(prob, float)
         assert 0.0 - 1e-6 <= prob <= 1.0 + 1e-6
         assert prob == pytest.approx(scorer_optimized_mcc.mcc_probability_dict_[1, 1])
+
+
+# ---------------------------------------------------------------------------
+# transform
+# ---------------------------------------------------------------------------
+class TestTransform:
+    def test_uses_init_col_names_by_default(self):
+        # カスタムカラム名で初期化 → transform に渡さなくても動作する
+        df_custom = _make_df().rename(columns={"user": "uid", "item": "iid", "datetime": "ts"})
+        s = RecencyFrequencyScorer(user_col="uid", item_col="iid", datetime_col="ts")
+        s.fit_period(
+            df_custom,
+            _OBS_PERIOD,
+            _EVAL_PERIOD,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        result = s.transform(df_custom, "2024-01-07")
+        assert "uid" in result.columns
+        assert "iid" in result.columns
+
+    def test_default_col_names_work_without_args(self, scorer_fitted, df):
+        # デフォルトカラム名 (user/item/datetime) の場合も引数なしで動作する
+        result = scorer_fitted.transform(df, "2024-01-07")
+        assert "user" in result.columns
+        assert "item" in result.columns
+
+    def test_explicit_col_names_override_init(self):
+        # __init__ と異なるカラム名を持つ DataFrame も明示指定で動作する
+        df_a = _make_df()
+        df_b = _make_df().rename(columns={"user": "uid", "item": "iid", "datetime": "ts"})
+        s = RecencyFrequencyScorer()
+        s.fit_period(
+            df_a,
+            _OBS_PERIOD,
+            _EVAL_PERIOD,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        result = s.transform(df_b, "2024-01-07", user_col="uid", item_col="iid", datetime_col="ts")
+        assert "uid" in result.columns
+        assert "iid" in result.columns
+
+    def test_returns_dataframe_with_expected_columns(self, scorer_fitted, df):
+        result = scorer_fitted.transform(df, "2024-01-07")
+        assert set(result.columns) == {
+            "user",
+            "item",
+            "recency",
+            "frequency",
+            "probability",
+            "order",
+        }
+
+    def test_sorted_by_user_and_probability(self, scorer_fitted, df):
+        result = scorer_fitted.transform(df, "2024-01-07")
+        for user, grp in result.groupby("user"):
+            assert list(grp["probability"]) == sorted(grp["probability"], reverse=True)

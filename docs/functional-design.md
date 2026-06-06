@@ -94,7 +94,7 @@ RecencyFrequencyScorer(user_col="user", item_col="item", datetime_col="datetime"
 |-----------|-----|-----------|------|
 | `df` | `pd.DataFrame` | — | 閲覧履歴 |
 | `observation_period` | `tuple[str \| datetime, str \| datetime]` | — | 観測期間の開始日・終了日 |
-| `evaluation_period` | `tuple[str \| datetime, str \| datetime]` | — | 評価期間の開始日・終了日 |
+| `evaluation_period` | `tuple[str \| datetime, str \| datetime]` | — | 評価期間の開始日・終了日。観測期間の終了日より後から始まる必要がある |
 | `recency_limit` | `int \| None` | `None` | 最大最新度。`None` の場合、累積再閲覧数の分布から `RECENCY_LIMIT_RATE` に基づいて自動決定 |
 | `frequency_limit` | `int \| None` | `None` | 最大頻度。`None` の場合、累積再閲覧数の分布から `FREQUENCY_LIMIT_RATE` に基づいて自動決定 |
 
@@ -106,8 +106,8 @@ RecencyFrequencyScorer(user_col="user", item_col="item", datetime_col="datetime"
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
-| `r` | `int` | — | 最新度ランク（1以上） |
-| `f` | `int` | — | 頻度（1以上） |
+| `r` | `int` | — | 最新度ランク（1が最も直近、数値が大きいほど古い。1以上） |
+| `f` | `int` | — | 頻度（観測期間の閲覧回数。1以上） |
 | `kind` | `str` | `'empirical'` | `'empirical'`・`'mono'`・`'mcc'` のいずれか |
 
 戻り値: `float`
@@ -121,11 +121,11 @@ RecencyFrequencyScorer(user_col="user", item_col="item", datetime_col="datetime"
 | `df` | `pd.DataFrame` | — | スコアリング対象の閲覧履歴 |
 | `target_date` | `str \| datetime` | — | 最新度・頻度の計算基準日 |
 | `kind` | `str` | `'empirical'` | `'empirical'`・`'mono'`・`'mcc'` のいずれか |
-| `user_col` | `str \| None` | `None` | ユーザーカラム名（省略時は `__init__` のデフォルト） |
-| `item_col` | `str \| None` | `None` | 商品カラム名（省略時は `__init__` のデフォルト） |
-| `datetime_col` | `str \| None` | `None` | 日付カラム名（省略時は `__init__` のデフォルト） |
+| `user_col` | `str \| None` | `None` | ユーザーカラム名。省略時は `__init__` で設定した値を使用 |
+| `item_col` | `str \| None` | `None` | 商品カラム名。省略時は `__init__` で設定した値を使用 |
+| `datetime_col` | `str \| None` | `None` | 日付カラム名。省略時は `__init__` で設定した値を使用 |
 
-戻り値: `pd.DataFrame`（カラム: `user`, `item`, `recency`, `frequency`, `probability`, `order`）
+戻り値: `pd.DataFrame`。ユーザー・商品カラム名は `__init__`（または引数の上書き）で設定した名前になる。その他のカラム: `recency`, `frequency`, `probability`, `order`
 
 ##### `evaluate(df_rec, UIrevisit, order=1, user_col=None, item_col=None)`
 
@@ -137,6 +137,8 @@ RecencyFrequencyScorer(user_col="user", item_col="item", datetime_col="datetime"
 | `df_rec` | `pd.DataFrame` | — | `transform()` の出力 |
 | `UIrevisit` | `set` | — | 実際に再閲覧された `(user, item)` ペアの集合 |
 | `order` | `int` | `1` | 評価する最大推薦順位 |
+| `user_col` | `str \| None` | `None` | ユーザーカラム名。省略時は `__init__` で設定した値を使用 |
+| `item_col` | `str \| None` | `None` | 商品カラム名。省略時は `__init__` で設定した値を使用 |
 
 戻り値: `pd.DataFrame`（カラム: `order`, `n_recommended`, `n_hit`, `precision`, `recall`, `f1`, `recall_norm`, `f1_norm`）
 
