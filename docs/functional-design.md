@@ -100,7 +100,7 @@ RecencyFrequencyScorer(user_col="user", item_col="item", datetime_col="datetime"
 
 戻り値: `self`
 
-##### `predict(r, f, kind='empirical')`
+##### `predict(r, f, kind="empirical")`
 
 指定した最新度 $r$・頻度 $f$ の再閲覧確率を返す。
 
@@ -108,11 +108,11 @@ RecencyFrequencyScorer(user_col="user", item_col="item", datetime_col="datetime"
 |-----------|-----|-----------|------|
 | `r` | `int` | — | 最新度ランク（1が最も直近、数値が大きいほど古い。1以上） |
 | `f` | `int` | — | 頻度（観測期間の閲覧回数。1以上） |
-| `kind` | `str` | `'empirical'` | `'empirical'`・`'mono'`・`'mcc'` のいずれか |
+| `kind` | `str` | `"empirical"` | `"empirical"`・`"mono"`・`"mcc"` のいずれか |
 
 戻り値: `float`
 
-##### `transform(df, target_date, kind='empirical', user_col=None, item_col=None, datetime_col=None)`
+##### `transform(df, target_date, kind="empirical", user_col=None, item_col=None, datetime_col=None)`
 
 入力 DataFrame の各 user×item ペアに最新度・頻度・再閲覧確率・順位を付与して返す。
 
@@ -120,7 +120,7 @@ RecencyFrequencyScorer(user_col="user", item_col="item", datetime_col="datetime"
 |-----------|-----|-----------|------|
 | `df` | `pd.DataFrame` | — | スコアリング対象の閲覧履歴 |
 | `target_date` | `str \| datetime` | — | 最新度・頻度の計算基準日 |
-| `kind` | `str` | `'empirical'` | `'empirical'`・`'mono'`・`'mcc'` のいずれか |
+| `kind` | `str` | `"empirical"` | `"empirical"`・`"mono"`・`"mcc"` のいずれか |
 | `user_col` | `str \| None` | `None` | ユーザーカラム名。省略時は `__init__` で設定した値を使用 |
 | `item_col` | `str \| None` | `None` | 商品カラム名。省略時は `__init__` で設定した値を使用 |
 | `datetime_col` | `str \| None` | `None` | 日付カラム名。省略時は `__init__` で設定した値を使用 |
@@ -142,43 +142,43 @@ RecencyFrequencyScorer(user_col="user", item_col="item", datetime_col="datetime"
 
 戻り値: `pd.DataFrame`（カラム: `order`, `n_recommended`, `n_hit`, `precision`, `recall`, `f1`, `recall_norm`, `f1_norm`）
 
-##### `optimize(kind='mono')`
+##### `optimize(kind="mono")`
 
-RF 制約を満たす最適化再閲覧確率を推定する。`fit()` の後に呼び出す。
+RF 制約を満たす最適化再閲覧確率を推定する。`fit()` または `fit_period()` の後に呼び出す。
 内部で `optimizer.py` の `RFOptimizer` を使用して凸2次計画問題を解く。
 結果は `kind` に対応する属性（`mono_probability_*` または `mcc_probability_*`）に格納されるため、両モデルの結果を同時に保持できる。
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
-| `kind` | `str` | `'mono'` | `'mono'`（単調性制約のみ）または `'mcc'`（単調性 + Recency 凸性 + Frequency 凹性） |
+| `kind` | `str` | `"mono"` | `"mono"`（単調性制約のみ）または `"mcc"`（単調性 + Recency 凸性 + Frequency 凹性） |
 
 戻り値: `self`
 
-##### `export_probability_csv(kind='empirical', path=None)`
+##### `export_probability_csv(kind="empirical", path=None)`
 
 再閲覧確率を CSV ファイルに書き出す。
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
-| `kind` | `str` | `'empirical'` | `'empirical'`・`'mono'`・`'mcc'`・`'all'` のいずれか。`'all'` は3者をマージして出力（カラム: `empirical_probability`, `mono_probability`, `mcc_probability`） |
+| `kind` | `str` | `"empirical"` | `"empirical"`・`"mono"`・`"mcc"`・`"all"` のいずれか。`"all"` は3者をマージして出力（カラム: `empirical_probability`, `mono_probability`, `mcc_probability`） |
 | `path` | `str \| None` | `None` | 出力先。`None` の場合カレントディレクトリに `{kind}_probability.csv` を出力。ディレクトリを指定した場合はそのディレクトリにデフォルトファイル名で出力 |
 
 戻り値: なし
 
-##### `plot_probability_surface(kind='empirical', path=None)`
+##### `plot_probability_surface(kind="empirical", path=None)`
 
 再閲覧確率を3次元ワイヤーフレームで可視化し PNG ファイルに保存する。
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
-| `kind` | `str` | `'empirical'` | `'empirical'`・`'mono'`・`'mcc'` のいずれか |
+| `kind` | `str` | `"empirical"` | `"empirical"`・`"mono"`・`"mcc"` のいずれか |
 | `path` | `str \| None` | `None` | 出力先。`None` の場合カレントディレクトリに `{kind}_probability_surface.png` を出力。ディレクトリを指定した場合はそのディレクトリにデフォルトファイル名で出力 |
 
 戻り値: なし
 
 ##### `show()`
 
-`fit()` 後の集計情報（レコード数・cv 数・期間・上限値）を標準出力に表示する。デバッグ・動作確認用。
+`fit()` または `fit_period()` 後の集計情報（レコード数・cv 数・期間・上限値）を標準出力に表示する。デバッグ・動作確認用。
 
 戻り値: なし
 
@@ -186,29 +186,29 @@ RF 制約を満たす最適化再閲覧確率を推定する。`fit()` の後に
 
 | 属性 | 型 | 説明 | 利用可能なタイミング |
 |------|-----|------|-----------------|
-| `recency_limit` | `int` | 最新度の上限値 | `fit()` 後 |
-| `frequency_limit` | `int` | 頻度の上限値 | `fit()` 後 |
-| `R` | `list[int]` | 最新度のリスト（`range(1, recency_limit+1)`） | `fit()` 後 |
-| `F` | `list[int]` | 頻度のリスト（`range(1, frequency_limit+1)`） | `fit()` 後 |
-| `RF2N` | `dict` | `(r, f)` → サンプル数 $N_{r,f}$ のマッピング | `fit()` 後 |
-| `RF2CV` | `dict` | `(r, f)` → cv 数 $n_{r,f}$ のマッピング | `fit()` 後 |
-| `RF2Prob` | `dict` | `(r, f)` → 経験的再閲覧確率 $p_{r,f}$ のマッピング | `fit()` 後 |
-| `empirical_probability_` | `pd.DataFrame` | 経験的再閲覧確率（カラム: `recency`, `frequency`, `N`, `cv`, `probability`） | `fit()` 後 |
-| `empirical_probability_table_` | `pd.DataFrame` | 経験的再閲覧確率（横持ち。インデックス: `recency`、カラム: `frequency`） | `fit()` 後 |
-| `empirical_probability_dict_` | `dict` | 経験的再閲覧確率（キー: `(r, f)`、値: `probability`） | `fit()` 後 |
-| `mono_probability_` | `pd.DataFrame` | mono モデル最適化再閲覧確率（カラム: `recency`, `frequency`, `probability`） | `optimize(kind='mono')` 後 |
-| `mono_probability_table_` | `pd.DataFrame` | mono モデル最適化再閲覧確率（横持ち） | `optimize(kind='mono')` 後 |
-| `mono_probability_dict_` | `dict` | mono モデル最適化再閲覧確率（キー: `(r, f)`、値: `probability`） | `optimize(kind='mono')` 後 |
-| `mcc_probability_` | `pd.DataFrame` | mcc モデル最適化再閲覧確率（カラム: `recency`, `frequency`, `probability`） | `optimize(kind='mcc')` 後 |
-| `mcc_probability_table_` | `pd.DataFrame` | mcc モデル最適化再閲覧確率（横持ち） | `optimize(kind='mcc')` 後 |
-| `mcc_probability_dict_` | `dict` | mcc モデル最適化再閲覧確率（キー: `(r, f)`、値: `probability`） | `optimize(kind='mcc')` 後 |
-| `record_num` | `int` | 全閲覧履歴のレコード数 | `fit()` 後 |
-| `record_num_obs` | `int` | 観測期間のレコード数 | `fit()` 後 |
-| `record_num_eval` | `int` | 評価期間のレコード数 | `fit()` 後 |
-| `record_num_target_org` | `int` | フィルタリング前の分析対象レコード数 | `fit()` 後 |
-| `record_num_target` | `int` | フィルタリング後の分析対象レコード数 | `fit()` 後 |
-| `total_cv_org` | `int` | フィルタリング前の cv 数 | `fit()` 後 |
-| `total_cv` | `int` | フィルタリング後の cv 数 | `fit()` 後 |
+| `recency_limit` | `int` | 最新度の上限値 | `fit()` または `fit_period()` 後 |
+| `frequency_limit` | `int` | 頻度の上限値 | `fit()` または `fit_period()` 後 |
+| `R` | `list[int]` | 最新度のリスト（`range(1, recency_limit+1)`） | `fit()` または `fit_period()` 後 |
+| `F` | `list[int]` | 頻度のリスト（`range(1, frequency_limit+1)`） | `fit()` または `fit_period()` 後 |
+| `RF2N` | `dict` | `(r, f)` → サンプル数 $N_{r,f}$ のマッピング | `fit()` または `fit_period()` 後 |
+| `RF2CV` | `dict` | `(r, f)` → cv 数 $n_{r,f}$ のマッピング | `fit()` または `fit_period()` 後 |
+| `RF2Prob` | `dict` | `(r, f)` → 経験的再閲覧確率 $p_{r,f}$ のマッピング | `fit()` または `fit_period()` 後 |
+| `empirical_probability_` | `pd.DataFrame` | 経験的再閲覧確率（カラム: `recency`, `frequency`, `N`, `cv`, `probability`） | `fit()` または `fit_period()` 後 |
+| `empirical_probability_table_` | `pd.DataFrame` | 経験的再閲覧確率（横持ち。インデックス: `recency`、カラム: `frequency`） | `fit()` または `fit_period()` 後 |
+| `empirical_probability_dict_` | `dict` | 経験的再閲覧確率（キー: `(r, f)`、値: `probability`） | `fit()` または `fit_period()` 後 |
+| `mono_probability_` | `pd.DataFrame` | mono モデル最適化再閲覧確率（カラム: `recency`, `frequency`, `probability`） | `optimize(kind="mono")` 後 |
+| `mono_probability_table_` | `pd.DataFrame` | mono モデル最適化再閲覧確率（横持ち） | `optimize(kind="mono")` 後 |
+| `mono_probability_dict_` | `dict` | mono モデル最適化再閲覧確率（キー: `(r, f)`、値: `probability`） | `optimize(kind="mono")` 後 |
+| `mcc_probability_` | `pd.DataFrame` | mcc モデル最適化再閲覧確率（カラム: `recency`, `frequency`, `probability`） | `optimize(kind="mcc")` 後 |
+| `mcc_probability_table_` | `pd.DataFrame` | mcc モデル最適化再閲覧確率（横持ち） | `optimize(kind="mcc")` 後 |
+| `mcc_probability_dict_` | `dict` | mcc モデル最適化再閲覧確率（キー: `(r, f)`、値: `probability`） | `optimize(kind="mcc")` 後 |
+| `record_num` | `int` | 全閲覧履歴のレコード数 | `fit()` または `fit_period()` 後 |
+| `record_num_obs` | `int` | 観測期間のレコード数 | `fit()` または `fit_period()` 後 |
+| `record_num_eval` | `int` | 評価期間のレコード数 | `fit()` または `fit_period()` 後 |
+| `record_num_target_org` | `int` | フィルタリング前の分析対象レコード数 | `fit()` または `fit_period()` 後 |
+| `record_num_target` | `int` | フィルタリング後の分析対象レコード数 | `fit()` または `fit_period()` 後 |
+| `total_cv_org` | `int` | フィルタリング前の cv 数 | `fit()` または `fit_period()` 後 |
+| `total_cv` | `int` | フィルタリング後の cv 数 | `fit()` または `fit_period()` 後 |
 
 ## データフロー
 

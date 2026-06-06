@@ -226,6 +226,8 @@ src/rfscorer/*.csv
 src/rfscorer/*.png
 workspace/
 examples/*.png
+examples/access_log10.csv
+examples/access_log100.csv
 all_probability.csv
 df_recommend_emp.csv
 df_recommend_mcc.csv

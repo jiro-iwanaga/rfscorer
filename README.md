@@ -119,9 +119,7 @@ Within each user, rows are sorted by `probability` descending; `order` represent
 
 If you use `rfscorer` in academic work, please cite the following paper:
 
-Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano,
-"Estimating product-choice probabilities from recency and frequency of page views,"
-*Knowledge-Based Systems*, Volume 99, 2016, Pages 157–167.
+- [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
 
 ```bibtex
 @article{Iwanaga2016,
@@ -137,9 +135,8 @@ Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano,
 
 If you additionally use the probability matrix as input to a collaborative filtering model, please also cite:
 
-Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano,
-"Improving collaborative filtering recommendations by estimating user preferences from clickstream data,"
-*Electronic Commerce Research and Applications*, Volume 37, Article 100877, 2019.
+- [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Improving collaborative filtering recommendations by estimating user preferences from clickstream data,” Electronic Commerce Research and Applications, Volume 37, Article 100877, 2019.](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)
+
 
 ```bibtex
 @article{Iwanaga2019,

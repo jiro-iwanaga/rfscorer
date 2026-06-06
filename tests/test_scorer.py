@@ -28,6 +28,8 @@ _FREQUENCY_LIMIT = 3
 _AUTO_RECENCY_LIMIT = 3
 _AUTO_FREQUENCY_LIMIT = 3
 
+_UIREVISIT = {("u1", "item1"), ("u2", "item2")}  # 評価期間に再閲覧したペア
+
 
 def _make_df():
     rows = [
@@ -94,6 +96,11 @@ def scorer_optimized_mcc():
     )
     s.optimize(kind="mcc")
     return s
+
+
+@pytest.fixture(scope="module")
+def df_rec(scorer_fitted):
+    return scorer_fitted.transform(_make_df(), _FIT_TARGET_DATE)
 
 
 # ---------------------------------------------------------------------------
@@ -572,6 +579,10 @@ class TestPredict:
 # transform
 # ---------------------------------------------------------------------------
 class TestTransform:
+    def test_before_fit_raises(self, scorer, df):
+        with pytest.raises(RuntimeError, match="fit"):
+            scorer.transform(df, "2024-01-07")
+
     def test_uses_init_col_names_by_default(self):
         # カスタムカラム名で初期化 → transform に渡さなくても動作する
         df_custom = _make_df().rename(columns={"user": "uid", "item": "iid", "datetime": "ts"})
@@ -624,3 +635,121 @@ class TestTransform:
         result = scorer_fitted.transform(df, "2024-01-07")
         for user, grp in result.groupby("user"):
             assert list(grp["probability"]) == sorted(grp["probability"], reverse=True)
+            assert list(grp["order"]) == list(range(1, len(grp) + 1))
+
+
+# ---------------------------------------------------------------------------
+# evaluate
+# ---------------------------------------------------------------------------
+# テストデータの期待値 (scorer_fitted: recency_limit=7, frequency_limit=3)
+#
+# transform(df, "2024-01-07") の結果:
+#   u1: item1(r=3,f=3,prob=1.0,order=1), item2(r=6,f=1,prob=0.0,order=2)
+#   u2: item2(r=1,f=2,prob=1.0,order=1), item1(r=4,f=1,prob=0.0,order=2)
+#
+# _UIREVISIT = {(u1,item1),(u2,item2)} → len=2
+#
+# order=1: UIrec={(u1,item1),(u2,item2)}, n_hit=2, n_rec=2
+#   precision=1.0, recall=1.0, f1=1.0, recall_norm=1.0, f1_norm=1.0
+# order=2 (=order_max): UIrec=all 4 pairs, n_hit=2, n_rec=4
+#   precision=0.5, recall=1.0, f1≈0.667
+# ---------------------------------------------------------------------------
+class TestEvaluate:
+    def test_returns_dataframe(self, scorer_fitted, df_rec):
+        result = scorer_fitted.evaluate(df_rec, _UIREVISIT, order=1)
+        assert isinstance(result, pd.DataFrame)
+
+    def test_columns(self, scorer_fitted, df_rec):
+        result = scorer_fitted.evaluate(df_rec, _UIREVISIT, order=1)
+        assert set(result.columns) == {
+            "order",
+            "n_recommended",
+            "n_hit",
+            "precision",
+            "recall",
+            "f1",
+            "recall_norm",
+            "f1_norm",
+        }
+
+    def test_row_count_with_order_1(self, scorer_fitted, df_rec):
+        # order=1 でも order_max(=2) の行が追加されるので 2 行
+        result = scorer_fitted.evaluate(df_rec, _UIREVISIT, order=1)
+        assert len(result) == 2
+
+    def test_order_max_always_included(self, scorer_fitted, df_rec):
+        result = scorer_fitted.evaluate(df_rec, _UIREVISIT, order=1)
+        assert df_rec["order"].max() in result["order"].values
+
+    def test_n_recommended_at_order1(self, scorer_fitted, df_rec):
+        result = scorer_fitted.evaluate(df_rec, _UIREVISIT, order=1)
+        row = result[result["order"] == 1].iloc[0]
+        assert row["n_recommended"] == 2  # 2ユーザー × 1推薦
+
+    def test_n_hit_at_order1(self, scorer_fitted, df_rec):
+        result = scorer_fitted.evaluate(df_rec, _UIREVISIT, order=1)
+        row = result[result["order"] == 1].iloc[0]
+        assert row["n_hit"] == 2
+
+    def test_precision_at_order1(self, scorer_fitted, df_rec):
+        result = scorer_fitted.evaluate(df_rec, _UIREVISIT, order=1)
+        row = result[result["order"] == 1].iloc[0]
+        assert row["precision"] == pytest.approx(1.0)
+
+    def test_recall_at_order1(self, scorer_fitted, df_rec):
+        result = scorer_fitted.evaluate(df_rec, _UIREVISIT, order=1)
+        row = result[result["order"] == 1].iloc[0]
+        assert row["recall"] == pytest.approx(1.0)
+
+    def test_f1_at_order1(self, scorer_fitted, df_rec):
+        result = scorer_fitted.evaluate(df_rec, _UIREVISIT, order=1)
+        row = result[result["order"] == 1].iloc[0]
+        assert row["f1"] == pytest.approx(1.0)
+
+    def test_precision_at_order_max(self, scorer_fitted, df_rec):
+        # order=2: 4推薦中2ヒット → precision=0.5
+        result = scorer_fitted.evaluate(df_rec, _UIREVISIT, order=2)
+        row = result[result["order"] == 2].iloc[0]
+        assert row["precision"] == pytest.approx(0.5)
+
+    def test_recall_norm_with_unseen_revisits(self, scorer_fitted, df_rec):
+        # UIrevisit に df_rec に存在しないペアを追加すると recall < recall_norm
+        extended = _UIREVISIT | {("u3", "item3")}  # len=3
+        result = scorer_fitted.evaluate(df_rec, extended, order=1)
+        row = result[result["order"] == 1].iloc[0]
+        assert row["recall"] == pytest.approx(2 / 3)
+        assert row["recall_norm"] == pytest.approx(1.0)
+
+    def test_f1_norm_with_unseen_revisits(self, scorer_fitted, df_rec):
+        extended = _UIREVISIT | {("u3", "item3")}
+        result = scorer_fitted.evaluate(df_rec, extended, order=1)
+        row = result[result["order"] == 1].iloc[0]
+        # recall_norm=1.0, precision=1.0 → f1_norm=1.0 > f1
+        assert row["f1_norm"] == pytest.approx(1.0)
+        assert row["f1"] < row["f1_norm"]
+
+    def test_uses_init_col_names_by_default(self):
+        df_custom = _make_df().rename(columns={"user": "uid", "item": "iid", "datetime": "ts"})
+        s = RecencyFrequencyScorer(user_col="uid", item_col="iid", datetime_col="ts")
+        s.fit_period(
+            df_custom,
+            _OBS_PERIOD,
+            _EVAL_PERIOD,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        df_rec_custom = s.transform(df_custom, _FIT_TARGET_DATE)
+        uirevisit = {("u1", "item1"), ("u2", "item2")}
+        result = s.evaluate(df_rec_custom, uirevisit)  # user_col/item_col 省略
+        assert isinstance(result, pd.DataFrame)
+
+    def test_explicit_col_override(self, scorer_fitted, df_rec):
+        df_rec_renamed = df_rec.rename(columns={"user": "uid", "item": "iid"})
+        result = scorer_fitted.evaluate(
+            df_rec_renamed, _UIREVISIT, order=1, user_col="uid", item_col="iid"
+        )
+        assert isinstance(result, pd.DataFrame)
+
+    def test_invalid_uirevisit_type_raises(self, scorer_fitted, df_rec):
+        with pytest.raises(ValueError, match="UIrevisit"):
+            scorer_fitted.evaluate(df_rec, 12345, order=1)

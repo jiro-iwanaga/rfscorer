@@ -20,11 +20,11 @@ class RecencyFrequencyScorer:
 
         Parameters
         ----------
-        user_col : str, default 'user'
+        user_col : str, default "user"
             Column name for user IDs in the interaction log.
-        item_col : str, default 'item'
+        item_col : str, default "item"
             Column name for item IDs in the interaction log.
-        datetime_col : str, default 'datetime'
+        datetime_col : str, default "datetime"
             Column name for interaction timestamps in the interaction log.
         """
         self.user_col = user_col
@@ -115,7 +115,7 @@ class RecencyFrequencyScorer:
         if not isinstance(df, pd.DataFrame):
             raise TypeError("df must be a pandas DataFrame.")
         if self.datetime_col not in df.columns:
-            raise ValueError(f"Missing required columns: ['{self.datetime_col}']")
+            raise ValueError(f"Missing required columns: [{self.datetime_col!r}]")
 
         try:
             target_date = pd.to_datetime(target_date)
@@ -125,7 +125,7 @@ class RecencyFrequencyScorer:
         try:
             dates = pd.to_datetime(df[self.datetime_col])
         except (ValueError, TypeError) as e:
-            raise ValueError(f"Column '{self.datetime_col}' could not be parsed as dates.") from e
+            raise ValueError(f"Column {self.datetime_col!r} could not be parsed as dates.") from e
         df_min = dates.min()
         df_max = dates.max()
 
@@ -173,12 +173,11 @@ class RecencyFrequencyScorer:
             Start and end dates of the evaluation period.
             Must start strictly after observation_period ends.
         recency_limit : int, optional
-            Maximum recency rank to include. If None, automatically
-            determined from the cumulative cv distribution using
-            RECENCY_LIMIT_RATE.
+            Maximum recency rank to include. If None, automatically set to
+            the recency rank covering 95% of cumulative revisits.
         frequency_limit : int, optional
-            Maximum frequency to include. If None, automatically determined
-            from the cumulative cv distribution using FREQUENCY_LIMIT_RATE.
+            Maximum frequency to include. If None, automatically set to
+            the frequency covering 95% of cumulative revisits.
 
         Returns
         -------
@@ -256,22 +255,16 @@ class RecencyFrequencyScorer:
         # 評価期間に cv がある user と item のペアを作成
         UIcv = {(row.user, row.item) for row in df_eval.itertuples()}
 
-        U2I2Recensys = self._build_u2i2recencies(df_obs, self.observation_end_date_)
-
-        # 閲覧履歴に最新度、頻度、cv の情報を追加
-        rows = [
-            (user, item, recency, frequency, int((user, item) in UIcv))
-            for user, item, recency, frequency in self._iter_u2i_rf(U2I2Recensys)
-        ]
-        df_ui2frc = pd.DataFrame(
-            rows, columns=[self._USER_COL, self._ITEM_COL, "recency", "frequency", "cv"]
+        df_ui2frc = self._build_ui_rf_df(df_obs, self.observation_end_date_)
+        df_ui2frc["cv"] = (
+            pd.MultiIndex.from_frame(df_ui2frc[[self._USER_COL, self._ITEM_COL]])
+            .isin(UIcv)
+            .astype(int)
         )
         self.record_num_target_org = len(df_ui2frc)  # レコード数の計測(フィルタリング前)
         self.total_cv_org = df_ui2frc.cv.sum()  # cv数の計測(フィルタリング前)
 
         # 最新度の最大値の決定
-        # 365日前のデータまで考える必要はない
-        # TODO: 適切な最大値は要検討
         if recency_limit is not None:
             self.recency_limit = recency_limit
         else:
@@ -292,8 +285,6 @@ class RecencyFrequencyScorer:
             self.recency_limit = recency_limit
 
         # 頻度の最大値の決定
-        # 100閲覧のデータまで考える必要はない
-        # TODO: 適切な最大値は要検討
         if frequency_limit is not None:
             self.frequency_limit = frequency_limit
         else:
@@ -414,12 +405,12 @@ class RecencyFrequencyScorer:
 
         Parameters
         ----------
-        kind : {'empirical', 'mono', 'mcc'}, default 'empirical'
-            Which probability to visualize. 'empirical' uses fit() or
-            fit_period() results; 'mono' and 'mcc' use optimize() results.
+        kind : {"empirical", "mono", "mcc"}, default "empirical"
+            Which probability to visualize. "empirical" uses fit() or
+            fit_period() results; "mono" and "mcc" use optimize() results.
         path : str or None, default None
             Output file path for the PNG image. If None, saves as
-            'surface_{kind}_probability.png' in the current directory.
+            "surface_{kind}_probability.png" in the current directory.
 
         Returns
         -------
@@ -429,7 +420,7 @@ class RecencyFrequencyScorer:
         import numpy as np
 
         if kind not in ("empirical", "mono", "mcc"):
-            raise ValueError(f"kind must be 'empirical', 'mono', or 'mcc', got '{kind}'.")
+            raise ValueError(f"kind must be 'empirical', 'mono', or 'mcc', got {kind!r}.")
         if kind == "empirical" and self.empirical_probability_table_ is None:
             raise RuntimeError("fit() must be called before plot_probability_surface().")
         if kind == "mono" and self.mono_probability_table_ is None:
@@ -479,23 +470,23 @@ class RecencyFrequencyScorer:
 
         Parameters
         ----------
-        kind : {'empirical', 'mono', 'mcc', 'all'}, default 'empirical'
-            Which probability to export. 'empirical' uses fit() or
-            fit_period() results; 'mono' and 'mcc' use optimize() results;
-            'all' merges empirical, mono, and mcc into a single file with
+        kind : {"empirical", "mono", "mcc", "all"}, default "empirical"
+            Which probability to export. "empirical" uses fit() or
+            fit_period() results; "mono" and "mcc" use optimize() results;
+            "all" merges empirical, mono, and mcc into a single file with
             columns empirical_probability, mono_probability, and
             mcc_probability.
         path : str or None, default None
             Output file path for the CSV. If None, saves as
-            '{kind}_probability.csv' in the current directory.
-            If a directory, saves '{kind}_probability.csv' inside it.
+            "{kind}_probability.csv" in the current directory.
+            If a directory, saves "{kind}_probability.csv" inside it.
 
         Returns
         -------
         None
         """
         if kind not in ("empirical", "mono", "mcc", "all"):
-            raise ValueError(f"kind must be 'empirical', 'mono', 'mcc', or 'all', got '{kind}'.")
+            raise ValueError(f"kind must be 'empirical', 'mono', 'mcc', or 'all', got {kind!r}.")
         if kind in ("empirical", "all") and self.empirical_probability_ is None:
             raise RuntimeError("fit() must be called before export_probability_csv().")
         if kind in ("mono", "all") and self.mono_probability_ is None:
@@ -545,9 +536,9 @@ class RecencyFrequencyScorer:
             Recency rank (1 = most recently interacted, higher = older).
         f : int
             Frequency (number of interactions in the observation period).
-        kind : {'empirical', 'mono', 'mcc'}, default 'empirical'
-            Which probability to use. 'empirical' uses fit() or fit_period()
-            results; 'mono' and 'mcc' use optimize() results.
+        kind : {"empirical", "mono", "mcc"}, default "empirical"
+            Which probability to use. "empirical" uses fit() or fit_period()
+            results; "mono" and "mcc" use optimize() results.
 
         Returns
         -------
@@ -561,7 +552,7 @@ class RecencyFrequencyScorer:
         if not isinstance(f, int) or f < 1:
             raise TypeError("f must be a positive integer.")
         if kind not in ("empirical", "mono", "mcc"):
-            raise ValueError(f"kind must be 'empirical', 'mono', or 'mcc', got '{kind}'.")
+            raise ValueError(f"kind must be 'empirical', 'mono', or 'mcc', got {kind!r}.")
         if kind == "empirical" and self.empirical_probability_dict_ is None:
             raise RuntimeError("fit() must be called before predict().")
         if kind == "mono" and self.mono_probability_dict_ is None:
@@ -601,9 +592,9 @@ class RecencyFrequencyScorer:
         target_date : str or datetime
             Reference date for computing recency and frequency.
             Rows after this date are excluded.
-        kind : {'empirical', 'mono', 'mcc'}, default 'empirical'
-            Which probability to use. 'empirical' uses fit() or fit_period()
-            results; 'mono' and 'mcc' use optimize() results.
+        kind : {"empirical", "mono", "mcc"}, default "empirical"
+            Which probability to use. "empirical" uses fit() or fit_period()
+            results; "mono" and "mcc" use optimize() results.
         user_col : str, optional
             Column name for user IDs in df. Defaults to the value set in __init__.
         item_col : str, optional
@@ -621,7 +612,7 @@ class RecencyFrequencyScorer:
             starts at 1.
         """
         if kind not in ("empirical", "mono", "mcc"):
-            raise ValueError(f"kind must be 'empirical', 'mono', or 'mcc', got '{kind}'.")
+            raise ValueError(f"kind must be 'empirical', 'mono', or 'mcc', got {kind!r}.")
         if self.empirical_probability_dict_ is None:
             raise RuntimeError("fit() must be called before transform().")
         if kind == "mono" and self.mono_probability_dict_ is None:
@@ -654,26 +645,18 @@ class RecencyFrequencyScorer:
         # 基準日(target_date)までのレコードに絞る
         df_log = df_log[df_log[self._DATETIME_COL] <= target_date]
 
-        # user と item ごとに最新度を計算
-        U2I2Recensys = self._build_u2i2recencies(df_log, target_date)
-
-        # 最新度と頻度を計算し、上限値でクランプしたうえで再閲覧確率を付与
+        # user と item ごとに最新度・頻度を集計し、再閲覧確率を付与（ベクトル演算）
         prob_dict = self._probability_dict(kind)
-        rows = []
-        for user, item, recency, frequency in self._iter_u2i_rf(U2I2Recensys):
-            r_adj = min(recency, self.recency_limit)
-            f_adj = min(frequency, self.frequency_limit)
-            rows.append((user, item, recency, frequency, prob_dict.get((r_adj, f_adj), 0.0)))
-        df_rf = pd.DataFrame(
-            rows,
-            columns=[
-                self._USER_COL,
-                self._ITEM_COL,
-                "recency",
-                "frequency",
-                "probability",
-            ],
+        prob_df = pd.DataFrame(
+            [(r, f, p) for (r, f), p in prob_dict.items()],
+            columns=["recency_adj", "frequency_adj", "probability"],
         )
+        df_rf = self._build_ui_rf_df(df_log, target_date)
+        df_rf["recency_adj"] = df_rf["recency"].clip(upper=self.recency_limit)
+        df_rf["frequency_adj"] = df_rf["frequency"].clip(upper=self.frequency_limit)
+        df_rf = df_rf.merge(prob_df, on=["recency_adj", "frequency_adj"], how="left")
+        df_rf["probability"] = df_rf["probability"].fillna(0.0)
+        df_rf = df_rf.drop(columns=["recency_adj", "frequency_adj"])
         df_rf = df_rf.sort_values([self._USER_COL, "probability"], ascending=[True, False])
         df_rf["order"] = df_rf.groupby(self._USER_COL).cumcount() + 1
         df_rf = df_rf.rename(columns={self._USER_COL: user_col, self._ITEM_COL: item_col})
@@ -690,7 +673,7 @@ class RecencyFrequencyScorer:
         Parameters
         ----------
         df_rec : pd.DataFrame
-            Recommendation results from transform(). Must have an 'order' column.
+            Recommendation results from transform(). Must have an "order" column.
         UIrevisit : set
             Ground truth set of (user, item) pairs that were actually revisited.
         order : int, default 1
@@ -706,7 +689,8 @@ class RecencyFrequencyScorer:
         pd.DataFrame
             Evaluation metrics for each order cutoff. Columns:
             order, n_recommended, n_hit, precision, recall, f1,
-            recall_norm, f1_norm.
+            recall_norm (recall normalized by the maximum hits achievable
+            within df_rec), f1_norm (f1 using recall_norm instead of recall).
         """
         user_col = user_col or self.user_col
         item_col = item_col or self.item_col
@@ -715,11 +699,11 @@ class RecencyFrequencyScorer:
         try:
             df_rec[user_col] = df_rec[user_col].astype(str)
         except Exception as e:
-            raise ValueError(f"Failed to cast column '{user_col}' to str: {e}") from e
+            raise ValueError(f"Failed to cast column {user_col!r} to str: {e}") from e
         try:
             df_rec[item_col] = df_rec[item_col].astype(str)
         except Exception as e:
-            raise ValueError(f"Failed to cast column '{item_col}' to str: {e}") from e
+            raise ValueError(f"Failed to cast column {item_col!r} to str: {e}") from e
         try:
             UIrevisit = {(str(u), str(i)) for u, i in UIrevisit}
         except (TypeError, ValueError) as e:
@@ -767,6 +751,21 @@ class RecencyFrequencyScorer:
             for item, Recencys in I2Recencys.items():
                 yield user, item, min(Recencys), len(Recencys)
 
+    def _build_ui_rf_df(self, df, ref_date):
+        """Vectorized alternative to _build_u2i2recencies() + _iter_u2i_rf().
+
+        Computes recency (minimum days since last interaction, 1-indexed) and
+        frequency (interaction count) for each (user, item) pair using
+        pandas groupby instead of a Python loop.
+        """
+        tmp = df[[self._USER_COL, self._ITEM_COL]].copy()
+        tmp["recency"] = (ref_date - df[self._DATETIME_COL]).dt.days + 1
+        return (
+            tmp.groupby([self._USER_COL, self._ITEM_COL], sort=False)
+            .agg(recency=("recency", "min"), frequency=("recency", "count"))
+            .reset_index()
+        )
+
     def _probability_dict(self, kind):
         if kind == "mono":
             return self.mono_probability_dict_
@@ -781,14 +780,14 @@ class RecencyFrequencyScorer:
         constraints (and optionally convexity/concavity constraints).
         Uses weighted least squares as objective.
 
-        Requires fit() to be called first. Depends on cvxpy.
+        Requires fit() or fit_period() to be called first. Depends on cvxpy.
 
         Parameters
         ----------
-        kind : {'mono', 'mcc'}, default 'mono'
+        kind : {"mono", "mcc"}, default "mono"
             Optimization model to use.
-            'mono' applies monotonicity constraints only.
-            'mcc' additionally applies convexity in recency and concavity
+            "mono" applies monotonicity constraints only.
+            "mcc" additionally applies convexity in recency and concavity
             in frequency (diminishing marginal returns).
 
         Returns
@@ -796,7 +795,7 @@ class RecencyFrequencyScorer:
         self
         """
         if kind not in ("mono", "mcc"):
-            raise ValueError(f"kind must be 'mono' or 'mcc', got '{kind}'.")
+            raise ValueError(f"kind must be 'mono' or 'mcc', got {kind!r}.")
 
         try:
             from .optimizer import RFOptimizer
@@ -831,8 +830,9 @@ class RecencyFrequencyScorer:
 
 if __name__ == "__main__":
     # データの読み込み（オーム社『Pythonではじめる数理最適化』サポートデータより引用）
-    url = "https://raw.githubusercontent.com/ohmsha/PyOptBook/main/7.recommendation/access_log.csv"
-    df = pd.read_csv(url)
+    # url = "https://raw.githubusercontent.com/ohmsha/PyOptBook/main/7.recommendation/access_log.csv"
+    # df = pd.read_csv(url)
+    df = pd.read_csv("../../examples/access_log100.csv")
     df_train = df[df.user_id.map(lambda x: hash(x) % 10 < 8)]  # hash関数で学習データ8割を抽出
     df_test = df[df.user_id.map(lambda x: hash(x) % 10 >= 8)]  # hash関数でテストデータ2割を抽出
 

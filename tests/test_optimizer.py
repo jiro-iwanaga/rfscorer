@@ -187,6 +187,9 @@ class TestBuildModel:
 
     def test_resets_solve_state(self, opt_with_data):
         opt_with_data.build_model()
+        opt_with_data.solve()
+        opt_with_data.postprocess()
+        opt_with_data.build_model()  # 再ビルドでソルバー結果がリセットされることを確認
         assert opt_with_data.status is None
         assert opt_with_data.objective_value is None
         assert opt_with_data.RF2X == {}

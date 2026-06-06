@@ -15,8 +15,9 @@ class RFOptimizer:
 
         optimizer = RFOptimizer()
         optimizer.set_data(R, F, RF2N, RF2Prob)
-        optimizer.build_model(kind='mono')
+        optimizer.build_model(kind="mono")
         optimizer.solve()
+        optimizer.show_solve_info()  # optional
         optimizer.postprocess()
         # optimizer.RF2X holds the optimized probabilities
     """
@@ -98,13 +99,13 @@ class RFOptimizer:
 
         Parameters
         ----------
-        kind : {'mono', 'mcc'}, default 'mono'
-            'mono' applies monotonicity constraints only.
-            'mcc' additionally applies convexity in recency and concavity in
+        kind : {"mono", "mcc"}, default "mono"
+            "mono" applies monotonicity constraints only.
+            "mcc" additionally applies convexity in recency and concavity in
             frequency (diminishing marginal returns).
         """
         if kind not in ("mono", "mcc"):
-            raise ValueError(f"kind must be 'mono' or 'mcc', got '{kind}'")
+            raise ValueError(f"kind must be 'mono' or 'mcc', got {kind!r}")
         if len(self.R) == 0 or len(self.F) == 0:
             raise RuntimeError("set_data() must be called before build_model()")
 
@@ -175,6 +176,7 @@ class RFOptimizer:
 
         Sets status, objective_value, and elapsed_time.
         Raises RuntimeError if build_model() has not been called.
+        Solver failures are not raised here; call postprocess() to detect them.
         """
         if self.problem is None:
             raise RuntimeError("build_model() must be called before solve()")
@@ -195,7 +197,7 @@ class RFOptimizer:
         if self.status is None:
             raise RuntimeError("solve() must be called before postprocess()")
         if self.x.value is None:
-            raise RuntimeError(f"Cannot postprocess: solver status is '{self.status}'")
+            raise RuntimeError(f"Cannot postprocess: solver status is {self.status!r}")
         self.RF2X = {}
         for r_idx, r in enumerate(self.R):
             for f_idx, f in enumerate(self.F):
@@ -204,7 +206,7 @@ class RFOptimizer:
     def _print_pivot(self, RF2Val, fmt="g"):
         row_w = max(9, max(len(str(r)) for r in self.R) + 1)
         col_w = max(9, max(len(str(f)) for f in self.F) + 1)
-        print(f"{'':>{row_w}}" + "".join(f"{f:>{col_w}}" for f in self.F))
+        print(" " * row_w + "".join(f"{f:>{col_w}}" for f in self.F))
         for r in self.R:
             cells = "".join(format(float(RF2Val[r, f]), f">{col_w}{fmt}") for f in self.F)
             print(f"{r:>{row_w}}{cells}")
