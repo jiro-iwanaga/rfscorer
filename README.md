@@ -115,7 +115,7 @@ Within each user, rows are sorted by `probability` descending; `order` represent
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Improving collaborative filtering recommendations by estimating user preferences from clickstream data,” Electronic Commerce Research and Applications, Volume 37, Article 100877, 2019.](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)
 
 
-## Citing
+## Citation
 
 If you use `rfscorer` in academic work, please cite the following paper:
 
