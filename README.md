@@ -63,16 +63,6 @@ Pass `target_date` as the split point: data up to `target_date` forms the observ
 scorer.fit(df_train, target_date="2026-07-07")
 ```
 
-For explicit period control, use `fit_period()` instead:
-
-```python
-scorer.fit_period(
-    df_train,
-    observation_period=("2026-07-01", "2026-07-07"),
-    evaluation_period=("2026-07-08", "2026-07-08"),
-)
-```
-
 The empirical surface reflects raw revisit rates and may be irregular due to sparse data.
 
 ![empirical probability surface](https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/empirical_probability_surface.png)
