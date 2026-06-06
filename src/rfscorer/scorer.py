@@ -265,8 +265,6 @@ class RecencyFrequencyScorer:
         self.total_cv_org = df_ui2frc.cv.sum()  # cv数の計測(フィルタリング前)
 
         # 最新度の最大値の決定
-        # 365日前のデータまで考える必要はない
-        # TODO: 適切な最大値は要検討
         if recency_limit is not None:
             self.recency_limit = recency_limit
         else:
@@ -287,8 +285,6 @@ class RecencyFrequencyScorer:
             self.recency_limit = recency_limit
 
         # 頻度の最大値の決定
-        # 100閲覧のデータまで考える必要はない
-        # TODO: 適切な最大値は要検討
         if frequency_limit is not None:
             self.frequency_limit = frequency_limit
         else:
