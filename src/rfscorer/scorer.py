@@ -173,12 +173,11 @@ class RecencyFrequencyScorer:
             Start and end dates of the evaluation period.
             Must start strictly after observation_period ends.
         recency_limit : int, optional
-            Maximum recency rank to include. If None, automatically
-            determined from the cumulative cv distribution using
-            RECENCY_LIMIT_RATE.
+            Maximum recency rank to include. If None, automatically set to
+            the recency rank covering 95% of cumulative revisits.
         frequency_limit : int, optional
-            Maximum frequency to include. If None, automatically determined
-            from the cumulative cv distribution using FREQUENCY_LIMIT_RATE.
+            Maximum frequency to include. If None, automatically set to
+            the frequency covering 95% of cumulative revisits.
 
         Returns
         -------
@@ -706,7 +705,8 @@ class RecencyFrequencyScorer:
         pd.DataFrame
             Evaluation metrics for each order cutoff. Columns:
             order, n_recommended, n_hit, precision, recall, f1,
-            recall_norm, f1_norm.
+            recall_norm (recall normalized by the maximum hits achievable
+            within df_rec), f1_norm (f1 using recall_norm instead of recall).
         """
         user_col = user_col or self.user_col
         item_col = item_col or self.item_col
@@ -781,7 +781,7 @@ class RecencyFrequencyScorer:
         constraints (and optionally convexity/concavity constraints).
         Uses weighted least squares as objective.
 
-        Requires fit() to be called first. Depends on cvxpy.
+        Requires fit() or fit_period() to be called first. Depends on cvxpy.
 
         Parameters
         ----------
