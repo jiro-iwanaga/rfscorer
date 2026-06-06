@@ -58,7 +58,7 @@ def df():
 @pytest.fixture(scope="module")
 def scorer_fitted():
     s = RecencyFrequencyScorer()
-    s.fit(
+    s.fit_period(
         _make_df(),
         _OBS_PERIOD,
         _EVAL_PERIOD,
@@ -71,7 +71,7 @@ def scorer_fitted():
 @pytest.fixture(scope="module")
 def scorer_optimized_mono():
     s = RecencyFrequencyScorer()
-    s.fit(
+    s.fit_period(
         _make_df(),
         _OBS_PERIOD,
         _EVAL_PERIOD,
@@ -85,7 +85,7 @@ def scorer_optimized_mono():
 @pytest.fixture(scope="module")
 def scorer_optimized_mcc():
     s = RecencyFrequencyScorer()
-    s.fit(
+    s.fit_period(
         _make_df(),
         _OBS_PERIOD,
         _EVAL_PERIOD,
@@ -121,41 +121,41 @@ class TestInit:
 
 
 # ---------------------------------------------------------------------------
-# fit — バリデーション
+# fit_period — バリデーション
 # ---------------------------------------------------------------------------
-class TestFitValidation:
+class TestFitPeriodValidation:
     def test_not_dataframe_raises(self, scorer):
         with pytest.raises(TypeError, match="pandas DataFrame"):
-            scorer.fit("not_a_df", _OBS_PERIOD, _EVAL_PERIOD)
+            scorer.fit_period("not_a_df", _OBS_PERIOD, _EVAL_PERIOD)
 
     def test_missing_column_raises(self, scorer, df):
         with pytest.raises(ValueError, match="Missing required columns"):
-            scorer.fit(df.drop(columns="item"), _OBS_PERIOD, _EVAL_PERIOD)
+            scorer.fit_period(df.drop(columns="item"), _OBS_PERIOD, _EVAL_PERIOD)
 
     def test_custom_col_missing_raises(self, df):
         s = RecencyFrequencyScorer(user_col="uid")
         with pytest.raises(ValueError, match="Missing required columns"):
-            s.fit(df, _OBS_PERIOD, _EVAL_PERIOD)
+            s.fit_period(df, _OBS_PERIOD, _EVAL_PERIOD)
 
     def test_observation_period_wrong_length_raises(self, scorer, df):
         with pytest.raises(ValueError, match="observation_period"):
-            scorer.fit(df, ("2024-01-01",), _EVAL_PERIOD)
+            scorer.fit_period(df, ("2024-01-01",), _EVAL_PERIOD)
 
     def test_evaluation_period_wrong_length_raises(self, scorer, df):
         with pytest.raises(ValueError, match="evaluation_period"):
-            scorer.fit(df, _OBS_PERIOD, ("2024-01-08",))
+            scorer.fit_period(df, _OBS_PERIOD, ("2024-01-08",))
 
     def test_observation_period_reversed_raises(self, scorer, df):
         with pytest.raises(ValueError, match="observation_period must be ordered"):
-            scorer.fit(df, ("2024-01-07", "2024-01-01"), _EVAL_PERIOD)
+            scorer.fit_period(df, ("2024-01-07", "2024-01-01"), _EVAL_PERIOD)
 
     def test_evaluation_period_reversed_raises(self, scorer, df):
         with pytest.raises(ValueError, match="evaluation_period must be ordered"):
-            scorer.fit(df, _OBS_PERIOD, ("2024-01-14", "2024-01-08"))
+            scorer.fit_period(df, _OBS_PERIOD, ("2024-01-14", "2024-01-08"))
 
     def test_overlapping_periods_raises(self, scorer, df):
         with pytest.raises(ValueError, match="observation_period must end before"):
-            scorer.fit(df, ("2024-01-01", "2024-01-09"), ("2024-01-08", "2024-01-14"))
+            scorer.fit_period(df, ("2024-01-01", "2024-01-09"), ("2024-01-08", "2024-01-14"))
 
     def test_no_cv_auto_limit_raises(self, scorer):
         # 評価期間に再閲覧なし → 自動上限計算で ValueError
@@ -165,15 +165,15 @@ class TestFitValidation:
         ]
         df_no_cv = pd.DataFrame(rows, columns=["user", "item", "datetime"])
         with pytest.raises(ValueError, match="No revisits"):
-            scorer.fit(df_no_cv, _OBS_PERIOD, _EVAL_PERIOD)
+            scorer.fit_period(df_no_cv, _OBS_PERIOD, _EVAL_PERIOD)
 
 
 # ---------------------------------------------------------------------------
-# fit — 正常系
+# fit_period — 正常系
 # ---------------------------------------------------------------------------
-class TestFitResult:
+class TestFitPeriodResult:
     def test_returns_self(self, scorer, df):
-        result = scorer.fit(
+        result = scorer.fit_period(
             df,
             _OBS_PERIOD,
             _EVAL_PERIOD,
@@ -248,7 +248,7 @@ class TestFitResult:
     def test_auto_limits(self, df):
         # 自動決定: recency_limit=3, frequency_limit=3
         s = RecencyFrequencyScorer()
-        s.fit(df, _OBS_PERIOD, _EVAL_PERIOD)
+        s.fit_period(df, _OBS_PERIOD, _EVAL_PERIOD)
         assert s.recency_limit == _AUTO_RECENCY_LIMIT
         assert s.frequency_limit == _AUTO_FREQUENCY_LIMIT
         # 上限が実際に適用されていること (limit 超えのキーが存在しないこと)
@@ -259,7 +259,7 @@ class TestFitResult:
     def test_custom_column_names(self):
         df_custom = _make_df().rename(columns={"user": "uid", "item": "iid", "datetime": "ts"})
         s = RecencyFrequencyScorer(user_col="uid", item_col="iid", datetime_col="ts")
-        s.fit(
+        s.fit_period(
             df_custom,
             _OBS_PERIOD,
             _EVAL_PERIOD,
@@ -273,7 +273,7 @@ class TestFitResult:
         original_columns = list(df.columns)
         original_values = df.values.copy()
         s = RecencyFrequencyScorer()
-        s.fit(
+        s.fit_period(
             df,
             _OBS_PERIOD,
             _EVAL_PERIOD,
@@ -285,6 +285,120 @@ class TestFitResult:
 
 
 # ---------------------------------------------------------------------------
+# fit — バリデーション
+# ---------------------------------------------------------------------------
+class TestFitValidation:
+    def test_not_dataframe_raises(self, scorer):
+        with pytest.raises(TypeError, match="pandas DataFrame"):
+            scorer.fit("not_a_df", "2024-01-07")
+
+    def test_missing_datetime_col_raises(self, scorer, df):
+        with pytest.raises(ValueError, match="Missing required columns"):
+            scorer.fit(df.drop(columns="datetime"), "2024-01-07")
+
+    def test_invalid_target_date_raises(self, scorer, df):
+        with pytest.raises(ValueError, match="target_date could not be parsed"):
+            scorer.fit(df, "not-a-date")
+
+
+# ---------------------------------------------------------------------------
+# fit — 正常系
+# ---------------------------------------------------------------------------
+# テストデータ (2024-01-01 〜 2024-01-10) に対して target_date="2024-01-07" を使用:
+#   obs: 2024-01-01 〜 2024-01-07 (observation_days=28 → df_min=Jan01 が floor)
+#   eval: 2024-01-08 〜 2024-01-10 (evaluation_days=7 → df_max=Jan10 が ceil)
+# fit_period(_OBS_PERIOD, ("2024-01-08","2024-01-10")) と等価
+_FIT_TARGET_DATE = "2024-01-07"
+
+
+class TestFitResult:
+    def test_returns_self(self, scorer, df):
+        result = scorer.fit(
+            df, _FIT_TARGET_DATE, recency_limit=_RECENCY_LIMIT, frequency_limit=_FREQUENCY_LIMIT
+        )
+        assert result is scorer
+
+    def test_periods_match_target_date(self, df):
+        s = RecencyFrequencyScorer()
+        s.fit(df, _FIT_TARGET_DATE, recency_limit=_RECENCY_LIMIT, frequency_limit=_FREQUENCY_LIMIT)
+        assert s.observation_end_date_ == pd.Timestamp(_FIT_TARGET_DATE)
+        assert s.evaluation_start_date_ == pd.Timestamp("2024-01-08")
+
+    def test_observation_start_bounded_by_observation_days(self, df):
+        # observation_days=3 → obs_start = max(Jan01, Jan07-3d) = Jan04
+        s = RecencyFrequencyScorer()
+        s.fit(
+            df,
+            _FIT_TARGET_DATE,
+            observation_days=3,
+            evaluation_days=None,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        assert s.observation_start_date_ == pd.Timestamp("2024-01-04")
+
+    def test_observation_days_none_uses_df_min(self, df):
+        s = RecencyFrequencyScorer()
+        s.fit(
+            df,
+            _FIT_TARGET_DATE,
+            observation_days=None,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        assert s.observation_start_date_ == pd.Timestamp("2024-01-01")
+
+    def test_evaluation_end_bounded_by_evaluation_days(self, df):
+        # evaluation_days=2 → eval_end = min(Jan10, Jan07+2d) = Jan09
+        s = RecencyFrequencyScorer()
+        s.fit(
+            df,
+            _FIT_TARGET_DATE,
+            evaluation_days=2,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        assert s.evaluation_end_date_ == pd.Timestamp("2024-01-09")
+
+    def test_evaluation_days_none_uses_df_max(self, df):
+        s = RecencyFrequencyScorer()
+        s.fit(
+            df,
+            _FIT_TARGET_DATE,
+            evaluation_days=None,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        assert s.evaluation_end_date_ == pd.Timestamp("2024-01-10")
+
+    def test_same_result_as_fit_period(self, df):
+        # fit(target_date, obs_days=None, eval_days=None) == fit_period(full range)
+        s1 = RecencyFrequencyScorer()
+        s1.fit(
+            df,
+            _FIT_TARGET_DATE,
+            observation_days=None,
+            evaluation_days=None,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        s2 = RecencyFrequencyScorer()
+        s2.fit_period(
+            df,
+            _OBS_PERIOD,
+            ("2024-01-08", "2024-01-10"),
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        assert s1.empirical_probability_dict_ == s2.empirical_probability_dict_
+
+    def test_empirical_probability_dict_populated(self, df):
+        s = RecencyFrequencyScorer()
+        s.fit(df, _FIT_TARGET_DATE, recency_limit=_RECENCY_LIMIT, frequency_limit=_FREQUENCY_LIMIT)
+        assert s.empirical_probability_dict_ is not None
+
+
+# ---------------------------------------------------------------------------
 # optimize
 # ---------------------------------------------------------------------------
 class TestOptimize:
@@ -293,7 +407,7 @@ class TestOptimize:
             scorer.optimize(kind="mono")
 
     def test_invalid_kind_raises(self, scorer, df):
-        scorer.fit(
+        scorer.fit_period(
             df,
             _OBS_PERIOD,
             _EVAL_PERIOD,
@@ -304,7 +418,7 @@ class TestOptimize:
             scorer.optimize(kind="invalid")
 
     def test_optimize_mono_returns_self(self, scorer, df):
-        scorer.fit(
+        scorer.fit_period(
             df,
             _OBS_PERIOD,
             _EVAL_PERIOD,
@@ -369,7 +483,7 @@ class TestPredict:
             scorer.predict(1, 1, kind="empirical")
 
     def test_before_optimize_mono_raises(self, scorer, df):
-        scorer.fit(
+        scorer.fit_period(
             df,
             _OBS_PERIOD,
             _EVAL_PERIOD,
@@ -380,7 +494,7 @@ class TestPredict:
             scorer.predict(1, 1, kind="mono")
 
     def test_before_optimize_mcc_raises(self, scorer, df):
-        scorer.fit(
+        scorer.fit_period(
             df,
             _OBS_PERIOD,
             _EVAL_PERIOD,

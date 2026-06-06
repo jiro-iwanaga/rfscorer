@@ -57,10 +57,16 @@ scorer = RecencyFrequencyScorer()
 ```
 
 Call `fit()` to estimate empirical revisit probabilities from the training log.
-Specify the observation period (from which recency and frequency are computed) and the evaluation period (which provides the ground-truth revisit labels).
+Pass `target_date` as the split point: data up to `target_date` forms the observation window (default: 28 days back), and data after `target_date` forms the evaluation window (default: 7 days forward).
 
 ```python
-scorer.fit(
+scorer.fit(df_train, target_date="2026-07-07")
+```
+
+For explicit period control, use `fit_period()` instead:
+
+```python
+scorer.fit_period(
     df_train,
     observation_period=("2026-07-01", "2026-07-07"),
     evaluation_period=("2026-07-08", "2026-07-08"),

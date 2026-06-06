@@ -9,8 +9,8 @@
 | 閲覧履歴 | interaction history | ユーザーが商品を閲覧した記録。`fit()` に DataFrame として渡す。カラム名はコンストラクタ引数で指定し、`fit()` 内で `user`・`item`・`datetime` に正規化される |
 | ユーザー | user | 閲覧履歴の主体。`user` カラムで識別する |
 | 商品 | item | 閲覧対象。`item` カラムで識別する |
-| 観測期間 | observation period / `observation_period` | 最新度・頻度を算出するために使用する期間。`fit()` に開始日・終了日の tuple で渡す |
-| 評価期間 | evaluation period / `evaluation_period` | 再閲覧の有無を観測するために使用する期間。観測期間の直後に設定する。`fit()` に開始日・終了日の tuple で渡す |
+| 観測期間 | observation period / `observation_period` | 最新度・頻度を算出するために使用する期間。`fit()` では `target_date` から自動導出される。`fit_period()` に開始日・終了日の tuple で明示指定することもできる |
+| 評価期間 | evaluation period / `evaluation_period` | 再閲覧の有無を観測するために使用する期間。観測期間の直後に設定する。`fit()` では `target_date` の翌日から自動導出される。`fit_period()` に開始日・終了日の tuple で明示指定することもできる |
 
 ## アルゴリズム
 
@@ -33,7 +33,8 @@
 | 用語 | 定義 |
 |------|------|
 | `RecencyFrequencyScorer` | RF スコアリングの主クラス。コンストラクタでカラム名を受け取る |
-| `fit(df, observation_period, evaluation_period, recency_limit=None, frequency_limit=None)` | 閲覧履歴 DataFrame と観測期間・評価期間を受け取り、経験的再閲覧確率を推定するメソッド。`recency_limit`・`frequency_limit` は省略時に累積再閲覧数から自動決定 |
+| `fit(df, target_date, observation_days=28, evaluation_days=7, recency_limit=None, frequency_limit=None)` | 閲覧履歴 DataFrame と基準日 `target_date` を受け取り、観測・評価ウィンドウを自動導出して経験的再閲覧確率を推定するメソッド。`observation_days`・`evaluation_days` でウィンドウ幅を調整できる（`None` でデータ全範囲） |
+| `fit_period(df, observation_period, evaluation_period, recency_limit=None, frequency_limit=None)` | 観測期間・評価期間を tuple で明示指定して経験的再閲覧確率を推定するメソッド。`fit()` より細かい期間制御が必要な場合に使用する |
 | `predict(r, f, kind='empirical')` | 指定した最新度 `r`・頻度 `f` の再閲覧確率を返すメソッド。`fit()` 後に利用可能 |
 | `transform(df, target_date, kind='empirical', ...)` | 入力 DataFrame の各 user×item ペアに最新度・頻度・再閲覧確率・順位を付与して返すメソッド。`fit()` 後に利用可能 |
 | `evaluate(df_rec, UIrevisit, order=1, ...)` | 推薦結果と正解データを比較し precision・recall・f1 等の評価指標を返すメソッド |

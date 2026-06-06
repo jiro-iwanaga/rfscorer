@@ -77,6 +77,82 @@ class RecencyFrequencyScorer:
     def fit(
         self,
         df,
+        target_date,
+        observation_days=28,
+        evaluation_days=7,
+        recency_limit=None,
+        frequency_limit=None,
+    ):
+        """Estimate empirical revisit probabilities using target_date as split point.
+
+        Derives observation and evaluation periods automatically from target_date:
+        observation spans from at most observation_days before target_date to
+        target_date; evaluation spans from the next day to at most evaluation_days
+        after target_date.  Pass None for either days argument to use the full
+        data range in that direction.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Interaction log containing user, item, and datetime columns.
+        target_date : str or datetime
+            Reference date used as the observation end / evaluation start boundary.
+        observation_days : int or None, default 28
+            Maximum number of days to look back from target_date for the
+            observation period.  If None, uses all data up to target_date.
+        evaluation_days : int or None, default 7
+            Maximum number of days to look forward from target_date for the
+            evaluation period.  If None, uses all data after target_date.
+        recency_limit : int, optional
+            Maximum recency rank to include.  If None, determined automatically.
+        frequency_limit : int, optional
+            Maximum frequency to include.  If None, determined automatically.
+
+        Returns
+        -------
+        self
+        """
+        if not isinstance(df, pd.DataFrame):
+            raise TypeError("df must be a pandas DataFrame.")
+        if self.datetime_col not in df.columns:
+            raise ValueError(f"Missing required columns: ['{self.datetime_col}']")
+
+        try:
+            target_date = pd.to_datetime(target_date)
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"target_date could not be parsed as a date: {target_date}") from e
+
+        try:
+            dates = pd.to_datetime(df[self.datetime_col])
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Column '{self.datetime_col}' could not be parsed as dates.") from e
+        df_min = dates.min()
+        df_max = dates.max()
+
+        if observation_days is None:
+            obs_start = df_min
+        else:
+            obs_start = max(df_min, target_date - pd.Timedelta(days=observation_days))
+
+        obs_end = target_date
+        eval_start = target_date + pd.Timedelta(days=1)
+
+        if evaluation_days is None:
+            eval_end = df_max
+        else:
+            eval_end = min(df_max, target_date + pd.Timedelta(days=evaluation_days))
+
+        return self.fit_period(
+            df,
+            observation_period=(obs_start, obs_end),
+            evaluation_period=(eval_start, eval_end),
+            recency_limit=recency_limit,
+            frequency_limit=frequency_limit,
+        )
+
+    def fit_period(
+        self,
+        df,
         observation_period,
         evaluation_period,
         recency_limit=None,
@@ -748,9 +824,9 @@ class RecencyFrequencyScorer:
 
 if __name__ == "__main__":
     # データの読み込み（オーム社『Pythonではじめる数理最適化』サポートデータより引用）
-    # url = "https://raw.githubusercontent.com/ohmsha/PyOptBook/main/7.recommendation/access_log.csv"
-    # df = pd.read_csv(url)
-    df = pd.read_csv("examples/access_log.csv")
+    url = "https://raw.githubusercontent.com/ohmsha/PyOptBook/main/7.recommendation/access_log.csv"
+    df = pd.read_csv(url)
+    # df = pd.read_csv("examples/access_log.csv")
     df_train = df[
         df.user_id.map(lambda x: hash(x) % 10 < 8)
     ]  # hash関数で簡易的に学習データ8割を抽出
@@ -762,9 +838,11 @@ if __name__ == "__main__":
     scorer = RecencyFrequencyScorer(user_col="user_id", item_col="item_id", datetime_col="date")
 
     # 経験的再閲覧確率の計算
-    observation_period = ("2015-07-01", "2015-07-07")
-    evaluation_period = ("2015-07-08", "2015-07-08")
-    scorer.fit(df_train, observation_period, evaluation_period)
+    # observation_period = ("2015-07-01", "2015-07-07")
+    # evaluation_period = ("2015-07-08", "2015-07-08")
+    # scorer.fit_period(df_train, observation_period, evaluation_period)
+    target_date = "2015-07-07"
+    scorer.fit(df_train, target_date)
     scorer.plot_probability_surface("empirical")
     scorer.show()
 
@@ -780,7 +858,6 @@ if __name__ == "__main__":
     scorer.export_probability_csv("all")
 
     # テストの実施
-    target_date = "2015-07-07"
     df_test_obs = df_test[df_test.date <= target_date]  # テストの観測期間データ
     df_test_eval = df_test[df_test.date > target_date]  # テストの評価期間データ(正解データ)
     UIrevisit = set([(row.user_id, row.item_id) for row in df_test_eval.itertuples()])  # 正解データ
