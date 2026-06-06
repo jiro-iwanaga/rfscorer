@@ -57,14 +57,10 @@ scorer = RecencyFrequencyScorer()
 ```
 
 Call `fit()` to estimate empirical revisit probabilities from the training log.
-Specify the observation period (from which recency and frequency are computed) and the evaluation period (which provides the ground-truth revisit labels).
+Pass `target_date` as the split point: data up to `target_date` forms the observation window (default: 28 days back), and data after `target_date` forms the evaluation window (default: 7 days forward).
 
 ```python
-scorer.fit(
-    df_train,
-    observation_period=("2026-07-01", "2026-07-07"),
-    evaluation_period=("2026-07-08", "2026-07-08"),
-)
+scorer.fit(df_train, target_date="2026-07-07")
 ```
 
 The empirical surface reflects raw revisit rates and may be irregular due to sparse data.
@@ -119,7 +115,7 @@ Within each user, rows are sorted by `probability` descending; `order` represent
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Improving collaborative filtering recommendations by estimating user preferences from clickstream data,” Electronic Commerce Research and Applications, Volume 37, Article 100877, 2019.](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)
 
 
-## Citing
+## Citation
 
 If you use `rfscorer` in academic work, please cite the following paper:
 

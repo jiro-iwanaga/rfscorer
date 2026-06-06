@@ -36,6 +36,8 @@ RF スコアリング手法を Python パッケージとして PyPI に公開し
   - カラム名を `user_col`・`item_col`・`datetime_col` で指定する（デフォルト: `user`・`item`・`datetime`）
 - `fit()` に渡す引数
   - `df`: ユーザー × 商品のインタラクション履歴 DataFrame。同一ユーザー × 商品の組み合わせが複数行存在することを想定（リピート閲覧）
+  - `target_date`: 観測期間と評価期間の分割点となる基準日。観測期間は `target_date` まで（デフォルト: 28日遡る）、評価期間は `target_date` の翌日から（デフォルト: 7日分）
+- 期間を明示的に指定したい場合は `fit_period()` を使用する
   - `observation_period`: 観測期間の開始日・終了日の tuple
   - `evaluation_period`: 評価期間の開始日・終了日の tuple
 
@@ -63,11 +65,7 @@ from rfscorer import RecencyFrequencyScorer
 df = pd.read_csv("examples/access_log.csv")
 scorer = RecencyFrequencyScorer(user_col="user_id", item_col="item_id", datetime_col="date")
 
-scorer.fit(
-    df,
-    observation_period=("2015-07-02", "2015-07-06"),
-    evaluation_period=("2015-07-07", "2015-07-08"),
-)
+scorer.fit(df, target_date="2015-07-06")
 df_empirical = scorer.empirical_probability_
 
 scorer.optimize(kind="mono")
