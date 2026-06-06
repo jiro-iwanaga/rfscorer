@@ -255,15 +255,11 @@ class RecencyFrequencyScorer:
         # 評価期間に cv がある user と item のペアを作成
         UIcv = {(row.user, row.item) for row in df_eval.itertuples()}
 
-        U2I2Recensys = self._build_u2i2recencies(df_obs, self.observation_end_date_)
-
-        # 閲覧履歴に最新度、頻度、cv の情報を追加
-        rows = [
-            (user, item, recency, frequency, int((user, item) in UIcv))
-            for user, item, recency, frequency in self._iter_u2i_rf(U2I2Recensys)
-        ]
-        df_ui2frc = pd.DataFrame(
-            rows, columns=[self._USER_COL, self._ITEM_COL, "recency", "frequency", "cv"]
+        df_ui2frc = self._build_ui_rf_df(df_obs, self.observation_end_date_)
+        df_ui2frc["cv"] = (
+            pd.MultiIndex.from_frame(df_ui2frc[[self._USER_COL, self._ITEM_COL]])
+            .isin(UIcv)
+            .astype(int)
         )
         self.record_num_target_org = len(df_ui2frc)  # レコード数の計測(フィルタリング前)
         self.total_cv_org = df_ui2frc.cv.sum()  # cv数の計測(フィルタリング前)
@@ -653,26 +649,18 @@ class RecencyFrequencyScorer:
         # 基準日(target_date)までのレコードに絞る
         df_log = df_log[df_log[self._DATETIME_COL] <= target_date]
 
-        # user と item ごとに最新度を計算
-        U2I2Recensys = self._build_u2i2recencies(df_log, target_date)
-
-        # 最新度と頻度を計算し、上限値でクランプしたうえで再閲覧確率を付与
+        # user と item ごとに最新度・頻度を集計し、再閲覧確率を付与（ベクトル演算）
         prob_dict = self._probability_dict(kind)
-        rows = []
-        for user, item, recency, frequency in self._iter_u2i_rf(U2I2Recensys):
-            r_adj = min(recency, self.recency_limit)
-            f_adj = min(frequency, self.frequency_limit)
-            rows.append((user, item, recency, frequency, prob_dict.get((r_adj, f_adj), 0.0)))
-        df_rf = pd.DataFrame(
-            rows,
-            columns=[
-                self._USER_COL,
-                self._ITEM_COL,
-                "recency",
-                "frequency",
-                "probability",
-            ],
+        prob_df = pd.DataFrame(
+            [(r, f, p) for (r, f), p in prob_dict.items()],
+            columns=["recency_adj", "frequency_adj", "probability"],
         )
+        df_rf = self._build_ui_rf_df(df_log, target_date)
+        df_rf["recency_adj"] = df_rf["recency"].clip(upper=self.recency_limit)
+        df_rf["frequency_adj"] = df_rf["frequency"].clip(upper=self.frequency_limit)
+        df_rf = df_rf.merge(prob_df, on=["recency_adj", "frequency_adj"], how="left")
+        df_rf["probability"] = df_rf["probability"].fillna(0.0)
+        df_rf = df_rf.drop(columns=["recency_adj", "frequency_adj"])
         df_rf = df_rf.sort_values([self._USER_COL, "probability"], ascending=[True, False])
         df_rf["order"] = df_rf.groupby(self._USER_COL).cumcount() + 1
         df_rf = df_rf.rename(columns={self._USER_COL: user_col, self._ITEM_COL: item_col})
@@ -767,6 +755,21 @@ class RecencyFrequencyScorer:
             for item, Recencys in I2Recencys.items():
                 yield user, item, min(Recencys), len(Recencys)
 
+    def _build_ui_rf_df(self, df, ref_date):
+        """Vectorized alternative to _build_u2i2recencies() + _iter_u2i_rf().
+
+        Computes recency (minimum days since last interaction, 1-indexed) and
+        frequency (interaction count) for each (user, item) pair using
+        pandas groupby instead of a Python loop.
+        """
+        tmp = df[[self._USER_COL, self._ITEM_COL]].copy()
+        tmp["recency"] = (ref_date - df[self._DATETIME_COL]).dt.days + 1
+        return (
+            tmp.groupby([self._USER_COL, self._ITEM_COL], sort=False)
+            .agg(recency=("recency", "min"), frequency=("recency", "count"))
+            .reset_index()
+        )
+
     def _probability_dict(self, kind):
         if kind == "mono":
             return self.mono_probability_dict_
@@ -831,8 +834,9 @@ class RecencyFrequencyScorer:
 
 if __name__ == "__main__":
     # データの読み込み（オーム社『Pythonではじめる数理最適化』サポートデータより引用）
-    url = "https://raw.githubusercontent.com/ohmsha/PyOptBook/main/7.recommendation/access_log.csv"
-    df = pd.read_csv(url)
+    # url = "https://raw.githubusercontent.com/ohmsha/PyOptBook/main/7.recommendation/access_log.csv"
+    # df = pd.read_csv(url)
+    df = pd.read_csv("../../examples/access_log100.csv")
     df_train = df[df.user_id.map(lambda x: hash(x) % 10 < 8)]  # hash関数で学習データ8割を抽出
     df_test = df[df.user_id.map(lambda x: hash(x) % 10 >= 8)]  # hash関数でテストデータ2割を抽出
 
