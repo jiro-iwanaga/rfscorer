@@ -28,7 +28,7 @@
 
 ## API 設計方針
 
-- scikit-learn スタイル（`fit` / `optimize`）に準拠する
+- scikit-learn スタイル（`fit` / `fit_period` / `optimize`）に準拠する
 - 推定後の属性名は末尾に `_` をつける（例: `empirical_probability_`）
 - `from rfscorer import RecencyFrequencyScorer` でインポートできるようにする
 - 解釈可能性を重視し、スコアの算出根拠を説明できる設計にする
@@ -37,7 +37,7 @@
 
 - テストコードは `tests/` に配置する
 - `pytest` を使用する
-- `fit()` と `optimize()` の正常系・異常系をカバーする
+- `fit()`・`fit_period()` と `optimize()` の正常系・異常系をカバーする
 
 ## ドキュメント管理
 
