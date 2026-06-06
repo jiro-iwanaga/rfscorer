@@ -20,11 +20,11 @@ class RecencyFrequencyScorer:
 
         Parameters
         ----------
-        user_col : str, default 'user'
+        user_col : str, default "user"
             Column name for user IDs in the interaction log.
-        item_col : str, default 'item'
+        item_col : str, default "item"
             Column name for item IDs in the interaction log.
-        datetime_col : str, default 'datetime'
+        datetime_col : str, default "datetime"
             Column name for interaction timestamps in the interaction log.
         """
         self.user_col = user_col
@@ -115,7 +115,7 @@ class RecencyFrequencyScorer:
         if not isinstance(df, pd.DataFrame):
             raise TypeError("df must be a pandas DataFrame.")
         if self.datetime_col not in df.columns:
-            raise ValueError(f"Missing required columns: ['{self.datetime_col}']")
+            raise ValueError(f"Missing required columns: [{self.datetime_col!r}]")
 
         try:
             target_date = pd.to_datetime(target_date)
@@ -125,7 +125,7 @@ class RecencyFrequencyScorer:
         try:
             dates = pd.to_datetime(df[self.datetime_col])
         except (ValueError, TypeError) as e:
-            raise ValueError(f"Column '{self.datetime_col}' could not be parsed as dates.") from e
+            raise ValueError(f"Column {self.datetime_col!r} could not be parsed as dates.") from e
         df_min = dates.min()
         df_max = dates.max()
 
@@ -413,12 +413,12 @@ class RecencyFrequencyScorer:
 
         Parameters
         ----------
-        kind : {'empirical', 'mono', 'mcc'}, default 'empirical'
-            Which probability to visualize. 'empirical' uses fit() or
-            fit_period() results; 'mono' and 'mcc' use optimize() results.
+        kind : {"empirical", "mono", "mcc"}, default "empirical"
+            Which probability to visualize. "empirical" uses fit() or
+            fit_period() results; "mono" and "mcc" use optimize() results.
         path : str or None, default None
             Output file path for the PNG image. If None, saves as
-            'surface_{kind}_probability.png' in the current directory.
+            "surface_{kind}_probability.png" in the current directory.
 
         Returns
         -------
@@ -428,7 +428,7 @@ class RecencyFrequencyScorer:
         import numpy as np
 
         if kind not in ("empirical", "mono", "mcc"):
-            raise ValueError(f"kind must be 'empirical', 'mono', or 'mcc', got '{kind}'.")
+            raise ValueError(f"kind must be 'empirical', 'mono', or 'mcc', got {kind!r}.")
         if kind == "empirical" and self.empirical_probability_table_ is None:
             raise RuntimeError("fit() must be called before plot_probability_surface().")
         if kind == "mono" and self.mono_probability_table_ is None:
@@ -478,23 +478,23 @@ class RecencyFrequencyScorer:
 
         Parameters
         ----------
-        kind : {'empirical', 'mono', 'mcc', 'all'}, default 'empirical'
-            Which probability to export. 'empirical' uses fit() or
-            fit_period() results; 'mono' and 'mcc' use optimize() results;
-            'all' merges empirical, mono, and mcc into a single file with
+        kind : {"empirical", "mono", "mcc", "all"}, default "empirical"
+            Which probability to export. "empirical" uses fit() or
+            fit_period() results; "mono" and "mcc" use optimize() results;
+            "all" merges empirical, mono, and mcc into a single file with
             columns empirical_probability, mono_probability, and
             mcc_probability.
         path : str or None, default None
             Output file path for the CSV. If None, saves as
-            '{kind}_probability.csv' in the current directory.
-            If a directory, saves '{kind}_probability.csv' inside it.
+            "{kind}_probability.csv" in the current directory.
+            If a directory, saves "{kind}_probability.csv" inside it.
 
         Returns
         -------
         None
         """
         if kind not in ("empirical", "mono", "mcc", "all"):
-            raise ValueError(f"kind must be 'empirical', 'mono', 'mcc', or 'all', got '{kind}'.")
+            raise ValueError(f"kind must be 'empirical', 'mono', 'mcc', or 'all', got {kind!r}.")
         if kind in ("empirical", "all") and self.empirical_probability_ is None:
             raise RuntimeError("fit() must be called before export_probability_csv().")
         if kind in ("mono", "all") and self.mono_probability_ is None:
@@ -544,9 +544,9 @@ class RecencyFrequencyScorer:
             Recency rank (1 = most recently interacted, higher = older).
         f : int
             Frequency (number of interactions in the observation period).
-        kind : {'empirical', 'mono', 'mcc'}, default 'empirical'
-            Which probability to use. 'empirical' uses fit() or fit_period()
-            results; 'mono' and 'mcc' use optimize() results.
+        kind : {"empirical", "mono", "mcc"}, default "empirical"
+            Which probability to use. "empirical" uses fit() or fit_period()
+            results; "mono" and "mcc" use optimize() results.
 
         Returns
         -------
@@ -560,7 +560,7 @@ class RecencyFrequencyScorer:
         if not isinstance(f, int) or f < 1:
             raise TypeError("f must be a positive integer.")
         if kind not in ("empirical", "mono", "mcc"):
-            raise ValueError(f"kind must be 'empirical', 'mono', or 'mcc', got '{kind}'.")
+            raise ValueError(f"kind must be 'empirical', 'mono', or 'mcc', got {kind!r}.")
         if kind == "empirical" and self.empirical_probability_dict_ is None:
             raise RuntimeError("fit() must be called before predict().")
         if kind == "mono" and self.mono_probability_dict_ is None:
@@ -600,9 +600,9 @@ class RecencyFrequencyScorer:
         target_date : str or datetime
             Reference date for computing recency and frequency.
             Rows after this date are excluded.
-        kind : {'empirical', 'mono', 'mcc'}, default 'empirical'
-            Which probability to use. 'empirical' uses fit() or fit_period()
-            results; 'mono' and 'mcc' use optimize() results.
+        kind : {"empirical", "mono", "mcc"}, default "empirical"
+            Which probability to use. "empirical" uses fit() or fit_period()
+            results; "mono" and "mcc" use optimize() results.
         user_col : str, optional
             Column name for user IDs in df. Defaults to the value set in __init__.
         item_col : str, optional
@@ -620,7 +620,7 @@ class RecencyFrequencyScorer:
             starts at 1.
         """
         if kind not in ("empirical", "mono", "mcc"):
-            raise ValueError(f"kind must be 'empirical', 'mono', or 'mcc', got '{kind}'.")
+            raise ValueError(f"kind must be 'empirical', 'mono', or 'mcc', got {kind!r}.")
         if self.empirical_probability_dict_ is None:
             raise RuntimeError("fit() must be called before transform().")
         if kind == "mono" and self.mono_probability_dict_ is None:
@@ -689,7 +689,7 @@ class RecencyFrequencyScorer:
         Parameters
         ----------
         df_rec : pd.DataFrame
-            Recommendation results from transform(). Must have an 'order' column.
+            Recommendation results from transform(). Must have an "order" column.
         UIrevisit : set
             Ground truth set of (user, item) pairs that were actually revisited.
         order : int, default 1
@@ -715,11 +715,11 @@ class RecencyFrequencyScorer:
         try:
             df_rec[user_col] = df_rec[user_col].astype(str)
         except Exception as e:
-            raise ValueError(f"Failed to cast column '{user_col}' to str: {e}") from e
+            raise ValueError(f"Failed to cast column {user_col!r} to str: {e}") from e
         try:
             df_rec[item_col] = df_rec[item_col].astype(str)
         except Exception as e:
-            raise ValueError(f"Failed to cast column '{item_col}' to str: {e}") from e
+            raise ValueError(f"Failed to cast column {item_col!r} to str: {e}") from e
         try:
             UIrevisit = {(str(u), str(i)) for u, i in UIrevisit}
         except (TypeError, ValueError) as e:
@@ -785,10 +785,10 @@ class RecencyFrequencyScorer:
 
         Parameters
         ----------
-        kind : {'mono', 'mcc'}, default 'mono'
+        kind : {"mono", "mcc"}, default "mono"
             Optimization model to use.
-            'mono' applies monotonicity constraints only.
-            'mcc' additionally applies convexity in recency and concavity
+            "mono" applies monotonicity constraints only.
+            "mcc" additionally applies convexity in recency and concavity
             in frequency (diminishing marginal returns).
 
         Returns
@@ -796,7 +796,7 @@ class RecencyFrequencyScorer:
         self
         """
         if kind not in ("mono", "mcc"):
-            raise ValueError(f"kind must be 'mono' or 'mcc', got '{kind}'.")
+            raise ValueError(f"kind must be 'mono' or 'mcc', got {kind!r}.")
 
         try:
             from .optimizer import RFOptimizer
