@@ -17,6 +17,7 @@ class RFOptimizer:
         optimizer.set_data(R, F, RF2N, RF2Prob)
         optimizer.build_model(kind='mono')
         optimizer.solve()
+        optimizer.show_solve_info()  # optional
         optimizer.postprocess()
         # optimizer.RF2X holds the optimized probabilities
     """
@@ -175,6 +176,7 @@ class RFOptimizer:
 
         Sets status, objective_value, and elapsed_time.
         Raises RuntimeError if build_model() has not been called.
+        Solver failures are not raised here; call postprocess() to detect them.
         """
         if self.problem is None:
             raise RuntimeError("build_model() must be called before solve()")
