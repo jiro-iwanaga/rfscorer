@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `optimize(kind='mrc')`: new optimization model applying monotonicity + recency convexity constraint.
+  Recency convexity enforces diminishing marginal penalty as recency grows
+  (second difference ≥ 0 along the recency axis).
+- `optimize(kind='mfc')`: new optimization model applying monotonicity + frequency concavity constraint.
+  Frequency concavity enforces diminishing marginal returns as frequency grows
+  (second difference ≤ 0 along the frequency axis).
+- Corresponding attributes populated by `optimize(kind='mrc')`:
+  `mrc_probability_`, `mrc_probability_table_`, `mrc_probability_dict_`
+- Corresponding attributes populated by `optimize(kind='mfc')`:
+  `mfc_probability_`, `mfc_probability_table_`, `mfc_probability_dict_`
+- `predict()`, `transform()`, `plot_probability_surface()`, and `export_probability_csv()`
+  now accept `kind='mrc'` and `kind='mfc'` in addition to the existing values.
+- `export_probability_csv(kind='all')` now outputs all five models:
+  `empirical_probability`, `mono_probability`, `mrc_probability`, `mfc_probability`, `mcc_probability`.
+
 ## [0.2.6] - 2026-06-07
 
 ### Added
