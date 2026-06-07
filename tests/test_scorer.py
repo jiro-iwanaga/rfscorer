@@ -85,6 +85,34 @@ def scorer_optimized_mono():
 
 
 @pytest.fixture(scope="module")
+def scorer_optimized_mr():
+    s = RecencyFrequencyScorer()
+    s.fit_period(
+        _make_df(),
+        _OBS_PERIOD,
+        _EVAL_PERIOD,
+        recency_limit=_RECENCY_LIMIT,
+        frequency_limit=_FREQUENCY_LIMIT,
+    )
+    s.optimize(kind="mr")
+    return s
+
+
+@pytest.fixture(scope="module")
+def scorer_optimized_mf():
+    s = RecencyFrequencyScorer()
+    s.fit_period(
+        _make_df(),
+        _OBS_PERIOD,
+        _EVAL_PERIOD,
+        recency_limit=_RECENCY_LIMIT,
+        frequency_limit=_FREQUENCY_LIMIT,
+    )
+    s.optimize(kind="mf")
+    return s
+
+
+@pytest.fixture(scope="module")
 def scorer_optimized_mrc():
     s = RecencyFrequencyScorer()
     s.fit_period(
@@ -153,6 +181,51 @@ class TestInit:
         assert scorer.empirical_probability_ is None
         assert scorer.empirical_probability_dict_ is None
         assert scorer.record_num is None
+
+
+# ---------------------------------------------------------------------------
+# kind エイリアス
+# ---------------------------------------------------------------------------
+class TestKindAliases:
+    @pytest.mark.parametrize(
+        "alias,canonical",
+        [
+            ("empirical", "emp"),
+            ("empirical_recency", "er"),
+            ("empirical_frequency", "ef"),
+            ("monotone", "mono"),
+            ("monotone_recency", "mr"),
+            ("monotone_frequency", "mf"),
+            ("monotone_recency_convex", "mrc"),
+            ("monotone_frequency_concave", "mfc"),
+            ("monotone_convex_concave", "mcc"),
+        ],
+    )
+    def test_predict_alias(
+        self,
+        alias,
+        canonical,
+        scorer_fitted,
+        scorer_optimized_mono,
+        scorer_optimized_mr,
+        scorer_optimized_mf,
+        scorer_optimized_mrc,
+        scorer_optimized_mfc,
+        scorer_optimized_mcc,
+    ):
+        scorers = {
+            "emp": scorer_fitted,
+            "er": scorer_fitted,
+            "ef": scorer_fitted,
+            "mono": scorer_optimized_mono,
+            "mr": scorer_optimized_mr,
+            "mf": scorer_optimized_mf,
+            "mrc": scorer_optimized_mrc,
+            "mfc": scorer_optimized_mfc,
+            "mcc": scorer_optimized_mcc,
+        }
+        s = scorers[canonical]
+        assert s.predict(1, 1, kind=alias) == s.predict(1, 1, kind=canonical)
 
 
 # ---------------------------------------------------------------------------
@@ -317,6 +390,46 @@ class TestFitPeriodResult:
         )
         assert list(df.columns) == original_columns
         assert (df.values == original_values).all()
+
+    def test_er_set_after_fit(self, scorer_fitted):
+        assert scorer_fitted.er_probability_ is not None
+        assert scorer_fitted.er_probability_dict_ is not None
+        assert scorer_fitted.er_probability_table_ is not None
+
+    def test_ef_set_after_fit(self, scorer_fitted):
+        assert scorer_fitted.ef_probability_ is not None
+        assert scorer_fitted.ef_probability_dict_ is not None
+        assert scorer_fitted.ef_probability_table_ is not None
+
+    def test_er_constant_across_frequency(self, scorer_fitted):
+        tol = 1e-9
+        for r in scorer_fitted.R:
+            vals = [scorer_fitted.er_probability_dict_[r, f] for f in scorer_fitted.F]
+            assert all(abs(v - vals[0]) < tol for v in vals)
+
+    def test_ef_constant_across_recency(self, scorer_fitted):
+        tol = 1e-9
+        for f in scorer_fitted.F:
+            vals = [scorer_fitted.ef_probability_dict_[r, f] for r in scorer_fitted.R]
+            assert all(abs(v - vals[0]) < tol for v in vals)
+
+    def test_er_matches_R2Prob(self, scorer_fitted):
+        for r in scorer_fitted.R:
+            expected = scorer_fitted.R2Prob[r]
+            for f in scorer_fitted.F:
+                assert scorer_fitted.er_probability_dict_[r, f] == pytest.approx(expected)
+
+    def test_ef_matches_F2Prob(self, scorer_fitted):
+        for f in scorer_fitted.F:
+            expected = scorer_fitted.F2Prob[f]
+            for r in scorer_fitted.R:
+                assert scorer_fitted.ef_probability_dict_[r, f] == pytest.approx(expected)
+
+    def test_er_table_shape(self, scorer_fitted):
+        assert scorer_fitted.er_probability_table_.shape == (_RECENCY_LIMIT, _FREQUENCY_LIMIT)
+
+    def test_ef_table_shape(self, scorer_fitted):
+        assert scorer_fitted.ef_probability_table_.shape == (_RECENCY_LIMIT, _FREQUENCY_LIMIT)
 
 
 # ---------------------------------------------------------------------------
@@ -488,6 +601,58 @@ class TestOptimize:
         for val in scorer_optimized_mono.mono_probability_dict_.values():
             assert -tol <= val <= 1 + tol
 
+    def test_mr_sets_probability(self, scorer_optimized_mr):
+        assert scorer_optimized_mr.mr_probability_ is not None
+        assert isinstance(scorer_optimized_mr.mr_probability_, pd.DataFrame)
+        assert set(scorer_optimized_mr.mr_probability_.columns) == {
+            "recency",
+            "frequency",
+            "probability",
+        }
+
+    def test_mr_sets_probability_dict(self, scorer_optimized_mr):
+        d = scorer_optimized_mr.mr_probability_dict_
+        assert d is not None
+        expected = {(r, f) for r in scorer_optimized_mr.R for f in scorer_optimized_mr.F}
+        assert set(d.keys()) == expected
+
+    def test_mr_probability_values_in_bounds(self, scorer_optimized_mr):
+        tol = 1e-6
+        for val in scorer_optimized_mr.mr_probability_dict_.values():
+            assert -tol <= val <= 1 + tol
+
+    def test_mr_constant_across_frequency(self, scorer_optimized_mr):
+        tol = 1e-6
+        for r in scorer_optimized_mr.R:
+            vals = [scorer_optimized_mr.mr_probability_dict_[r, f] for f in scorer_optimized_mr.F]
+            assert all(abs(v - vals[0]) < tol for v in vals)
+
+    def test_mf_sets_probability(self, scorer_optimized_mf):
+        assert scorer_optimized_mf.mf_probability_ is not None
+        assert isinstance(scorer_optimized_mf.mf_probability_, pd.DataFrame)
+        assert set(scorer_optimized_mf.mf_probability_.columns) == {
+            "recency",
+            "frequency",
+            "probability",
+        }
+
+    def test_mf_sets_probability_dict(self, scorer_optimized_mf):
+        d = scorer_optimized_mf.mf_probability_dict_
+        assert d is not None
+        expected = {(r, f) for r in scorer_optimized_mf.R for f in scorer_optimized_mf.F}
+        assert set(d.keys()) == expected
+
+    def test_mf_probability_values_in_bounds(self, scorer_optimized_mf):
+        tol = 1e-6
+        for val in scorer_optimized_mf.mf_probability_dict_.values():
+            assert -tol <= val <= 1 + tol
+
+    def test_mf_constant_across_recency(self, scorer_optimized_mf):
+        tol = 1e-6
+        for f in scorer_optimized_mf.F:
+            vals = [scorer_optimized_mf.mf_probability_dict_[r, f] for r in scorer_optimized_mf.R]
+            assert all(abs(v - vals[0]) < tol for v in vals)
+
     def test_mrc_sets_probability(self, scorer_optimized_mrc):
         assert scorer_optimized_mrc.mrc_probability_ is not None
         assert isinstance(scorer_optimized_mrc.mrc_probability_, pd.DataFrame)
@@ -555,7 +720,7 @@ class TestOptimize:
 class TestPredict:
     def test_before_fit_raises(self, scorer):
         with pytest.raises(RuntimeError, match="fit"):
-            scorer.predict(1, 1, kind="empirical")
+            scorer.predict(1, 1, kind="emp")
 
     def test_before_optimize_mono_raises(self, scorer, df):
         scorer.fit_period(
@@ -630,7 +795,7 @@ class TestPredict:
 
     def test_empirical_known_value(self, scorer_fitted):
         # (1,2) u2-item2: prob=1.0
-        assert scorer_fitted.predict(1, 2, kind="empirical") == pytest.approx(1.0)
+        assert scorer_fitted.predict(1, 2, kind="emp") == pytest.approx(1.0)
 
     def test_empirical_returns_float(self, scorer_fitted):
         assert isinstance(scorer_fitted.predict(1, 1), float)
@@ -657,6 +822,18 @@ class TestPredict:
         assert 0.0 - 1e-6 <= prob <= 1.0 + 1e-6
         assert prob == pytest.approx(scorer_optimized_mono.mono_probability_dict_[1, 1])
 
+    def test_mr_kind(self, scorer_optimized_mr):
+        prob = scorer_optimized_mr.predict(1, 1, kind="mr")
+        assert isinstance(prob, float)
+        assert 0.0 - 1e-6 <= prob <= 1.0 + 1e-6
+        assert prob == pytest.approx(scorer_optimized_mr.mr_probability_dict_[1, 1])
+
+    def test_mf_kind(self, scorer_optimized_mf):
+        prob = scorer_optimized_mf.predict(1, 1, kind="mf")
+        assert isinstance(prob, float)
+        assert 0.0 - 1e-6 <= prob <= 1.0 + 1e-6
+        assert prob == pytest.approx(scorer_optimized_mf.mf_probability_dict_[1, 1])
+
     def test_mrc_kind(self, scorer_optimized_mrc):
         # 型・範囲に加えて、mrc_probability_dict_ から値を引いていることを確認
         prob = scorer_optimized_mrc.predict(1, 1, kind="mrc")
@@ -677,6 +854,21 @@ class TestPredict:
         assert isinstance(prob, float)
         assert 0.0 - 1e-6 <= prob <= 1.0 + 1e-6
         assert prob == pytest.approx(scorer_optimized_mcc.mcc_probability_dict_[1, 1])
+
+    def test_er_kind(self, scorer_fitted):
+        prob = scorer_fitted.predict(1, 1, kind="er")
+        assert isinstance(prob, float)
+        assert prob == pytest.approx(scorer_fitted.er_probability_dict_[1, 1])
+
+    def test_ef_kind(self, scorer_fitted):
+        prob = scorer_fitted.predict(1, 1, kind="ef")
+        assert isinstance(prob, float)
+        assert prob == pytest.approx(scorer_fitted.ef_probability_dict_[1, 1])
+
+    def test_emp_alias_equals_empirical(self, scorer_fitted):
+        prob_emp = scorer_fitted.predict(1, 1, kind="emp")
+        prob_empirical = scorer_fitted.predict(1, 1, kind="empirical")
+        assert prob_emp == prob_empirical
 
 
 # ---------------------------------------------------------------------------
@@ -740,6 +932,11 @@ class TestTransform:
         for user, grp in result.groupby("user"):
             assert list(grp["probability"]) == sorted(grp["probability"], reverse=True)
             assert list(grp["order"]) == list(range(1, len(grp) + 1))
+
+    def test_emp_alias_equals_empirical(self, scorer_fitted, df):
+        result_emp = scorer_fitted.transform(df, "2024-01-07", kind="emp")
+        result_empirical = scorer_fitted.transform(df, "2024-01-07", kind="empirical")
+        assert list(result_emp["probability"]) == list(result_empirical["probability"])
 
 
 # ---------------------------------------------------------------------------
@@ -882,6 +1079,14 @@ class TestPlotProbabilitySurface:
         with pytest.raises(RuntimeError, match="optimize"):
             scorer_fitted.plot_probability_surface(kind="mono")
 
+    def test_before_optimize_mr_raises(self, scorer_fitted):
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer_fitted.plot_probability_surface(kind="mr")
+
+    def test_before_optimize_mf_raises(self, scorer_fitted):
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer_fitted.plot_probability_surface(kind="mf")
+
     def test_before_optimize_mrc_raises(self, scorer_fitted):
         with pytest.raises(RuntimeError, match="optimize"):
             scorer_fitted.plot_probability_surface(kind="mrc")
@@ -897,13 +1102,25 @@ class TestPlotProbabilitySurface:
     def test_returns_figure_empirical(self, scorer_fitted):
         import matplotlib.figure
 
-        fig = scorer_fitted.plot_probability_surface(kind="empirical")
+        fig = scorer_fitted.plot_probability_surface(kind="emp")
         assert isinstance(fig, matplotlib.figure.Figure)
 
     def test_returns_figure_mono(self, scorer_optimized_mono):
         import matplotlib.figure
 
         fig = scorer_optimized_mono.plot_probability_surface(kind="mono")
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_returns_figure_mr(self, scorer_optimized_mr):
+        import matplotlib.figure
+
+        fig = scorer_optimized_mr.plot_probability_surface(kind="mr")
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_returns_figure_mf(self, scorer_optimized_mf):
+        import matplotlib.figure
+
+        fig = scorer_optimized_mf.plot_probability_surface(kind="mf")
         assert isinstance(fig, matplotlib.figure.Figure)
 
     def test_returns_figure_mrc(self, scorer_optimized_mrc):
@@ -922,6 +1139,18 @@ class TestPlotProbabilitySurface:
         import matplotlib.figure
 
         fig = scorer_optimized_mcc.plot_probability_surface(kind="mcc")
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_returns_figure_er(self, scorer_fitted):
+        import matplotlib.figure
+
+        fig = scorer_fitted.plot_probability_surface(kind="er")
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_returns_figure_ef(self, scorer_fitted):
+        import matplotlib.figure
+
+        fig = scorer_fitted.plot_probability_surface(kind="ef")
         assert isinstance(fig, matplotlib.figure.Figure)
 
     def test_figsize_applied(self, scorer_fitted):
@@ -1072,3 +1301,56 @@ class TestPlotMarginalProbability:
         ax = fig.axes[0]
         assert ax.xaxis.label.get_size() == 16
         assert ax.yaxis.label.get_size() == 16
+
+    def test_invalid_kind_raises(self, scorer_fitted):
+        with pytest.raises(ValueError, match="kind"):
+            scorer_fitted.plot_marginal_probability(axis="recency", kind="invalid")
+
+    def test_mf_on_recency_axis_raises(self, scorer_fitted):
+        with pytest.raises(ValueError, match="kind='mf'"):
+            scorer_fitted.plot_marginal_probability(axis="recency", kind="mf")
+
+    def test_mr_on_frequency_axis_raises(self, scorer_fitted):
+        with pytest.raises(ValueError, match="kind='mr'"):
+            scorer_fitted.plot_marginal_probability(axis="frequency", kind="mr")
+
+    def test_mr_before_optimize_raises(self, scorer_fitted):
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer_fitted.plot_marginal_probability(axis="recency", kind="mr")
+
+    def test_mf_before_optimize_raises(self, scorer_fitted):
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer_fitted.plot_marginal_probability(axis="frequency", kind="mf")
+
+    def test_mr_returns_figure(self, scorer_optimized_mr):
+        import matplotlib.figure
+
+        fig = scorer_optimized_mr.plot_marginal_probability(axis="recency", kind="mr")
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_mf_returns_figure(self, scorer_optimized_mf):
+        import matplotlib.figure
+
+        fig = scorer_optimized_mf.plot_marginal_probability(axis="frequency", kind="mf")
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_all_recency_returns_figure_with_legend(self, scorer_optimized_mr):
+        import matplotlib.figure
+
+        fig = scorer_optimized_mr.plot_marginal_probability(axis="recency", kind="all")
+        assert isinstance(fig, matplotlib.figure.Figure)
+        ax = fig.axes[0]
+        assert ax.get_legend() is not None
+
+    def test_all_frequency_returns_figure_with_legend(self, scorer_optimized_mf):
+        import matplotlib.figure
+
+        fig = scorer_optimized_mf.plot_marginal_probability(axis="frequency", kind="all")
+        assert isinstance(fig, matplotlib.figure.Figure)
+        ax = fig.axes[0]
+        assert ax.get_legend() is not None
+
+    def test_emp_has_no_legend(self, scorer_fitted):
+        fig = scorer_fitted.plot_marginal_probability(axis="recency", kind="emp")
+        ax = fig.axes[0]
+        assert ax.get_legend() is None

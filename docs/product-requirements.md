@@ -45,18 +45,40 @@ RF スコアリング手法を Python パッケージとして PyPI に公開し
 
 | 機能 | 説明 |
 |------|------|
-| 経験的再閲覧確率の推定 | 観測期間における最新度 $r$・頻度 $f$ 別に、評価期間での再閲覧比率を直接推定する |
-| 最適化再閲覧確率の推定 | RF 制約と最小二乗誤差を目的関数にもつ凸2次計画問題を解いて推定する。制約の組み合わせにより `mono`（単調性のみ）・`mrc`（+ Recency 凸性）・`mfc`（+ Frequency 凹性）・`mcc`（+ 両凹凸性）の4モデルを提供する |
+| 経験的再閲覧確率の推定（`emp`） | 観測期間における最新度 $r$・頻度 $f$ 別に、評価期間での再閲覧比率を直接推定する |
+| 周辺的経験的再閲覧確率の推定（`er` / `ef`） | `fit()` 時に自動計算。最新度方向（`er`）・頻度方向（`ef`）の周辺確率を RF グリッド全体にブロードキャストした確率面 |
+| 1次元最適化再閲覧確率の推定（`mr` / `mf`） | 周辺確率を目標とした1次元の凸2次計画問題を解く。`mr` は Recency 単調性 + 凸性、`mf` は Frequency 単調性 + 凹性を制約として課す。結果を RF グリッド全体にブロードキャスト |
+| 2次元最適化再閲覧確率の推定（`mono` / `mrc` / `mfc` / `mcc`） | RF 制約と最小二乗誤差を目的関数にもつ凸2次計画問題を解いて推定する。制約の組み合わせにより `mono`（単調性のみ）・`mrc`（+ Recency 凸性）・`mfc`（+ Frequency 凹性）・`mcc`（+ 両凹凸性）の4モデルを提供する |
 
 ### 出力
 
 | 属性 | 説明 |
 |------|------|
-| `empirical_probability_` | 経験的再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `N`, `cv`, `probability`）。`fit()` 後にアクセス可能 |
+| `empirical_probability_` | 経験的再閲覧確率（`emp`）。`pd.DataFrame`（カラム: `recency`, `frequency`, `N`, `cv`, `probability`）。`fit()` 後にアクセス可能 |
+| `er_probability_` | 経験的 Recency 周辺確率（`er`）。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`fit()` 後にアクセス可能 |
+| `ef_probability_` | 経験的 Frequency 周辺確率（`ef`）。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`fit()` 後にアクセス可能 |
+| `mr_probability_` | mr モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mr')` 後にアクセス可能 |
+| `mf_probability_` | mf モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mf')` 後にアクセス可能 |
 | `mono_probability_` | mono モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mono')` 後にアクセス可能 |
 | `mrc_probability_` | mrc モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mrc')` 後にアクセス可能 |
 | `mfc_probability_` | mfc モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mfc')` 後にアクセス可能 |
 | `mcc_probability_` | mcc モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mcc')` 後にアクセス可能 |
+
+### kind エイリアス
+
+短い正式名と長いエイリアス名の両方が使用可能。
+
+| 正式名 | エイリアス |
+|--------|-----------|
+| `emp` | `empirical` |
+| `er` | `empirical_recency` |
+| `ef` | `empirical_frequency` |
+| `mono` | `monotone` |
+| `mr` | `monotone_recency` |
+| `mf` | `monotone_frequency` |
+| `mrc` | `monotone_recency_convex` |
+| `mfc` | `monotone_frequency_concave` |
+| `mcc` | `monotone_convex_concave` |
 
 ### API
 
@@ -68,16 +90,18 @@ df = pd.read_csv("examples/access_log.csv")
 scorer = RecencyFrequencyScorer(user_col="user_id", item_col="item_id", datetime_col="date")
 
 scorer.fit(df, target_date="2015-07-06")
-df_empirical = scorer.empirical_probability_
+df_emp = scorer.empirical_probability_  # 経験的確率（2次元）
+df_er  = scorer.er_probability_         # 経験的 Recency 周辺（fit 時に自動計算）
+df_ef  = scorer.ef_probability_         # 経験的 Frequency 周辺（fit 時に自動計算）
+
+scorer.optimize(kind="mr")   # 1次元: Recency 単調性 + 凸性
+df_mr = scorer.mr_probability_
+
+scorer.optimize(kind="mf")   # 1次元: Frequency 単調性 + 凹性
+df_mf = scorer.mf_probability_
 
 scorer.optimize(kind="mono")
 df_mono = scorer.mono_probability_
-
-scorer.optimize(kind="mrc")
-df_mrc = scorer.mrc_probability_
-
-scorer.optimize(kind="mfc")
-df_mfc = scorer.mfc_probability_
 
 scorer.optimize(kind="mcc")
 df_mcc = scorer.mcc_probability_

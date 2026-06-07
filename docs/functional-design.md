@@ -20,19 +20,35 @@
 | $F$ | 観測期間の頻度のリスト(1以上の連続自然数の集合)。$f$は頻度を表す。 |
 | $n_{r,f}$ | 観測期間で最新度 $r$、頻度 $f$ の商品が評価期間で再閲覧される頻度合計 |
 | $N_{r,f}$ | 観測期間で最新度 $r$、頻度 $f$ の商品の頻度合計 |
-| $p_{r,f}$ | 観測期間で最新度 $r$、頻度 $f$ の商品の評価期間における経験的再閲覧確率 |
+| $p_{r,f}$ | 観測期間で最新度 $r$、頻度 $f$ の商品の評価期間における経験的再閲覧確率（2次元） |
+| $p_r$ | 最新度 $r$ の周辺的経験的再閲覧確率（$f$ 方向に集約） |
+| $p_f$ | 頻度 $f$ の周辺的経験的再閲覧確率（$r$ 方向に集約） |
 | $x_{r,f}$ | 観測期間で最新度 $r$、頻度 $f$ の商品の評価期間における最適化再閲覧確率 |
 
-### 経験的再閲覧確率の推定
+### 経験的再閲覧確率の推定（`emp`）
 
 「観測期間で最新度 $r$、頻度 $f$ の商品が評価期間で再閲覧される頻度合計」を
 「観測期間で最新度 $r$、頻度 $f$ の商品の頻度合計」で割った値を経験的再閲覧確率とする。
 
 $$p_{r,f} := \frac{n_{r,f}}{N_{r,f}}\ \ \  (r\in R, f\in F)$$
 
+### 周辺的経験的再閲覧確率の推定（`er` / `ef`）
+
+$p_{r,f}$ を一方の次元で集約した周辺確率を RF グリッド全体にブロードキャストする。
+`fit()` または `fit_period()` 呼び出し時に自動計算される。
+
+- **`er`**（Empirical Recency）: 最新度 $r$ の周辺確率を全ての $f$ に展開。
+$$x_{r,f} = p_r\ \ \ (r\in R, f\in F)$$
+- **`ef`**（Empirical Frequency）: 頻度 $f$ の周辺確率を全ての $r$ に展開。
+$$x_{r,f} = p_f\ \ \ (r\in R, f\in F)$$
+
 ### 最適化再閲覧確率の推定
 
-経験的確率 $p_{r,f}$ を基準として、RF 制約を満たす確率 $x_{r,f}$ を求める。最適化モデルは `mono`・`mrc`・`mfc`・`mcc` の4種類。
+経験的確率を基準として、RF 制約を満たす最適化確率を求める。
+
+#### 2次元最適化モデル（`mono` / `mrc` / `mfc` / `mcc`）
+
+経験的確率 $p_{r,f}$ を目標として、(r, f) グリッド全体で最適化する。
 
 **共通制約（単調性）**
 すべてのモデルに適用する。
@@ -57,6 +73,24 @@ $$x_{r,f} - 2x_{r,f+1} + x_{r,f+2} \leq 0\ \ \ (f, f+1, f+2 \in F)$$
 
 **目的関数（共通）**
 $$\sum_{r\in R, f\in F} N_{r,f} \cdot(p_{r,f} - x_{r,f})^2$$
+
+#### 1次元最適化モデル（`mr` / `mf`）
+
+周辺確率 $p_r$・$p_f$ を目標として1次元で最適化し、結果を RF グリッド全体にブロードキャストする。
+
+- **`mr`**（Monotone Recency）: $r$ 方向の単調性と凸性を同時に制約。
+  - 変数: $x_r\ (r \in R)$
+  - 単調性: $x_r \geq x_{r+1}$
+  - 凸性: $x_r - 2x_{r+1} + x_{r+2} \geq 0$
+  - 目的関数: $\sum_{r \in R} N_r \cdot (p_r - x_r)^2$
+  - ブロードキャスト: $x_{r,f} = x_r\ (f \in F)$
+
+- **`mf`**（Monotone Frequency）: $f$ 方向の単調性と凹性を同時に制約。
+  - 変数: $x_f\ (f \in F)$
+  - 単調性: $x_f \leq x_{f+1}$
+  - 凹性: $x_f - 2x_{f+1} + x_{f+2} \leq 0$
+  - 目的関数: $\sum_{f \in F} N_f \cdot (p_f - x_f)^2$
+  - ブロードキャスト: $x_{r,f} = x_f\ (r \in R)$
 
 
 ## クラス仕様
@@ -109,7 +143,7 @@ RecencyFrequencyScorer(user_col="user", item_col="item", datetime_col="datetime"
 
 戻り値: `self`
 
-##### `predict(r, f, kind="empirical")`
+##### `predict(r, f, kind="emp")`
 
 指定した最新度 $r$・頻度 $f$ の再閲覧確率を返す。
 
@@ -117,11 +151,11 @@ RecencyFrequencyScorer(user_col="user", item_col="item", datetime_col="datetime"
 |-----------|-----|-----------|------|
 | `r` | `int` | — | 最新度ランク（1が最も直近、数値が大きいほど古い。1以上） |
 | `f` | `int` | — | 頻度（観測期間の閲覧回数。1以上） |
-| `kind` | `str` | `"empirical"` | `"empirical"`・`"mono"`・`"mrc"`・`"mfc"`・`"mcc"` のいずれか |
+| `kind` | `str` | `"emp"` | `"emp"`・`"er"`・`"ef"`・`"mono"`・`"mr"`・`"mf"`・`"mrc"`・`"mfc"`・`"mcc"` のいずれか（長名エイリアスも使用可） |
 
 戻り値: `float`
 
-##### `transform(df, target_date, kind="empirical", user_col=None, item_col=None, datetime_col=None)`
+##### `transform(df, target_date, kind="emp", user_col=None, item_col=None, datetime_col=None)`
 
 入力 DataFrame の各 user×item ペアに最新度・頻度・再閲覧確率・順位を付与して返す。
 
@@ -129,7 +163,7 @@ RecencyFrequencyScorer(user_col="user", item_col="item", datetime_col="datetime"
 |-----------|-----|-----------|------|
 | `df` | `pd.DataFrame` | — | スコアリング対象の閲覧履歴 |
 | `target_date` | `str \| datetime` | — | 最新度・頻度の計算基準日 |
-| `kind` | `str` | `"empirical"` | `"empirical"`・`"mono"`・`"mrc"`・`"mfc"`・`"mcc"` のいずれか |
+| `kind` | `str` | `"emp"` | `"emp"`・`"er"`・`"ef"`・`"mono"`・`"mr"`・`"mf"`・`"mrc"`・`"mfc"`・`"mcc"` のいずれか（長名エイリアスも使用可） |
 | `user_col` | `str \| None` | `None` | ユーザーカラム名。省略時は `__init__` で設定した値を使用 |
 | `item_col` | `str \| None` | `None` | 商品カラム名。省略時は `__init__` で設定した値を使用 |
 | `datetime_col` | `str \| None` | `None` | 日付カラム名。省略時は `__init__` で設定した値を使用 |
@@ -155,26 +189,26 @@ RecencyFrequencyScorer(user_col="user", item_col="item", datetime_col="datetime"
 
 RF 制約を満たす最適化再閲覧確率を推定する。`fit()` または `fit_period()` の後に呼び出す。
 内部で `optimizer.py` の `RFOptimizer` を使用して凸2次計画問題を解く。
-結果は `kind` に対応する属性（`mono_probability_*`・`mrc_probability_*`・`mfc_probability_*`・`mcc_probability_*`）に格納されるため、複数モデルの結果を同時に保持できる。
+結果は `kind` に対応する属性（例: `mr_probability_*`、`mono_probability_*`）に格納されるため、複数モデルの結果を同時に保持できる。
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
-| `kind` | `str` | `"mono"` | `"mono"`（単調性のみ）・`"mrc"`（単調性 + Recency 凸性）・`"mfc"`（単調性 + Frequency 凹性）・`"mcc"`（単調性 + Recency 凸性 + Frequency 凹性）のいずれか |
+| `kind` | `str` | `"mono"` | `"mr"`（Recency 1次元・単調性 + 凸性）・`"mf"`（Frequency 1次元・単調性 + 凹性）・`"mono"`（2次元・単調性のみ）・`"mrc"`（2次元・単調性 + Recency 凸性）・`"mfc"`（2次元・単調性 + Frequency 凹性）・`"mcc"`（2次元・単調性 + Recency 凸性 + Frequency 凹性）のいずれか |
 
 戻り値: `self`
 
-##### `export_probability_csv(kind="empirical", path=None)`
+##### `export_probability_csv(kind="emp", path=None)`
 
 再閲覧確率を CSV ファイルに書き出す。
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
-| `kind` | `str` | `"empirical"` | `"empirical"`・`"mono"`・`"mrc"`・`"mfc"`・`"mcc"`・`"all"` のいずれか。`"all"` は5者をマージして出力（カラム: `empirical_probability`, `mono_probability`, `mrc_probability`, `mfc_probability`, `mcc_probability`） |
+| `kind` | `str` | `"emp"` | `"emp"`・`"er"`・`"ef"`・`"mono"`・`"mr"`・`"mf"`・`"mrc"`・`"mfc"`・`"mcc"`・`"all"` のいずれか。`"all"` は9モデルをマージして出力（カラム: `emp_probability`, `er_probability`, `ef_probability`, `mono_probability`, `mr_probability`, `mf_probability`, `mrc_probability`, `mfc_probability`, `mcc_probability`） |
 | `path` | `str \| None` | `None` | 出力先。`None` の場合カレントディレクトリに `{kind}_probability.csv` を出力。ディレクトリを指定した場合はそのディレクトリにデフォルトファイル名で出力 |
 
 戻り値: なし
 
-##### `plot_probability_surface(kind="empirical", title=None, figsize=(6, 5), fontsize=12, recency_label="recency", frequency_label="frequency", probability_label="probability")`
+##### `plot_probability_surface(kind="emp", title=None, figsize=(6, 5), fontsize=12, recency_label="recency", frequency_label="frequency", probability_label="probability")`
 
 再閲覧確率を3次元ワイヤーフレームで可視化し、`matplotlib.figure.Figure` を返す。
 
@@ -184,7 +218,7 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
-| `kind` | `str` | `"empirical"` | `"empirical"`・`"mono"`・`"mrc"`・`"mfc"`・`"mcc"` のいずれか |
+| `kind` | `str` | `"emp"` | `"emp"`・`"er"`・`"ef"`・`"mono"`・`"mr"`・`"mf"`・`"mrc"`・`"mfc"`・`"mcc"` のいずれか（長名エイリアスも使用可） |
 | `title` | `str \| None` | `None` | 図のタイトル。`None` の場合は表示しない |
 | `figsize` | `tuple[float, float]` | `(6, 5)` | 図のサイズ（インチ）。論文用途では最終印刷サイズに合わせる |
 | `fontsize` | `int` | `12` | 軸ラベル・目盛りのフォントサイズ。論文用途では対象ジャーナルの本文サイズ（通常 8〜10 pt）に合わせる |
@@ -194,10 +228,10 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 
 戻り値: `matplotlib.figure.Figure`
 
-##### `plot_marginal_probability(axis="recency", title=None, figsize=(5, 4), fontsize=12, xlabel=None, probability_label="probability")`
+##### `plot_marginal_probability(axis="recency", kind="emp", title=None, figsize=(5, 4), fontsize=12, recency_label="recency", frequency_label="frequency", probability_label="probability")`
 
-最新度または頻度の一方向に集約した周辺的経験的再閲覧確率を折れ線グラフで可視化し、`matplotlib.figure.Figure` を返す。
-`optimize()` 前に単調性を確認する用途に使用する。
+最新度または頻度の一方向の再閲覧確率を折れ線グラフで可視化し、`matplotlib.figure.Figure` を返す。
+経験的確率（`emp`）と1次元最適化確率（`mr`・`mf`）を重ねて表示できる。
 
 Jupyter Lab / Colab では返り値がそのままインライン描画される。
 ファイルに保存する場合は `fig.savefig("output.png")` を呼ぶ。
@@ -206,11 +240,15 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
 | `axis` | `str` | `"recency"` | `"recency"`（最新度方向）または `"frequency"`（頻度方向） |
+| `kind` | `str` | `"emp"` | `"emp"`（経験的周辺確率のみ）・`"mr"`（mr 最適化のみ、`axis="recency"` 限定）・`"mf"`（mf 最適化のみ、`axis="frequency"` 限定）・`"all"`（経験的 + 最適化を重ねて表示）のいずれか |
 | `title` | `str \| None` | `None` | 図のタイトル。`None` の場合は表示しない |
 | `figsize` | `tuple[float, float]` | `(5, 4)` | 図のサイズ（インチ）。論文用途では最終印刷サイズに合わせる |
 | `fontsize` | `int` | `12` | 軸ラベル・目盛りのフォントサイズ。論文用途では対象ジャーナルの本文サイズ（通常 8〜10 pt）に合わせる |
-| `xlabel` | `str \| None` | `None` | x 軸のラベル。`None` の場合は `axis` の値（`"recency"` または `"frequency"`）を使用 |
+| `recency_label` | `str` | `"recency"` | x 軸のラベル（`axis="recency"` 時に使用） |
+| `frequency_label` | `str` | `"frequency"` | x 軸のラベル（`axis="frequency"` 時に使用） |
 | `probability_label` | `str` | `"probability"` | y 軸（確率）のラベル |
+
+線スタイル: `kind="all"` のとき emp が実線・最適化が破線。単独表示のときは実線。すべて黒色。
 
 戻り値: `matplotlib.figure.Figure`
 
@@ -242,6 +280,18 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 | `frequency_probability_` | `pd.DataFrame` | 頻度別経験的再閲覧確率（カラム: `frequency`, `N`, `cv`, `probability`） | `fit()` または `fit_period()` 後 |
 | `empirical_probability_table_` | `pd.DataFrame` | 経験的再閲覧確率（横持ち。インデックス: `recency`、カラム: `frequency`） | `fit()` または `fit_period()` 後 |
 | `empirical_probability_dict_` | `dict` | 経験的再閲覧確率（キー: `(r, f)`、値: `probability`） | `fit()` または `fit_period()` 後 |
+| `er_probability_` | `pd.DataFrame` | er モデル再閲覧確率・R2Prob を全 f にブロードキャスト（カラム: `recency`, `frequency`, `probability`） | `fit()` または `fit_period()` 後 |
+| `er_probability_table_` | `pd.DataFrame` | er モデル再閲覧確率（横持ち） | `fit()` または `fit_period()` 後 |
+| `er_probability_dict_` | `dict` | er モデル再閲覧確率（キー: `(r, f)`、値: `probability`） | `fit()` または `fit_period()` 後 |
+| `ef_probability_` | `pd.DataFrame` | ef モデル再閲覧確率・F2Prob を全 r にブロードキャスト（カラム: `recency`, `frequency`, `probability`） | `fit()` または `fit_period()` 後 |
+| `ef_probability_table_` | `pd.DataFrame` | ef モデル再閲覧確率（横持ち） | `fit()` または `fit_period()` 後 |
+| `ef_probability_dict_` | `dict` | ef モデル再閲覧確率（キー: `(r, f)`、値: `probability`） | `fit()` または `fit_period()` 後 |
+| `mr_probability_` | `pd.DataFrame` | mr モデル最適化再閲覧確率・1次元最適化を全 f にブロードキャスト（カラム: `recency`, `frequency`, `probability`） | `optimize(kind="mr")` 後 |
+| `mr_probability_table_` | `pd.DataFrame` | mr モデル最適化再閲覧確率（横持ち） | `optimize(kind="mr")` 後 |
+| `mr_probability_dict_` | `dict` | mr モデル最適化再閲覧確率（キー: `(r, f)`、値: `probability`） | `optimize(kind="mr")` 後 |
+| `mf_probability_` | `pd.DataFrame` | mf モデル最適化再閲覧確率・1次元最適化を全 r にブロードキャスト（カラム: `recency`, `frequency`, `probability`） | `optimize(kind="mf")` 後 |
+| `mf_probability_table_` | `pd.DataFrame` | mf モデル最適化再閲覧確率（横持ち） | `optimize(kind="mf")` 後 |
+| `mf_probability_dict_` | `dict` | mf モデル最適化再閲覧確率（キー: `(r, f)`、値: `probability`） | `optimize(kind="mf")` 後 |
 | `mono_probability_` | `pd.DataFrame` | mono モデル最適化再閲覧確率（カラム: `recency`, `frequency`, `probability`） | `optimize(kind="mono")` 後 |
 | `mono_probability_table_` | `pd.DataFrame` | mono モデル最適化再閲覧確率（横持ち） | `optimize(kind="mono")` 後 |
 | `mono_probability_dict_` | `dict` | mono モデル最適化再閲覧確率（キー: `(r, f)`、値: `probability`） | `optimize(kind="mono")` 後 |
@@ -272,23 +322,35 @@ user / item / datetime に正規化
 観測期間・評価期間でフィルタ（fit() は target_date から自動導出）
 r（最新度ランク）・f（頻度）を算出
 (r, f) 別に n_{r,f}・N_{r,f} を集計
-p_{r,f} = n_{r,f} / N_{r,f}
+p_{r,f} = n_{r,f} / N_{r,f}（2次元）、p_r・p_f も同時に計算
         ▼
-empirical_probability_ / empirical_probability_table_ / empirical_probability_dict_
-RF2N / RF2CV / RF2Prob
+empirical_probability_ / _table_ / _dict_   ← 2次元経験的確率（emp）
+er_probability_ / _table_ / _dict_          ← R2Prob を全 f にブロードキャスト（er）
+ef_probability_ / _table_ / _dict_          ← F2Prob を全 r にブロードキャスト（ef）
+RF2N / RF2CV / RF2Prob / R2N / R2CV / R2Prob / F2N / F2CV / F2Prob
         │
         ├─  predict(r, f, kind)  ─→ 特定 (r, f) の再閲覧確率を返す
         │
         ├─  transform(df, target_date, kind)  ─→ user×item に r・f・確率・順位を付与
         │
+        ├─  plot_probability_surface(kind)  ─→ 3次元ワイヤーフレームで可視化
+        │
+        ├─  plot_marginal_probability(axis, kind)  ─→ 1次元折れ線グラフで可視化
+        │
         ├─  export_probability_csv(kind, path)  ─→ 確率テーブルを CSV に書き出す
         │
-        ▼  optimize(kind='mono'|'mrc'|'mfc'|'mcc')  ← RFOptimizer (optimizer.py) に委譲
-RF 制約付き凸2次計画問題を求解（kind に応じた追加制約を適用）
-        ▼
-{mono|mrc|mfc|mcc}_probability_ / _table_ / _dict_
+        ├─  optimize(kind='mr'|'mf')  ← RFOptimizer (optimizer.py) に委譲（1次元最適化）
+        │   周辺確率を目標とした1次元凸2次計画問題を求解し、結果を 2次元グリッドにブロードキャスト
+        │       ▼
+        │   {mr|mf}_probability_ / _table_ / _dict_
         │
-        └─  export_probability_csv(kind='all', path)  ─→ empirical + mono + mrc + mfc + mcc を併記した CSV を書き出す
+        └─  optimize(kind='mono'|'mrc'|'mfc'|'mcc')  ← RFOptimizer に委譲（2次元最適化）
+            RF 制約付き凸2次計画問題を求解（kind に応じた追加制約を適用）
+                ▼
+            {mono|mrc|mfc|mcc}_probability_ / _table_ / _dict_
+                │
+                └─  export_probability_csv(kind='all', path)
+                    ─→ emp + er + ef + mr + mf + mono + mrc + mfc + mcc を併記した CSV を書き出す
 ```
 
 ## 入出力例

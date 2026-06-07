@@ -19,6 +19,10 @@ _RF2Prob = {
     (3, 2): 0.55,
     (3, 3): 0.40,
 }
+_R2N = {1: 300, 2: 300, 3: 300}
+_R2Prob = {1: 0.82, 2: 0.65, 3: 0.48}
+_F2N = {1: 300, 2: 300, 3: 300}
+_F2Prob = {1: 0.55, 2: 0.70, 3: 0.65}  # 意図的に単調性違反あり
 _TOL = 1e-4
 
 
@@ -31,6 +35,36 @@ def opt():
 def opt_with_data():
     o = RFOptimizer()
     o.set_data(_R, _F, _RF2N, _RF2Prob)
+    return o
+
+
+@pytest.fixture
+def opt_with_marginal_data():
+    o = RFOptimizer()
+    o.set_data(_R, _F, _RF2N, _RF2Prob)
+    o.set_marginal_data(_R2N, _R2Prob, _F2N, _F2Prob)
+    return o
+
+
+@pytest.fixture(scope="module")
+def opt_solved_mr():
+    o = RFOptimizer()
+    o.set_data(_R, _F, _RF2N, _RF2Prob)
+    o.set_marginal_data(_R2N, _R2Prob, _F2N, _F2Prob)
+    o.build_model(kind="mr")
+    o.solve()
+    o.postprocess()
+    return o
+
+
+@pytest.fixture(scope="module")
+def opt_solved_mf():
+    o = RFOptimizer()
+    o.set_data(_R, _F, _RF2N, _RF2Prob)
+    o.set_marginal_data(_R2N, _R2Prob, _F2N, _F2Prob)
+    o.build_model(kind="mf")
+    o.solve()
+    o.postprocess()
     return o
 
 
@@ -175,7 +209,7 @@ class TestSetData:
 # ---------------------------------------------------------------------------
 class TestBuildModel:
     def test_invalid_kind_raises(self, opt_with_data):
-        with pytest.raises(ValueError, match="kind must be 'mono', 'mrc', 'mfc', or 'mcc'"):
+        with pytest.raises(ValueError, match="kind must be 'mono'"):
             opt_with_data.build_model(kind="invalid")
 
     def test_before_set_data_raises(self, opt):
@@ -185,6 +219,14 @@ class TestBuildModel:
     def test_sets_kind_mono(self, opt_with_data):
         opt_with_data.build_model(kind="mono")
         assert opt_with_data.kind == "mono"
+
+    def test_sets_kind_mr(self, opt_with_marginal_data):
+        opt_with_marginal_data.build_model(kind="mr")
+        assert opt_with_marginal_data.kind == "mr"
+
+    def test_sets_kind_mf(self, opt_with_marginal_data):
+        opt_with_marginal_data.build_model(kind="mf")
+        assert opt_with_marginal_data.kind == "mf"
 
     def test_sets_kind_mrc(self, opt_with_data):
         opt_with_data.build_model(kind="mrc")
@@ -198,10 +240,38 @@ class TestBuildModel:
         opt_with_data.build_model(kind="mcc")
         assert opt_with_data.kind == "mcc"
 
+    def test_mr_requires_marginal_data(self, opt_with_data):
+        with pytest.raises(RuntimeError, match="set_marginal_data"):
+            opt_with_data.build_model(kind="mr")
+
+    def test_mf_requires_marginal_data(self, opt_with_data):
+        with pytest.raises(RuntimeError, match="set_marginal_data"):
+            opt_with_data.build_model(kind="mf")
+
     def test_num_variables(self, opt_with_data):
         opt_with_data.build_model()
         # 3×3 格子 → 9 変数
         assert opt_with_data.num_variables == 9
+
+    def test_num_variables_mr(self, opt_with_marginal_data):
+        opt_with_marginal_data.build_model(kind="mr")
+        # 1D: |R| = 3
+        assert opt_with_marginal_data.num_variables == 3
+
+    def test_num_variables_mf(self, opt_with_marginal_data):
+        opt_with_marginal_data.build_model(kind="mf")
+        # 1D: |F| = 3
+        assert opt_with_marginal_data.num_variables == 3
+
+    def test_num_constraints_mr(self, opt_with_marginal_data):
+        opt_with_marginal_data.build_model(kind="mr")
+        # 範囲: 3+3=6、単調性: (3-1)=2、凸性: (3-2)=1 → 合計 9
+        assert opt_with_marginal_data.num_constraints == 9
+
+    def test_num_constraints_mf(self, opt_with_marginal_data):
+        opt_with_marginal_data.build_model(kind="mf")
+        # 範囲: 3+3=6、単調性: (3-1)=2、凹性: (3-2)=1 → 合計 9
+        assert opt_with_marginal_data.num_constraints == 9
 
     def test_num_constraints_mono(self, opt_with_data):
         opt_with_data.build_model(kind="mono")
@@ -355,6 +425,68 @@ class TestMFCConstraints:
                     + opt_solved_mfc.RF2X[r, f2]
                 )
                 assert second_diff <= _TOL
+
+
+# ---------------------------------------------------------------------------
+# 制約充足: mr
+# ---------------------------------------------------------------------------
+class TestMRConstraints:
+    def test_recency_monotonicity(self, opt_solved_mr):
+        for i in range(len(_R) - 1):
+            r, r_next = _R[i], _R[i + 1]
+            for f in _F:
+                assert opt_solved_mr.RF2X[r, f] >= opt_solved_mr.RF2X[r_next, f] - _TOL
+
+    def test_recency_convexity(self, opt_solved_mr):
+        for i in range(len(_R) - 2):
+            r0, r1, r2 = _R[i], _R[i + 1], _R[i + 2]
+            for f in _F:
+                second_diff = (
+                    opt_solved_mr.RF2X[r0, f]
+                    - 2 * opt_solved_mr.RF2X[r1, f]
+                    + opt_solved_mr.RF2X[r2, f]
+                )
+                assert second_diff >= -_TOL
+
+    def test_constant_across_frequency(self, opt_solved_mr):
+        # 1D モデルなので f によらず同じ値
+        for r in _R:
+            vals = [opt_solved_mr.RF2X[r, f] for f in _F]
+            assert all(abs(v - vals[0]) < _TOL for v in vals)
+
+    def test_RF2X_covers_all_pairs(self, opt_solved_mr):
+        assert set(opt_solved_mr.RF2X.keys()) == {(r, f) for r in _R for f in _F}
+
+
+# ---------------------------------------------------------------------------
+# 制約充足: mf
+# ---------------------------------------------------------------------------
+class TestMFConstraints:
+    def test_frequency_monotonicity(self, opt_solved_mf):
+        for j in range(len(_F) - 1):
+            f, f_next = _F[j], _F[j + 1]
+            for r in _R:
+                assert opt_solved_mf.RF2X[r, f] <= opt_solved_mf.RF2X[r, f_next] + _TOL
+
+    def test_frequency_concavity(self, opt_solved_mf):
+        for j in range(len(_F) - 2):
+            f0, f1, f2 = _F[j], _F[j + 1], _F[j + 2]
+            for r in _R:
+                second_diff = (
+                    opt_solved_mf.RF2X[r, f0]
+                    - 2 * opt_solved_mf.RF2X[r, f1]
+                    + opt_solved_mf.RF2X[r, f2]
+                )
+                assert second_diff <= _TOL
+
+    def test_constant_across_recency(self, opt_solved_mf):
+        # 1D モデルなので r によらず同じ値
+        for f in _F:
+            vals = [opt_solved_mf.RF2X[r, f] for r in _R]
+            assert all(abs(v - vals[0]) < _TOL for v in vals)
+
+    def test_RF2X_covers_all_pairs(self, opt_solved_mf):
+        assert set(opt_solved_mf.RF2X.keys()) == {(r, f) for r in _R for f in _F}
 
 
 # ---------------------------------------------------------------------------
