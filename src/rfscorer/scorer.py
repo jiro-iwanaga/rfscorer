@@ -592,17 +592,18 @@ class RecencyFrequencyScorer:
     def plot_marginal_probability(
         self,
         axis="recency",
+        kind="emp",
         title=None,
         figsize=(5, 4),
         fontsize=12,
-        xlabel=None,
+        recency_label="recency",
+        frequency_label="frequency",
         probability_label="probability",
     ):
-        """Plot empirical revisit probability aggregated along one RF dimension.
+        """Plot revisit probability aggregated along one RF dimension.
 
-        Visualizes R2Prob (when axis='recency') or F2Prob (when axis='frequency')
-        as a line chart with markers. Use this to verify monotonicity in each
-        RF signal before running optimize().
+        Visualizes R2Prob / mr (when axis='recency') or F2Prob / mf (when
+        axis='frequency') as a line chart with markers.
 
         In Jupyter Lab / Colab the returned figure renders inline automatically.
         To save to a file, call ``fig.savefig("output.png")`` on the returned figure.
@@ -613,6 +614,12 @@ class RecencyFrequencyScorer:
             Which dimension to aggregate and plot.
             "recency" plots probability vs recency rank (expected: decreasing).
             "frequency" plots probability vs frequency (expected: increasing).
+        kind : {"emp", "mr", "mf", "all"}, default "emp"
+            Which probability series to draw.
+            "emp" draws the empirical marginal (R2Prob or F2Prob).
+            "mr" draws the mr-optimized series (valid only when axis="recency").
+            "mf" draws the mf-optimized series (valid only when axis="frequency").
+            "all" draws both the empirical and the optimized series together.
         title : str or None, default None
             Figure title. If None, no title is shown.
         figsize : tuple[float, float], default (5, 4)
@@ -623,9 +630,10 @@ class RecencyFrequencyScorer:
             Font size for axis labels and tick labels. For publication, match
             this to the body text size of the target journal (typically 8–10 pt)
             and set figsize to the final printed size so the font is not scaled.
-        xlabel : str or None, default None
-            Label for the x-axis. If None, defaults to the value of axis
-            ("recency" or "frequency").
+        recency_label : str, default "recency"
+            Label for the x-axis when axis="recency".
+        frequency_label : str, default "frequency"
+            Label for the x-axis when axis="frequency".
         probability_label : str, default "probability"
             Label for the y-axis (probability dimension).
 
@@ -637,21 +645,65 @@ class RecencyFrequencyScorer:
 
         if axis not in ("recency", "frequency"):
             raise ValueError(f"axis must be 'recency' or 'frequency', got {axis!r}.")
+        valid_kinds = ("emp", "mr", "mf", "all")
+        if kind not in valid_kinds:
+            raise ValueError(f"kind must be one of {valid_kinds}, got {kind!r}.")
+        if axis == "recency" and kind == "mf":
+            raise ValueError("kind='mf' is not valid when axis='recency'. Use kind='mr'.")
+        if axis == "frequency" and kind == "mr":
+            raise ValueError("kind='mr' is not valid when axis='frequency'. Use kind='mf'.")
         if self.recency_probability_ is None:
             raise RuntimeError("fit() must be called before plot_marginal_probability().")
+        opt_kind = "mr" if axis == "recency" else "mf"
+        if kind in (opt_kind, "all"):
+            opt_attr = f"{opt_kind}_probability_"
+            if getattr(self, opt_attr) is None:
+                raise RuntimeError(
+                    f"optimize(kind='{opt_kind}') must be called before"
+                    f" plot_marginal_probability(kind='{kind}')."
+                )
 
+        x_col = axis
+        x_label = recency_label if axis == "recency" else frequency_label
         if axis == "recency":
-            df = self.recency_probability_
-            x_col = "recency"
+            df_emp = self.recency_probability_
         else:
-            df = self.frequency_probability_
-            x_col = "frequency"
+            df_emp = self.frequency_probability_
+
+        if kind in (opt_kind, "all"):
+            df_opt_full = getattr(self, f"{opt_kind}_probability_")
+            fixed_col = "frequency" if axis == "recency" else "recency"
+            fixed_val = df_opt_full[fixed_col].iloc[0]
+            df_opt = df_opt_full[df_opt_full[fixed_col] == fixed_val][
+                [x_col, "probability"]
+            ].reset_index(drop=True)
 
         fig, ax = plt.subplots(figsize=figsize)
-        ax.plot(
-            df[x_col], df["probability"], color="black", marker="o", linewidth=1.5, markersize=6
-        )
-        ax.set_xlabel(xlabel if xlabel is not None else x_col, fontsize=fontsize)
+        if kind in ("emp", "all"):
+            ax.plot(
+                df_emp[x_col],
+                df_emp["probability"],
+                color="black",
+                linestyle="-",
+                marker="o",
+                linewidth=1.5,
+                markersize=6,
+                label="emp",
+            )
+        if kind in (opt_kind, "all"):
+            ax.plot(
+                df_opt[x_col],
+                df_opt["probability"],
+                color="black",
+                linestyle="--" if kind == "all" else "-",
+                marker="s",
+                linewidth=1.5,
+                markersize=6,
+                label=opt_kind,
+            )
+        if kind == "all":
+            ax.legend(fontsize=fontsize)
+        ax.set_xlabel(x_label, fontsize=fontsize)
         ax.set_ylabel(probability_label, fontsize=fontsize)
         ax.tick_params(labelsize=fontsize)
         if title is not None:
@@ -1175,17 +1227,32 @@ if __name__ == "__main__":
     target_date = "2015-07-07"
     scorer.fit(df_train, target_date)
     scorer.plot_probability_surface("empirical").savefig("surface_emp_probability.png")
+
     scorer.plot_marginal_probability("recency").savefig("marginal_recency_probability.png")
     scorer.plot_marginal_probability("frequency").savefig("marginal_frequency_probability.png")
-    scorer.show()
+
+    scorer.plot_probability_surface("er").savefig("surface_er_probability.png")
+    scorer.plot_probability_surface("ef").savefig("surface_ef_probability.png")
 
     # 最適化(mr)
     scorer.optimize(kind="mr")
     scorer.plot_probability_surface("mr").savefig("surface_mr_probability.png")
+    scorer.plot_marginal_probability("recency", kind="mr").savefig(
+        "marginal_mono_recency_probability.png"
+    )
+    scorer.plot_marginal_probability("recency", kind="all").savefig(
+        "marginal_all_recency_probability.png"
+    )
 
     # 最適化(mf)
     scorer.optimize(kind="mf")
     scorer.plot_probability_surface("mf").savefig("surface_mf_probability.png")
+    scorer.plot_marginal_probability("frequency", kind="mf").savefig(
+        "marginal_mono_frequency_probability.png"
+    )
+    scorer.plot_marginal_probability("frequency", kind="all").savefig(
+        "marginal_all_frequency_probability.png"
+    )
 
     # 最適化(mono)
     scorer.optimize(kind="mono")
@@ -1211,10 +1278,20 @@ if __name__ == "__main__":
     df_test_eval = df_test[df_test.date > target_date]  # テストの評価期間データ(正解データ)
     UIrevisit = set([(row.user_id, row.item_id) for row in df_test_eval.itertuples()])  # 正解データ
 
-    print("--- empirical ---")
+    print("--- emp ---")
     df_rec_emp = scorer.transform(df_test_obs, target_date, kind="emp")
     df_rec_emp.to_csv("df_recommend_emp.csv", index=False)
     print(scorer.evaluate(df_rec_emp, UIrevisit, order=10))
+
+    print("--- er ---")
+    df_rec_er = scorer.transform(df_test_obs, target_date, kind="er")
+    df_rec_er.to_csv("df_recommend_er.csv", index=False)
+    print(scorer.evaluate(df_rec_er, UIrevisit, order=10))
+
+    print("--- ef ---")
+    df_rec_ef = scorer.transform(df_test_obs, target_date, kind="ef")
+    df_rec_ef.to_csv("df_recommend_ef.csv", index=False)
+    print(scorer.evaluate(df_rec_ef, UIrevisit, order=10))
 
     print("--- mr ---")
     df_rec_mr = scorer.transform(df_test_obs, target_date, kind="mr")

@@ -1301,3 +1301,56 @@ class TestPlotMarginalProbability:
         ax = fig.axes[0]
         assert ax.xaxis.label.get_size() == 16
         assert ax.yaxis.label.get_size() == 16
+
+    def test_invalid_kind_raises(self, scorer_fitted):
+        with pytest.raises(ValueError, match="kind"):
+            scorer_fitted.plot_marginal_probability(axis="recency", kind="invalid")
+
+    def test_mf_on_recency_axis_raises(self, scorer_fitted):
+        with pytest.raises(ValueError, match="kind='mf'"):
+            scorer_fitted.plot_marginal_probability(axis="recency", kind="mf")
+
+    def test_mr_on_frequency_axis_raises(self, scorer_fitted):
+        with pytest.raises(ValueError, match="kind='mr'"):
+            scorer_fitted.plot_marginal_probability(axis="frequency", kind="mr")
+
+    def test_mr_before_optimize_raises(self, scorer_fitted):
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer_fitted.plot_marginal_probability(axis="recency", kind="mr")
+
+    def test_mf_before_optimize_raises(self, scorer_fitted):
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer_fitted.plot_marginal_probability(axis="frequency", kind="mf")
+
+    def test_mr_returns_figure(self, scorer_optimized_mr):
+        import matplotlib.figure
+
+        fig = scorer_optimized_mr.plot_marginal_probability(axis="recency", kind="mr")
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_mf_returns_figure(self, scorer_optimized_mf):
+        import matplotlib.figure
+
+        fig = scorer_optimized_mf.plot_marginal_probability(axis="frequency", kind="mf")
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_all_recency_returns_figure_with_legend(self, scorer_optimized_mr):
+        import matplotlib.figure
+
+        fig = scorer_optimized_mr.plot_marginal_probability(axis="recency", kind="all")
+        assert isinstance(fig, matplotlib.figure.Figure)
+        ax = fig.axes[0]
+        assert ax.get_legend() is not None
+
+    def test_all_frequency_returns_figure_with_legend(self, scorer_optimized_mf):
+        import matplotlib.figure
+
+        fig = scorer_optimized_mf.plot_marginal_probability(axis="frequency", kind="all")
+        assert isinstance(fig, matplotlib.figure.Figure)
+        ax = fig.axes[0]
+        assert ax.get_legend() is not None
+
+    def test_emp_has_no_legend(self, scorer_fitted):
+        fig = scorer_fitted.plot_marginal_probability(axis="recency", kind="emp")
+        ax = fig.axes[0]
+        assert ax.get_legend() is None
