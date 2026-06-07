@@ -302,6 +302,62 @@ class TestBuildModel:
         assert opt_with_data.objective_value is None
         assert opt_with_data.RF2X == {}
 
+    def test_eps_default_is_zero(self, opt_with_data):
+        opt_with_data.build_model()
+        assert opt_with_data.eps == 0.0
+
+    def test_eps_stored(self, opt_with_data):
+        opt_with_data.build_model(eps=1e-4)
+        assert opt_with_data.eps == 1e-4
+
+    def test_negative_eps_raises(self, opt_with_data):
+        with pytest.raises(ValueError, match="eps"):
+            opt_with_data.build_model(eps=-1e-6)
+
+    def test_eps_exceeds_max_2d_raises(self, opt_with_data):
+        # eps_max = max(RF2Prob) / (nr - 1) = 0.90 / 2 = 0.45
+        with pytest.raises(ValueError, match="eps"):
+            opt_with_data.build_model(kind="mono", eps=0.45 + 1e-9)
+
+    def test_eps_at_max_2d_ok(self, opt_with_data):
+        opt_with_data.build_model(kind="mono", eps=0.45)  # 上界ちょうどは許容
+
+    def test_eps_exceeds_max_mr_raises(self, opt_with_marginal_data):
+        # eps_max = max(R2Prob) / (nr - 1) = 0.82 / 2 = 0.41
+        with pytest.raises(ValueError, match="eps"):
+            opt_with_marginal_data.build_model(kind="mr", eps=0.41 + 1e-9)
+
+    def test_eps_at_max_mr_ok(self, opt_with_marginal_data):
+        opt_with_marginal_data.build_model(kind="mr", eps=0.41)  # 上界ちょうどは許容
+
+    def test_eps_exceeds_max_mf_raises(self, opt_with_marginal_data):
+        # eps_max = max(F2Prob) / (nf - 1) = 0.70 / 2 = 0.35
+        with pytest.raises(ValueError, match="eps"):
+            opt_with_marginal_data.build_model(kind="mf", eps=0.35 + 1e-9)
+
+    def test_eps_at_max_mf_ok(self, opt_with_marginal_data):
+        opt_with_marginal_data.build_model(kind="mf", eps=0.35)  # 上界ちょうどは許容
+
+    def test_strict_mono_recency_enforced(self, opt_with_marginal_data):
+        """eps > 0 の場合、最適化後の recency 隣接値の差が eps 以上になること。"""
+        eps = 1e-4
+        opt_with_marginal_data.build_model(kind="mr", eps=eps)
+        opt_with_marginal_data.solve()
+        opt_with_marginal_data.postprocess()
+        vals = [opt_with_marginal_data.x.value[i] for i in range(len(opt_with_marginal_data.R))]
+        for i in range(len(vals) - 1):
+            assert vals[i] >= vals[i + 1] + eps - 1e-9
+
+    def test_strict_mono_frequency_enforced(self, opt_with_marginal_data):
+        """eps > 0 の場合、最適化後の frequency 隣接値の差が eps 以上になること。"""
+        eps = 1e-4
+        opt_with_marginal_data.build_model(kind="mf", eps=eps)
+        opt_with_marginal_data.solve()
+        opt_with_marginal_data.postprocess()
+        vals = [opt_with_marginal_data.x.value[i] for i in range(len(opt_with_marginal_data.F))]
+        for i in range(len(vals) - 1):
+            assert vals[i + 1] >= vals[i] + eps - 1e-9
+
 
 # ---------------------------------------------------------------------------
 # solve

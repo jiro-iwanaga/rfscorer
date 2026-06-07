@@ -25,8 +25,11 @@
 | $n_{r,f}$ | — | 観測期間で最新度 $r$・頻度 $f$ であった商品が、評価期間に再閲覧された回数の合計 |
 | $N_{r,f}$ | — | 観測期間で最新度 $r$・頻度 $f$ であった商品の閲覧回数の合計 |
 | RF 制約 | RF constraints | 最適化再閲覧確率に課す単調性制約の総称。Recency 制約と Frequency 制約からなる |
-| Recency 制約 | recency constraint | $r < r' \Rightarrow x_{r,f} \geq x_{r',f}$。最新度ランクが小さい（より直近に閲覧した）商品ほど再閲覧確率が高い |
-| Frequency 制約 | frequency constraint | $f < f' \Rightarrow x_{r,f} \leq x_{r',f}$。頻度が高い商品ほど再閲覧確率が高い |
+| Recency 制約 | recency constraint | 隣接する $r_k < r_{k+1}$ に対して $x_{r_k,f} \geq x_{r_{k+1},f} + \varepsilon$。最新度ランクが小さい（より直近に閲覧した）商品ほど再閲覧確率が高い |
+| Frequency 制約 | frequency constraint | 隣接する $f_k < f_{k+1}$ に対して $x_{r,f_k} + \varepsilon \leq x_{r,f_{k+1}}$。頻度が高い商品ほど再閲覧確率が高い |
+| 弱単調性 | weak monotonicity | $\varepsilon = 0$ のときの単調性制約。隣接する確率値が同値になることを許す（$\geq$ または $\leq$） |
+| 狭義単調性 | strict monotonicity | $\varepsilon > 0$ のときの単調性制約。隣接する最新度・頻度の確率値が必ず $\varepsilon$ 以上離れることを保証する |
+| $\varepsilon$（eps） | eps | `optimize(eps=ε)` で指定する単調性制約の最小ギャップ。デフォルト `0.0`（弱単調性）。上限は $\min(\max(p_{r,f}) / (\lvert R\rvert - 1),\ \max(p_{r,f}) / (\lvert F\rvert - 1))$ で自動計算される |
 
 ## API
 
@@ -40,7 +43,7 @@
 | `evaluate(df_rec, UIrevisit, order=1, ...)` | 推薦結果と正解データを比較し precision・recall・f1 等の評価指標を返すメソッド。`user_col`・`item_col` は省略すると `__init__` の設定値を使用する |
 | `plot_probability_surface(kind='empirical', title=None, figsize=(6,5), fontsize=12, recency_label='recency', frequency_label='frequency', probability_label='probability')` | 再閲覧確率を3次元ワイヤーフレームで可視化し `matplotlib.figure.Figure` を返すメソッド。軸ラベル・タイトル・図サイズ・フォントサイズを指定可能。日本語ラベルには `rfscorer[ja]` が必要。`fit()` または `fit_period()` 後（`kind='mono'` または `'mcc'` の場合は `optimize()` 後）に利用可能 |
 | `plot_marginal_probability(axis='recency', title=None, figsize=(5,4), fontsize=12, xlabel=None, probability_label='probability')` | 最新度または頻度の一方向に集約した周辺的経験的再閲覧確率を折れ線グラフで可視化し `matplotlib.figure.Figure` を返すメソッド。`optimize()` 前の単調性確認に使用する。日本語ラベルには `rfscorer[ja]` が必要。`fit()` または `fit_period()` 後に利用可能 |
-| `optimize(kind='mono')` | `fit()` または `fit_period()` の結果を用いて、RF 制約付きの最適化再閲覧確率を推定するメソッド。`kind='mono'`（単調性のみ）・`'mrc'`（単調性 + Recency 凸性）・`'mfc'`（単調性 + Frequency 凹性）・`'mcc'`（単調性 + 両凹凸性）を指定する |
+| `optimize(kind='mono', eps=0.0)` | `fit()` または `fit_period()` の結果を用いて、RF 制約付きの最適化再閲覧確率を推定するメソッド。`kind='mono'`（単調性のみ）・`'mrc'`（単調性 + Recency 凸性）・`'mfc'`（単調性 + Frequency 凹性）・`'mcc'`（単調性 + 両凹凸性）・`'mr'`（1次元 Recency）・`'mf'`（1次元 Frequency）を指定する。`eps > 0` で狭義単調性を適用する |
 | `show()` | `fit()` または `fit_period()` 後の集計情報（レコード数・cv 数・期間・上限値）を標準出力に表示するデバッグ用メソッド |
 | `R` | `fit()` または `fit_period()` 後に参照できる最新度のリスト |
 | `F` | `fit()` または `fit_period()` 後に参照できる頻度のリスト |

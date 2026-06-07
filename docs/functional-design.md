@@ -51,11 +51,14 @@ $$x_{r,f} = p_f\ \ \ (r\in R, f\in F)$$
 経験的確率 $p_{r,f}$ を目標として、(r, f) グリッド全体で最適化する。
 
 **共通制約（単調性）**
-すべてのモデルに適用する。
-- **Recency 制約**: 最近閲覧した商品ほど再閲覧確率が高い。
-$$r < r' \implies x_{r,f} \geq x_{r',f}\ \ \ (r, r'\in R) $$
-- **Frequency 制約**: 頻度が高い商品ほど再閲覧確率が高い。
-$$f < f' \implies x_{r,f} \leq x_{r',f}\ \ \ (f, f'\in F) $$
+すべてのモデルに適用する。`eps=0.0`（デフォルト）の場合は弱単調性、`eps > 0` の場合は狭義単調性となり隣接値の差が $\varepsilon$ 以上になる。
+
+- **Recency 制約**: 最近閲覧した商品ほど再閲覧確率が高い。隣接する $r_k < r_{k+1}$ に対して:
+$$x_{r_k,f} \geq x_{r_{k+1},f} + \varepsilon\ \ \ (r_k, r_{k+1}\in R,\ f\in F)$$
+- **Frequency 制約**: 頻度が高い商品ほど再閲覧確率が高い。隣接する $f_k < f_{k+1}$ に対して:
+$$x_{r,f_k} + \varepsilon \leq x_{r,f_{k+1}}\ \ \ (r\in R,\ f_k, f_{k+1}\in F)$$
+
+$\varepsilon = 0$ のとき弱単調性（$\geq$）、$\varepsilon > 0$ のとき狭義単調性。$\varepsilon$ の上限は $\max(p_{r,f}) / (\lvert R\rvert - 1)$ および $\max(p_{r,f}) / (\lvert F\rvert - 1)$ の小さい方。
 
 **追加制約（凹凸性）**
 
@@ -78,19 +81,21 @@ $$\sum_{r\in R, f\in F} N_{r,f} \cdot(p_{r,f} - x_{r,f})^2$$
 
 周辺確率 $p_r$・$p_f$ を目標として1次元で最適化し、結果を RF グリッド全体にブロードキャストする。
 
-- **`mr`**（Monotone Recency）: $r$ 方向の単調性と凸性を同時に制約。
+- **`mr`**（Monotonic Recency）: $r$ 方向の単調性と凸性を同時に制約。
   - 変数: $x_r\ (r \in R)$
-  - 単調性: $x_r \geq x_{r+1}$
+  - 単調性: $x_{r_k} \geq x_{r_{k+1}} + \varepsilon$（隣接する $r_k < r_{k+1}$）
   - 凸性: $x_r - 2x_{r+1} + x_{r+2} \geq 0$
   - 目的関数: $\sum_{r \in R} N_r \cdot (p_r - x_r)^2$
   - ブロードキャスト: $x_{r,f} = x_r\ (f \in F)$
+  - $\varepsilon$ の上限: $\max(p_r) / (\lvert R\rvert - 1)$
 
-- **`mf`**（Monotone Frequency）: $f$ 方向の単調性と凹性を同時に制約。
+- **`mf`**（Monotonic Frequency）: $f$ 方向の単調性と凹性を同時に制約。
   - 変数: $x_f\ (f \in F)$
-  - 単調性: $x_f \leq x_{f+1}$
+  - 単調性: $x_{f_k} + \varepsilon \leq x_{f_{k+1}}$（隣接する $f_k < f_{k+1}$）
   - 凹性: $x_f - 2x_{f+1} + x_{f+2} \leq 0$
   - 目的関数: $\sum_{f \in F} N_f \cdot (p_f - x_f)^2$
   - ブロードキャスト: $x_{r,f} = x_f\ (r \in R)$
+  - $\varepsilon$ の上限: $\max(p_f) / (\lvert F\rvert - 1)$
 
 
 ## クラス仕様
@@ -185,7 +190,7 @@ RecencyFrequencyScorer(user_col="user", item_col="item", datetime_col="datetime"
 
 戻り値: `pd.DataFrame`（カラム: `order`, `n_recommended`, `n_hit`, `precision`, `recall`, `f1`, `recall_norm`, `f1_norm`）
 
-##### `optimize(kind="mono")`
+##### `optimize(kind="mono", eps=0.0)`
 
 RF 制約を満たす最適化再閲覧確率を推定する。`fit()` または `fit_period()` の後に呼び出す。
 内部で `optimizer.py` の `RFOptimizer` を使用して凸2次計画問題を解く。
@@ -194,6 +199,7 @@ RF 制約を満たす最適化再閲覧確率を推定する。`fit()` または
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
 | `kind` | `str` | `"mono"` | `"mr"`（Recency 1次元・単調性 + 凸性）・`"mf"`（Frequency 1次元・単調性 + 凹性）・`"mono"`（2次元・単調性のみ）・`"mrc"`（2次元・単調性 + Recency 凸性）・`"mfc"`（2次元・単調性 + Frequency 凹性）・`"mcc"`（2次元・単調性 + Recency 凸性 + Frequency 凹性）のいずれか |
+| `eps` | `float` | `0.0` | 単調性制約における隣接値の最小差 $\varepsilon$。`0.0`（デフォルト）のとき弱単調性。正の値を指定すると狭義単調性となり、同一 recency または frequency で確率値が一致しなくなる。上限はデータから自動計算され、超過すると `ValueError` |
 
 戻り値: `self`
 

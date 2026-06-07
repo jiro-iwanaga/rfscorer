@@ -1106,12 +1106,12 @@ class RecencyFrequencyScorer:
         "empirical": "emp",
         "empirical_recency": "er",
         "empirical_frequency": "ef",
-        "monotone": "mono",
-        "monotone_recency": "mr",
-        "monotone_frequency": "mf",
-        "monotone_recency_convex": "mrc",
-        "monotone_frequency_concave": "mfc",
-        "monotone_convex_concave": "mcc",
+        "monotonic": "mono",
+        "monotonic_recency": "mr",
+        "monotonic_frequency": "mf",
+        "monotonic_recency_convex": "mrc",
+        "monotonic_frequency_concave": "mfc",
+        "monotonic_convex_concave": "mcc",
     }
 
     def _normalize_kind(self, kind):
@@ -1136,7 +1136,7 @@ class RecencyFrequencyScorer:
             return self.mcc_probability_dict_
         return self.empirical_probability_dict_
 
-    def optimize(self, kind="mono"):
+    def optimize(self, kind="mono", eps=0.0):
         """Estimate optimized revisit probabilities under RF constraints.
 
         Solves a convex quadratic programming problem with monotonicity
@@ -1155,6 +1155,11 @@ class RecencyFrequencyScorer:
             "mrc" additionally applies convexity in recency (2D joint model).
             "mfc" additionally applies concavity in frequency (2D joint model).
             "mcc" applies both recency convexity and frequency concavity (2D joint model).
+        eps : float, default 0.0
+            Minimum gap enforced between adjacent values in monotonicity
+            constraints.  When 0.0 (default), weak monotonicity is used.
+            When positive, strict monotonicity is enforced, preventing ties
+            between adjacent recency or frequency levels.
 
         Returns
         -------
@@ -1176,7 +1181,7 @@ class RecencyFrequencyScorer:
         optimizer = RFOptimizer()
         optimizer.set_data(self.R, self.F, self.RF2N, self.RF2Prob)
         optimizer.set_marginal_data(self.R2N, self.R2Prob, self.F2N, self.F2Prob)
-        optimizer.build_model(kind=kind)
+        optimizer.build_model(kind=kind, eps=eps)
         optimizer.solve()
         optimizer.show_solve_info()
         optimizer.postprocess()

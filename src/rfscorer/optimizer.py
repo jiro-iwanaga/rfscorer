@@ -35,6 +35,7 @@ class RFOptimizer:
 
         # 数理最適化モデルとソルバー
         self.kind = None
+        self.eps = 0.0
         self.x = None
         self.constraints = None
         self.objectives = None
@@ -91,6 +92,7 @@ class RFOptimizer:
 
         # 初期化
         self.kind = None
+        self.eps = 0.0
         self.x = None
         self.constraints = None
         self.objectives = None
@@ -145,18 +147,24 @@ class RFOptimizer:
         self.F2N = dict(F2N)
         self.F2Prob = dict(F2Prob)
 
-    def build_model(self, kind="mono"):
+    def build_model(self, kind="mono", eps=0.0):
         """Build the optimization model.
 
         Parameters
         ----------
-        kind : {"mono", "mrc", "mfc", "mcc"}, default "mono"
+        kind : {"mono", "mr", "mf", "mrc", "mfc", "mcc"}, default "mono"
             "mono" applies monotonicity constraints only.
             "mrc" additionally applies convexity in recency (diminishing
             marginal penalty as recency grows).
             "mfc" additionally applies concavity in frequency (diminishing
             marginal returns as frequency grows).
             "mcc" applies both recency convexity and frequency concavity.
+        eps : float, default 0.0
+            Minimum gap enforced between adjacent values in monotonicity
+            constraints.  When 0.0 (default), weak monotonicity is used
+            (``x[r] >= x[r+1]``).  When positive, strict monotonicity is
+            enforced (``x[r] >= x[r+1] + eps``), preventing ties between
+            adjacent recency or frequency levels.
         """
         if kind not in ("mono", "mr", "mf", "mrc", "mfc", "mcc"):
             raise ValueError(
@@ -168,11 +176,32 @@ class RFOptimizer:
             raise RuntimeError(
                 "set_marginal_data() must be called before build_model() with kind='mr' or 'mf'"
             )
+        if eps < 0:
+            raise ValueError(f"eps must be non-negative, got {eps!r}")
 
         self.kind = kind
+        self.eps = eps
 
         nr = len(self.R)
         nf = len(self.F)
+
+        if eps > 0:
+            if kind == "mr":
+                p_max = max(self.R2Prob.values())
+                eps_max = p_max / (nr - 1) if nr > 1 else math.inf
+            elif kind == "mf":
+                p_max = max(self.F2Prob.values())
+                eps_max = p_max / (nf - 1) if nf > 1 else math.inf
+            else:
+                p_max = max(self.RF2Prob.values())
+                candidates = []
+                if nr > 1:
+                    candidates.append(p_max / (nr - 1))
+                if nf > 1:
+                    candidates.append(p_max / (nf - 1))
+                eps_max = min(candidates) if candidates else math.inf
+            if eps > eps_max:
+                raise ValueError(f"eps={eps!r} exceeds the maximum feasible value {eps_max:.6g}")
 
         self.constraints = []
         self.objectives = []
@@ -181,9 +210,9 @@ class RFOptimizer:
             self.x = cp.Variable(nr)
             self.constraints.append(self.x >= 0)
             self.constraints.append(self.x <= 1)
-            # Recency 単調性: r < r' => x[r] >= x[r']
+            # Recency 単調性: r < r' => x[r] >= x[r'] + eps
             for r_idx in range(nr - 1):
-                self.constraints.append(self.x[r_idx] >= self.x[r_idx + 1])
+                self.constraints.append(self.x[r_idx] >= self.x[r_idx + 1] + eps)
             # Recency 凸性（二階差分 >= 0）
             for r_idx in range(nr - 2):
                 self.constraints.append(
@@ -198,9 +227,9 @@ class RFOptimizer:
             self.x = cp.Variable(nf)
             self.constraints.append(self.x >= 0)
             self.constraints.append(self.x <= 1)
-            # Frequency 単調性: f < f' => x[f] <= x[f']
+            # Frequency 単調性: f < f' => x[f] + eps <= x[f']
             for f_idx in range(nf - 1):
-                self.constraints.append(self.x[f_idx] <= self.x[f_idx + 1])
+                self.constraints.append(self.x[f_idx] + eps <= self.x[f_idx + 1])
             # Frequency 凹性（二階差分 <= 0）
             for f_idx in range(nf - 2):
                 self.constraints.append(
@@ -215,14 +244,14 @@ class RFOptimizer:
             self.x = cp.Variable((nr, nf))
             self.constraints.append(self.x >= 0)
             self.constraints.append(self.x <= 1)
-            # Recency 単調性: r < r' => x[r,f] >= x[r',f]
+            # Recency 単調性: r < r' => x[r,f] >= x[r',f] + eps
             for r_idx in range(nr - 1):
                 for f_idx in range(nf):
-                    self.constraints.append(self.x[r_idx, f_idx] >= self.x[r_idx + 1, f_idx])
-            # Frequency 単調性: f < f' => x[r,f] <= x[r,f']
+                    self.constraints.append(self.x[r_idx, f_idx] >= self.x[r_idx + 1, f_idx] + eps)
+            # Frequency 単調性: f < f' => x[r,f] + eps <= x[r,f']
             for r_idx in range(nr):
                 for f_idx in range(nf - 1):
-                    self.constraints.append(self.x[r_idx, f_idx] <= self.x[r_idx, f_idx + 1])
+                    self.constraints.append(self.x[r_idx, f_idx] + eps <= self.x[r_idx, f_idx + 1])
             if kind in ("mrc", "mcc"):
                 # Recency 凸性（二階差分 >= 0）
                 for r_idx in range(nr - 2):
@@ -337,6 +366,7 @@ class RFOptimizer:
         obj_str = f"{obj_val:.4f}" if (obj_val is not None and math.isfinite(obj_val)) else "N/A"
         print("=== show solve info ===")
         print(f"kind: {self.kind}")
+        print(f"eps: {self.eps}")
         print(f"status: {self.status}")
         print(f"objective_value: {obj_str}")
         print(f"elapsed_time: {self.elapsed_time:.2f}[s]")
