@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-07
+
+### Added
+
+- `eps` parameter to `optimize()` and `RFOptimizer.build_model()` for strict monotonicity.
+  When `eps > 0`, adjacent recency/frequency probability values are forced to differ by at least
+  `eps`, preventing ties. Default `eps=0.0` preserves the existing weak monotonicity behavior.
+  Applies to all `kind` values (`mono`, `mr`, `mf`, `mrc`, `mfc`, `mcc`).
+- Automatic upper-bound validation for `eps`: raises `ValueError` if `eps` exceeds
+  `p_max / (n - 1)` (where `p_max` is the empirical probability maximum and `n` is the number
+  of recency or frequency levels), ensuring the problem remains feasible.
+
+### Changed
+
+- Kind aliases renamed from `monotone_*` to `monotonic_*` for consistent mathematical terminology.
+
+  | Old alias | New alias | Canonical |
+  |---|---|---|
+  | `monotone` | `monotonic` | `mono` |
+  | `monotone_recency` | `monotonic_recency` | `mr` |
+  | `monotone_frequency` | `monotonic_frequency` | `mf` |
+  | `monotone_recency_convex` | `monotonic_recency_convex` | `mrc` |
+  | `monotone_frequency_concave` | `monotonic_frequency_concave` | `mfc` |
+  | `monotone_convex_concave` | `monotonic_convex_concave` | `mcc` |
+
 ## [0.2.8] - 2026-06-07
 
 ### Added
