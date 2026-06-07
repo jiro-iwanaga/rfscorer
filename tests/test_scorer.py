@@ -753,3 +753,49 @@ class TestEvaluate:
     def test_invalid_uirevisit_type_raises(self, scorer_fitted, df_rec):
         with pytest.raises(ValueError, match="UIrevisit"):
             scorer_fitted.evaluate(df_rec, 12345, order=1)
+
+
+# ---------------------------------------------------------------------------
+# plot_probability_surface
+# ---------------------------------------------------------------------------
+class TestPlotProbabilitySurface:
+    @pytest.fixture(autouse=True)
+    def close_figures(self):
+        import matplotlib.pyplot as plt
+
+        yield
+        plt.close("all")
+
+    def test_before_fit_raises(self, scorer):
+        with pytest.raises(RuntimeError, match="fit"):
+            scorer.plot_probability_surface()
+
+    def test_invalid_kind_raises(self, scorer_fitted):
+        with pytest.raises(ValueError, match="kind"):
+            scorer_fitted.plot_probability_surface(kind="invalid")
+
+    def test_before_optimize_mono_raises(self, scorer_fitted):
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer_fitted.plot_probability_surface(kind="mono")
+
+    def test_before_optimize_mcc_raises(self, scorer_fitted):
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer_fitted.plot_probability_surface(kind="mcc")
+
+    def test_returns_figure_empirical(self, scorer_fitted):
+        import matplotlib.figure
+
+        fig = scorer_fitted.plot_probability_surface(kind="empirical")
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_returns_figure_mono(self, scorer_optimized_mono):
+        import matplotlib.figure
+
+        fig = scorer_optimized_mono.plot_probability_surface(kind="mono")
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_returns_figure_mcc(self, scorer_optimized_mcc):
+        import matplotlib.figure
+
+        fig = scorer_optimized_mcc.plot_probability_surface(kind="mcc")
+        assert isinstance(fig, matplotlib.figure.Figure)

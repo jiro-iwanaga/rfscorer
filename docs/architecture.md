@@ -7,7 +7,7 @@
 | `pandas` | データ操作・集計・出力形式 |
 | `cvxpy` | 凸2次計画問題のソルバー |
 | `numpy` | `plot_probability_surface()` 内のグリッド生成（遅延インポート） |
-| `matplotlib` | `plot_probability_surface()` 内の3次元ワイヤーフレーム描画（遅延インポート） |
+| `matplotlib` | `plot_probability_surface()` 内の3次元ワイヤーフレーム描画・`Figure` 返却（遅延インポート） |
 
 開発依存:
 

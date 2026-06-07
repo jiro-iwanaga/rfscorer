@@ -165,16 +165,18 @@ RF 制約を満たす最適化再閲覧確率を推定する。`fit()` または
 
 戻り値: なし
 
-##### `plot_probability_surface(kind="empirical", path=None)`
+##### `plot_probability_surface(kind="empirical")`
 
-再閲覧確率を3次元ワイヤーフレームで可視化し PNG ファイルに保存する。
+再閲覧確率を3次元ワイヤーフレームで可視化し、`matplotlib.figure.Figure` を返す。
+
+Jupyter Lab / Colab では返り値がそのままインライン描画される。
+ファイルに保存する場合は `fig.savefig("output.png")` を呼ぶ。
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
 | `kind` | `str` | `"empirical"` | `"empirical"`・`"mono"`・`"mcc"` のいずれか |
-| `path` | `str \| None` | `None` | 出力先。`None` の場合カレントディレクトリに `{kind}_probability_surface.png` を出力。ディレクトリを指定した場合はそのディレクトリにデフォルトファイル名で出力 |
 
-戻り値: なし
+戻り値: `matplotlib.figure.Figure`
 
 ##### `show()`
 

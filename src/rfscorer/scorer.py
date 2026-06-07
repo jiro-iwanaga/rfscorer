@@ -397,24 +397,25 @@ class RecencyFrequencyScorer:
             print("empirical_probability_table_:")
             print(self.empirical_probability_table_.round(3).to_string())
 
-    def plot_probability_surface(self, kind="empirical", path=None):
-        """Plot revisit probabilities as a 3D surface and save to file.
+    def plot_probability_surface(self, kind="empirical"):
+        """Plot revisit probabilities as a 3D surface.
 
         Visualizes the probability table as a 3D wireframe with recency on
         the x-axis, frequency on the y-axis, and probability on the z-axis.
+
+        In Jupyter Lab / Colab the returned figure renders inline automatically.
+        To save to a file, call ``fig.savefig("output.png")`` on the returned
+        figure.
 
         Parameters
         ----------
         kind : {"empirical", "mono", "mcc"}, default "empirical"
             Which probability to visualize. "empirical" uses fit() or
             fit_period() results; "mono" and "mcc" use optimize() results.
-        path : str or None, default None
-            Output file path for the PNG image. If None, saves as
-            "surface_{kind}_probability.png" in the current directory.
 
         Returns
         -------
-        None
+        matplotlib.figure.Figure
         """
         import matplotlib.pyplot as plt
         import numpy as np
@@ -431,15 +432,6 @@ class RecencyFrequencyScorer:
             raise RuntimeError(
                 "optimize(kind='mcc') must be called before plot_probability_surface(kind='mcc')."
             )
-
-        from pathlib import Path
-
-        default_filename = f"surface_{kind}_probability.png"
-        if path is None:
-            output_path = Path(default_filename)
-        else:
-            p = Path(path)
-            output_path = p / default_filename if p.is_dir() else p
 
         if kind == "empirical":
             table = self.empirical_probability_table_
@@ -462,8 +454,7 @@ class RecencyFrequencyScorer:
             zlabel="probability",
         )
         ax.plot_wireframe(X, Y, Z)
-        plt.savefig(output_path)
-        plt.close(fig)
+        return fig
 
     def export_probability_csv(self, kind="empirical", path=None):
         """Export revisit probabilities to a CSV file.
@@ -841,16 +832,16 @@ if __name__ == "__main__":
     # 経験的再閲覧確率の計算
     target_date = "2015-07-07"
     scorer.fit(df_train, target_date)
-    scorer.plot_probability_surface("empirical")
+    scorer.plot_probability_surface("empirical").savefig("surface_empirical_probability.png")
     scorer.show()
 
     # 最適化(Mono)
     scorer.optimize(kind="mono")
-    scorer.plot_probability_surface("mono")
+    scorer.plot_probability_surface("mono").savefig("surface_mono_probability.png")
 
     # 最適化(MCC)
     scorer.optimize(kind="mcc")
-    scorer.plot_probability_surface("mcc")
+    scorer.plot_probability_surface("mcc").savefig("surface_mcc_probability.png")
 
     # 全確率テーブルの出力
     scorer.export_probability_csv("all")

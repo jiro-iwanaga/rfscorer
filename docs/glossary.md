@@ -38,7 +38,7 @@
 | `predict(r, f, kind='empirical')` | 指定した最新度 `r`・頻度 `f` の再閲覧確率を返すメソッド。`r` は1が最も直近（数値が大きいほど古い）、`f` は観測期間の閲覧回数。`fit()` または `fit_period()` 後に利用可能 |
 | `transform(df, target_date, kind='empirical', ...)` | 入力 DataFrame の各 user×item ペアに最新度・頻度・再閲覧確率・順位を付与して返すメソッド。`user_col`・`item_col`・`datetime_col` は省略すると `__init__` の設定値を使用する。`fit()` または `fit_period()` 後に利用可能 |
 | `evaluate(df_rec, UIrevisit, order=1, ...)` | 推薦結果と正解データを比較し precision・recall・f1 等の評価指標を返すメソッド。`user_col`・`item_col` は省略すると `__init__` の設定値を使用する |
-| `plot_probability_surface(kind='empirical', path=None)` | 再閲覧確率を3次元ワイヤーフレームで可視化し PNG ファイルに保存するメソッド。`fit()` または `fit_period()` 後（`kind='mono'` または `'mcc'` の場合は `optimize()` 後）に利用可能 |
+| `plot_probability_surface(kind='empirical')` | 再閲覧確率を3次元ワイヤーフレームで可視化し `matplotlib.figure.Figure` を返すメソッド。Jupyter Lab / Colab ではインライン描画される。ファイル保存は `fig.savefig()` で行う。`fit()` または `fit_period()` 後（`kind='mono'` または `'mcc'` の場合は `optimize()` 後）に利用可能 |
 | `optimize(kind='mono')` | `fit()` または `fit_period()` の結果を用いて、RF 制約付きの最適化再閲覧確率を推定するメソッド。`kind='mono'`（単調性制約のみ）または `'mcc'`（単調性 + 凹凸性制約）を指定する |
 | `show()` | `fit()` または `fit_period()` 後の集計情報（レコード数・cv 数・期間・上限値）を標準出力に表示するデバッグ用メソッド |
 | `R` | `fit()` または `fit_period()` 後に参照できる最新度のリスト |
