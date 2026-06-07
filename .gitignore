@@ -234,6 +234,8 @@ src/rfscorer/*.csv
 # csv
 all_probability.csv
 df_recommend_emp.csv
+df_recommend_mf.csv
+df_recommend_mr.csv
 df_recommend_mcc.csv
 df_recommend_mono.csv
 df_recommend_mfc.csv
@@ -242,9 +244,11 @@ df_recommend_mrc.csv
 # png
 /examples/*.png
 /src/rfscorer/*.png
-/surface_empirical_probability.png
+/surface_emp_probability.png
 /marginal_recency_probability.png
 /marginal_frequency_probability.png
+/surface_mf_probability.png
+/surface_mr_probability.png
 /surface_mono_probability.png
 /surface_mrc_probability.png
 /surface_mfc_probability.png

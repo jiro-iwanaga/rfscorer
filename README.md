@@ -65,7 +65,7 @@ scorer.fit(df_train, target_date="2026-07-07")
 
 The empirical surface reflects raw revisit rates and may be irregular due to sparse data.
 
-![empirical probability surface](https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/surface_empirical_probability.png)
+![empirical probability surface](https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/surface_emp_probability.png)
 
 Optionally, call `optimize()` to smooth the surface under RF monotonicity constraints using convex quadratic programming.
 `kind="mono"` enforces recency and frequency monotonicity.
