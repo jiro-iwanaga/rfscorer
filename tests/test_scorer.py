@@ -800,6 +800,26 @@ class TestPlotProbabilitySurface:
         fig = scorer_optimized_mcc.plot_probability_surface(kind="mcc")
         assert isinstance(fig, matplotlib.figure.Figure)
 
+    def test_figsize_applied(self, scorer_fitted):
+        fig = scorer_fitted.plot_probability_surface(figsize=(4, 3))
+        assert tuple(fig.get_size_inches()) == (4, 3)
+
+    def test_title_shown_when_set(self, scorer_fitted):
+        fig = scorer_fitted.plot_probability_surface(title="My Title")
+        ax = fig.axes[0]
+        assert ax.get_title() == "My Title"
+
+    def test_title_empty_when_none(self, scorer_fitted):
+        fig = scorer_fitted.plot_probability_surface(title=None)
+        ax = fig.axes[0]
+        assert ax.get_title() == ""
+
+    def test_fontsize_applied_to_labels(self, scorer_fitted):
+        fig = scorer_fitted.plot_probability_surface(fontsize=16)
+        ax = fig.axes[0]
+        assert ax.xaxis.label.get_size() == 16
+        assert ax.yaxis.label.get_size() == 16
+
 
 # ---------------------------------------------------------------------------
 # 周辺確率属性 (R2N / R2CV / R2Prob / F2N / F2CV / F2Prob)
@@ -908,3 +928,23 @@ class TestPlotMarginalProbability:
 
         fig = scorer_fitted.plot_marginal_probability(axis="frequency")
         assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_figsize_applied(self, scorer_fitted):
+        fig = scorer_fitted.plot_marginal_probability(figsize=(4, 3))
+        assert tuple(fig.get_size_inches()) == (4, 3)
+
+    def test_title_shown_when_set(self, scorer_fitted):
+        fig = scorer_fitted.plot_marginal_probability(title="My Title")
+        ax = fig.axes[0]
+        assert ax.get_title() == "My Title"
+
+    def test_title_empty_when_none(self, scorer_fitted):
+        fig = scorer_fitted.plot_marginal_probability(title=None)
+        ax = fig.axes[0]
+        assert ax.get_title() == ""
+
+    def test_fontsize_applied_to_labels(self, scorer_fitted):
+        fig = scorer_fitted.plot_marginal_probability(fontsize=16)
+        ax = fig.axes[0]
+        assert ax.xaxis.label.get_size() == 16
+        assert ax.yaxis.label.get_size() == 16
