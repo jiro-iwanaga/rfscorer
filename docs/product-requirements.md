@@ -46,7 +46,7 @@ RF スコアリング手法を Python パッケージとして PyPI に公開し
 | 機能 | 説明 |
 |------|------|
 | 経験的再閲覧確率の推定 | 観測期間における最新度 $r$・頻度 $f$ 別に、評価期間での再閲覧比率を直接推定する |
-| 最適化再閲覧確率の推定 | RF 制約（Recency・Frequency に関する単調性制約）と最小二乗誤差を目的関数にもつ凸2次計画問題を解いて推定する |
+| 最適化再閲覧確率の推定 | RF 制約と最小二乗誤差を目的関数にもつ凸2次計画問題を解いて推定する。制約の組み合わせにより `mono`（単調性のみ）・`mrc`（+ Recency 凸性）・`mfc`（+ Frequency 凹性）・`mcc`（+ 両凹凸性）の4モデルを提供する |
 
 ### 出力
 
@@ -54,6 +54,8 @@ RF スコアリング手法を Python パッケージとして PyPI に公開し
 |------|------|
 | `empirical_probability_` | 経験的再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `N`, `cv`, `probability`）。`fit()` 後にアクセス可能 |
 | `mono_probability_` | mono モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mono')` 後にアクセス可能 |
+| `mrc_probability_` | mrc モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mrc')` 後にアクセス可能 |
+| `mfc_probability_` | mfc モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mfc')` 後にアクセス可能 |
 | `mcc_probability_` | mcc モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mcc')` 後にアクセス可能 |
 
 ### API
@@ -70,6 +72,12 @@ df_empirical = scorer.empirical_probability_
 
 scorer.optimize(kind="mono")
 df_mono = scorer.mono_probability_
+
+scorer.optimize(kind="mrc")
+df_mrc = scorer.mrc_probability_
+
+scorer.optimize(kind="mfc")
+df_mfc = scorer.mfc_probability_
 
 scorer.optimize(kind="mcc")
 df_mcc = scorer.mcc_probability_

@@ -85,6 +85,34 @@ def scorer_optimized_mono():
 
 
 @pytest.fixture(scope="module")
+def scorer_optimized_mrc():
+    s = RecencyFrequencyScorer()
+    s.fit_period(
+        _make_df(),
+        _OBS_PERIOD,
+        _EVAL_PERIOD,
+        recency_limit=_RECENCY_LIMIT,
+        frequency_limit=_FREQUENCY_LIMIT,
+    )
+    s.optimize(kind="mrc")
+    return s
+
+
+@pytest.fixture(scope="module")
+def scorer_optimized_mfc():
+    s = RecencyFrequencyScorer()
+    s.fit_period(
+        _make_df(),
+        _OBS_PERIOD,
+        _EVAL_PERIOD,
+        recency_limit=_RECENCY_LIMIT,
+        frequency_limit=_FREQUENCY_LIMIT,
+    )
+    s.optimize(kind="mfc")
+    return s
+
+
+@pytest.fixture(scope="module")
 def scorer_optimized_mcc():
     s = RecencyFrequencyScorer()
     s.fit_period(
@@ -460,6 +488,46 @@ class TestOptimize:
         for val in scorer_optimized_mono.mono_probability_dict_.values():
             assert -tol <= val <= 1 + tol
 
+    def test_mrc_sets_probability(self, scorer_optimized_mrc):
+        assert scorer_optimized_mrc.mrc_probability_ is not None
+        assert isinstance(scorer_optimized_mrc.mrc_probability_, pd.DataFrame)
+        assert set(scorer_optimized_mrc.mrc_probability_.columns) == {
+            "recency",
+            "frequency",
+            "probability",
+        }
+
+    def test_mrc_sets_probability_dict(self, scorer_optimized_mrc):
+        d = scorer_optimized_mrc.mrc_probability_dict_
+        assert d is not None
+        expected = {(r, f) for r in scorer_optimized_mrc.R for f in scorer_optimized_mrc.F}
+        assert set(d.keys()) == expected
+
+    def test_mrc_probability_values_in_bounds(self, scorer_optimized_mrc):
+        tol = 1e-6
+        for val in scorer_optimized_mrc.mrc_probability_dict_.values():
+            assert -tol <= val <= 1 + tol
+
+    def test_mfc_sets_probability(self, scorer_optimized_mfc):
+        assert scorer_optimized_mfc.mfc_probability_ is not None
+        assert isinstance(scorer_optimized_mfc.mfc_probability_, pd.DataFrame)
+        assert set(scorer_optimized_mfc.mfc_probability_.columns) == {
+            "recency",
+            "frequency",
+            "probability",
+        }
+
+    def test_mfc_sets_probability_dict(self, scorer_optimized_mfc):
+        d = scorer_optimized_mfc.mfc_probability_dict_
+        assert d is not None
+        expected = {(r, f) for r in scorer_optimized_mfc.R for f in scorer_optimized_mfc.F}
+        assert set(d.keys()) == expected
+
+    def test_mfc_probability_values_in_bounds(self, scorer_optimized_mfc):
+        tol = 1e-6
+        for val in scorer_optimized_mfc.mfc_probability_dict_.values():
+            assert -tol <= val <= 1 + tol
+
     def test_mcc_sets_probability(self, scorer_optimized_mcc):
         assert scorer_optimized_mcc.mcc_probability_ is not None
         assert isinstance(scorer_optimized_mcc.mcc_probability_, pd.DataFrame)
@@ -499,6 +567,28 @@ class TestPredict:
         )
         with pytest.raises(RuntimeError, match="optimize"):
             scorer.predict(1, 1, kind="mono")
+
+    def test_before_optimize_mrc_raises(self, scorer, df):
+        scorer.fit_period(
+            df,
+            _OBS_PERIOD,
+            _EVAL_PERIOD,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer.predict(1, 1, kind="mrc")
+
+    def test_before_optimize_mfc_raises(self, scorer, df):
+        scorer.fit_period(
+            df,
+            _OBS_PERIOD,
+            _EVAL_PERIOD,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer.predict(1, 1, kind="mfc")
 
     def test_before_optimize_mcc_raises(self, scorer, df):
         scorer.fit_period(
@@ -566,6 +656,20 @@ class TestPredict:
         assert isinstance(prob, float)
         assert 0.0 - 1e-6 <= prob <= 1.0 + 1e-6
         assert prob == pytest.approx(scorer_optimized_mono.mono_probability_dict_[1, 1])
+
+    def test_mrc_kind(self, scorer_optimized_mrc):
+        # 型・範囲に加えて、mrc_probability_dict_ から値を引いていることを確認
+        prob = scorer_optimized_mrc.predict(1, 1, kind="mrc")
+        assert isinstance(prob, float)
+        assert 0.0 - 1e-6 <= prob <= 1.0 + 1e-6
+        assert prob == pytest.approx(scorer_optimized_mrc.mrc_probability_dict_[1, 1])
+
+    def test_mfc_kind(self, scorer_optimized_mfc):
+        # 型・範囲に加えて、mfc_probability_dict_ から値を引いていることを確認
+        prob = scorer_optimized_mfc.predict(1, 1, kind="mfc")
+        assert isinstance(prob, float)
+        assert 0.0 - 1e-6 <= prob <= 1.0 + 1e-6
+        assert prob == pytest.approx(scorer_optimized_mfc.mfc_probability_dict_[1, 1])
 
     def test_mcc_kind(self, scorer_optimized_mcc):
         # 型・範囲に加えて、mcc_probability_dict_ から値を引いていることを確認
@@ -778,6 +882,14 @@ class TestPlotProbabilitySurface:
         with pytest.raises(RuntimeError, match="optimize"):
             scorer_fitted.plot_probability_surface(kind="mono")
 
+    def test_before_optimize_mrc_raises(self, scorer_fitted):
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer_fitted.plot_probability_surface(kind="mrc")
+
+    def test_before_optimize_mfc_raises(self, scorer_fitted):
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer_fitted.plot_probability_surface(kind="mfc")
+
     def test_before_optimize_mcc_raises(self, scorer_fitted):
         with pytest.raises(RuntimeError, match="optimize"):
             scorer_fitted.plot_probability_surface(kind="mcc")
@@ -792,6 +904,18 @@ class TestPlotProbabilitySurface:
         import matplotlib.figure
 
         fig = scorer_optimized_mono.plot_probability_surface(kind="mono")
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_returns_figure_mrc(self, scorer_optimized_mrc):
+        import matplotlib.figure
+
+        fig = scorer_optimized_mrc.plot_probability_surface(kind="mrc")
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_returns_figure_mfc(self, scorer_optimized_mfc):
+        import matplotlib.figure
+
+        fig = scorer_optimized_mfc.plot_probability_surface(kind="mfc")
         assert isinstance(fig, matplotlib.figure.Figure)
 
     def test_returns_figure_mcc(self, scorer_optimized_mcc):

@@ -99,13 +99,16 @@ class RFOptimizer:
 
         Parameters
         ----------
-        kind : {"mono", "mcc"}, default "mono"
+        kind : {"mono", "mrc", "mfc", "mcc"}, default "mono"
             "mono" applies monotonicity constraints only.
-            "mcc" additionally applies convexity in recency and concavity in
-            frequency (diminishing marginal returns).
+            "mrc" additionally applies convexity in recency (diminishing
+            marginal penalty as recency grows).
+            "mfc" additionally applies concavity in frequency (diminishing
+            marginal returns as frequency grows).
+            "mcc" applies both recency convexity and frequency concavity.
         """
-        if kind not in ("mono", "mcc"):
-            raise ValueError(f"kind must be 'mono' or 'mcc', got {kind!r}")
+        if kind not in ("mono", "mrc", "mfc", "mcc"):
+            raise ValueError(f"kind must be 'mono', 'mrc', 'mfc', or 'mcc', got {kind!r}")
         if len(self.R) == 0 or len(self.F) == 0:
             raise RuntimeError("set_data() must be called before build_model()")
 
@@ -132,7 +135,7 @@ class RFOptimizer:
             for f_idx in range(nf - 1):
                 self.constraints.append(self.x[r_idx, f_idx] <= self.x[r_idx, f_idx + 1])
 
-        if kind == "mcc":
+        if kind in ("mrc", "mcc"):
             # Recency 凸性: 新しいほど効果が大きい（二階差分 >= 0）
             for r_idx in range(nr - 2):
                 for f_idx in range(nf):
@@ -143,6 +146,7 @@ class RFOptimizer:
                         >= 0
                     )
 
+        if kind in ("mfc", "mcc"):
             # Frequency 凹性: 限界効用逓減（二階差分 <= 0）
             for r_idx in range(nr):
                 for f_idx in range(nf - 2):

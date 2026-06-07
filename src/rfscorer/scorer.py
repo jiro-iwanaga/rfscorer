@@ -68,6 +68,16 @@ class RecencyFrequencyScorer:
         self.mono_probability_table_ = None
         self.mono_probability_dict_ = None
 
+        # mrc
+        self.mrc_probability_ = None
+        self.mrc_probability_table_ = None
+        self.mrc_probability_dict_ = None
+
+        # mfc
+        self.mfc_probability_ = None
+        self.mfc_probability_table_ = None
+        self.mfc_probability_dict_ = None
+
         # mcc
         self.mcc_probability_ = None
         self.mcc_probability_table_ = None
@@ -469,13 +479,23 @@ class RecencyFrequencyScorer:
         import matplotlib.pyplot as plt
         import numpy as np
 
-        if kind not in ("empirical", "mono", "mcc"):
-            raise ValueError(f"kind must be 'empirical', 'mono', or 'mcc', got {kind!r}.")
+        if kind not in ("empirical", "mono", "mrc", "mfc", "mcc"):
+            raise ValueError(
+                f"kind must be 'empirical', 'mono', 'mrc', 'mfc', or 'mcc', got {kind!r}."
+            )
         if kind == "empirical" and self.empirical_probability_table_ is None:
             raise RuntimeError("fit() must be called before plot_probability_surface().")
         if kind == "mono" and self.mono_probability_table_ is None:
             raise RuntimeError(
                 "optimize(kind='mono') must be called before plot_probability_surface(kind='mono')."
+            )
+        if kind == "mrc" and self.mrc_probability_table_ is None:
+            raise RuntimeError(
+                "optimize(kind='mrc') must be called before plot_probability_surface(kind='mrc')."
+            )
+        if kind == "mfc" and self.mfc_probability_table_ is None:
+            raise RuntimeError(
+                "optimize(kind='mfc') must be called before plot_probability_surface(kind='mfc')."
             )
         if kind == "mcc" and self.mcc_probability_table_ is None:
             raise RuntimeError(
@@ -486,6 +506,10 @@ class RecencyFrequencyScorer:
             table = self.empirical_probability_table_
         elif kind == "mono":
             table = self.mono_probability_table_
+        elif kind == "mrc":
+            table = self.mrc_probability_table_
+        elif kind == "mfc":
+            table = self.mfc_probability_table_
         else:
             table = self.mcc_probability_table_
 
@@ -597,13 +621,23 @@ class RecencyFrequencyScorer:
         -------
         None
         """
-        if kind not in ("empirical", "mono", "mcc", "all"):
-            raise ValueError(f"kind must be 'empirical', 'mono', 'mcc', or 'all', got {kind!r}.")
+        if kind not in ("empirical", "mono", "mrc", "mfc", "mcc", "all"):
+            raise ValueError(
+                f"kind must be 'empirical', 'mono', 'mrc', 'mfc', 'mcc', or 'all', got {kind!r}."
+            )
         if kind in ("empirical", "all") and self.empirical_probability_ is None:
             raise RuntimeError("fit() must be called before export_probability_csv().")
         if kind in ("mono", "all") and self.mono_probability_ is None:
             raise RuntimeError(
                 "optimize(kind='mono') must be called before export_probability_csv(kind='mono')."
+            )
+        if kind in ("mrc", "all") and self.mrc_probability_ is None:
+            raise RuntimeError(
+                "optimize(kind='mrc') must be called before export_probability_csv(kind='mrc')."
+            )
+        if kind in ("mfc", "all") and self.mfc_probability_ is None:
+            raise RuntimeError(
+                "optimize(kind='mfc') must be called before export_probability_csv(kind='mfc')."
             )
         if kind in ("mcc", "all") and self.mcc_probability_ is None:
             raise RuntimeError(
@@ -627,6 +661,14 @@ class RecencyFrequencyScorer:
                     on=["recency", "frequency"],
                 )
                 .merge(
+                    self.mrc_probability_.rename(columns={"probability": "mrc_probability"}),
+                    on=["recency", "frequency"],
+                )
+                .merge(
+                    self.mfc_probability_.rename(columns={"probability": "mfc_probability"}),
+                    on=["recency", "frequency"],
+                )
+                .merge(
                     self.mcc_probability_.rename(columns={"probability": "mcc_probability"}),
                     on=["recency", "frequency"],
                 )
@@ -635,6 +677,10 @@ class RecencyFrequencyScorer:
             df = self.empirical_probability_
         elif kind == "mono":
             df = self.mono_probability_
+        elif kind == "mrc":
+            df = self.mrc_probability_
+        elif kind == "mfc":
+            df = self.mfc_probability_
         else:
             df = self.mcc_probability_
         df.to_csv(output_path, index=False)
@@ -663,12 +709,18 @@ class RecencyFrequencyScorer:
             raise TypeError("r must be a positive integer.")
         if not isinstance(f, int) or f < 1:
             raise TypeError("f must be a positive integer.")
-        if kind not in ("empirical", "mono", "mcc"):
-            raise ValueError(f"kind must be 'empirical', 'mono', or 'mcc', got {kind!r}.")
+        if kind not in ("empirical", "mono", "mrc", "mfc", "mcc"):
+            raise ValueError(
+                f"kind must be 'empirical', 'mono', 'mrc', 'mfc', or 'mcc', got {kind!r}."
+            )
         if kind == "empirical" and self.empirical_probability_dict_ is None:
             raise RuntimeError("fit() must be called before predict().")
         if kind == "mono" and self.mono_probability_dict_ is None:
             raise RuntimeError("optimize(kind='mono') must be called before predict(kind='mono').")
+        if kind == "mrc" and self.mrc_probability_dict_ is None:
+            raise RuntimeError("optimize(kind='mrc') must be called before predict(kind='mrc').")
+        if kind == "mfc" and self.mfc_probability_dict_ is None:
+            raise RuntimeError("optimize(kind='mfc') must be called before predict(kind='mfc').")
         if kind == "mcc" and self.mcc_probability_dict_ is None:
             raise RuntimeError("optimize(kind='mcc') must be called before predict(kind='mcc').")
 
@@ -678,6 +730,10 @@ class RecencyFrequencyScorer:
             prob = self.empirical_probability_dict_.get((r, f), 0.0)
         elif kind == "mono":
             prob = self.mono_probability_dict_.get((r, f), 0.0)
+        elif kind == "mrc":
+            prob = self.mrc_probability_dict_.get((r, f), 0.0)
+        elif kind == "mfc":
+            prob = self.mfc_probability_dict_.get((r, f), 0.0)
         else:
             prob = self.mcc_probability_dict_.get((r, f), 0.0)
         return prob
@@ -723,14 +779,20 @@ class RecencyFrequencyScorer:
             order. Sorted by user ascending and probability descending; order
             starts at 1.
         """
-        if kind not in ("empirical", "mono", "mcc"):
-            raise ValueError(f"kind must be 'empirical', 'mono', or 'mcc', got {kind!r}.")
+        if kind not in ("empirical", "mono", "mrc", "mfc", "mcc"):
+            raise ValueError(
+                f"kind must be 'empirical', 'mono', 'mrc', 'mfc', or 'mcc', got {kind!r}."
+            )
         if self.empirical_probability_dict_ is None:
             raise RuntimeError("fit() must be called before transform().")
         if kind == "mono" and self.mono_probability_dict_ is None:
             raise RuntimeError(
                 "optimize(kind='mono') must be called before transform(kind='mono')."
             )
+        if kind == "mrc" and self.mrc_probability_dict_ is None:
+            raise RuntimeError("optimize(kind='mrc') must be called before transform(kind='mrc').")
+        if kind == "mfc" and self.mfc_probability_dict_ is None:
+            raise RuntimeError("optimize(kind='mfc') must be called before transform(kind='mfc').")
         if kind == "mcc" and self.mcc_probability_dict_ is None:
             raise RuntimeError("optimize(kind='mcc') must be called before transform(kind='mcc').")
 
@@ -881,6 +943,10 @@ class RecencyFrequencyScorer:
     def _probability_dict(self, kind):
         if kind == "mono":
             return self.mono_probability_dict_
+        if kind == "mrc":
+            return self.mrc_probability_dict_
+        if kind == "mfc":
+            return self.mfc_probability_dict_
         if kind == "mcc":
             return self.mcc_probability_dict_
         return self.empirical_probability_dict_
@@ -896,18 +962,20 @@ class RecencyFrequencyScorer:
 
         Parameters
         ----------
-        kind : {"mono", "mcc"}, default "mono"
+        kind : {"mono", "mrc", "mfc", "mcc"}, default "mono"
             Optimization model to use.
             "mono" applies monotonicity constraints only.
-            "mcc" additionally applies convexity in recency and concavity
-            in frequency (diminishing marginal returns).
+            "mrc" additionally applies convexity in recency.
+            "mfc" additionally applies concavity in frequency
+            (diminishing marginal returns).
+            "mcc" applies both recency convexity and frequency concavity.
 
         Returns
         -------
         self
         """
-        if kind not in ("mono", "mcc"):
-            raise ValueError(f"kind must be 'mono' or 'mcc', got {kind!r}.")
+        if kind not in ("mono", "mrc", "mfc", "mcc"):
+            raise ValueError(f"kind must be 'mono', 'mrc', 'mfc', or 'mcc', got {kind!r}.")
 
         try:
             from .optimizer import RFOptimizer
@@ -932,6 +1000,14 @@ class RecencyFrequencyScorer:
             self.mono_probability_dict_ = optimizer.RF2X
             self.mono_probability_ = df_opt
             self.mono_probability_table_ = table
+        elif kind == "mrc":
+            self.mrc_probability_dict_ = optimizer.RF2X
+            self.mrc_probability_ = df_opt
+            self.mrc_probability_table_ = table
+        elif kind == "mfc":
+            self.mfc_probability_dict_ = optimizer.RF2X
+            self.mfc_probability_ = df_opt
+            self.mfc_probability_table_ = table
         else:
             self.mcc_probability_dict_ = optimizer.RF2X
             self.mcc_probability_ = df_opt
@@ -962,6 +1038,14 @@ if __name__ == "__main__":
     scorer.optimize(kind="mono")
     scorer.plot_probability_surface("mono").savefig("surface_mono_probability.png")
 
+    # 最適化(MRC)
+    scorer.optimize(kind="mrc")
+    scorer.plot_probability_surface("mrc").savefig("surface_mrc_probability.png")
+
+    # 最適化(MFC)
+    scorer.optimize(kind="mfc")
+    scorer.plot_probability_surface("mfc").savefig("surface_mfc_probability.png")
+
     # 最適化(MCC)
     scorer.optimize(kind="mcc")
     scorer.plot_probability_surface("mcc").savefig("surface_mcc_probability.png")
@@ -983,6 +1067,16 @@ if __name__ == "__main__":
     df_rec_mono = scorer.transform(df_test_obs, target_date, kind="mono")
     df_rec_mono.to_csv("df_recommend_mono.csv", index=False)
     print(scorer.evaluate(df_rec_mono, UIrevisit, order=10))
+
+    print("--- mrc ---")
+    df_rec_mrc = scorer.transform(df_test_obs, target_date, kind="mrc")
+    df_rec_mrc.to_csv("df_recommend_mrc.csv", index=False)
+    print(scorer.evaluate(df_rec_mrc, UIrevisit, order=10))
+
+    print("--- mfc ---")
+    df_rec_mfc = scorer.transform(df_test_obs, target_date, kind="mfc")
+    df_rec_mfc.to_csv("df_recommend_mfc.csv", index=False)
+    print(scorer.evaluate(df_rec_mfc, UIrevisit, order=10))
 
     print("--- mcc ---")
     df_rec_mcc = scorer.transform(df_test_obs, target_date, kind="mcc")

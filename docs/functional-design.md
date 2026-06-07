@@ -32,18 +32,27 @@ $$p_{r,f} := \frac{n_{r,f}}{N_{r,f}}\ \ \  (r\in R, f\in F)$$
 
 ### 最適化再閲覧確率の推定
 
-経験的確率 $p_{r,f}$ を基準として、RF 制約を満たす確率 $x_{r,f}$ を求める。最適化モデルは `mono` と `mcc` の2種類。
+経験的確率 $p_{r,f}$ を基準として、RF 制約を満たす確率 $x_{r,f}$ を求める。最適化モデルは `mono`・`mrc`・`mfc`・`mcc` の4種類。
 
 **共通制約（単調性）**
+すべてのモデルに適用する。
 - **Recency 制約**: 最近閲覧した商品ほど再閲覧確率が高い。
 $$r < r' \implies x_{r,f} \geq x_{r',f}\ \ \ (r, r'\in R) $$
 - **Frequency 制約**: 頻度が高い商品ほど再閲覧確率が高い。
 $$f < f' \implies x_{r,f} \leq x_{r',f}\ \ \ (f, f'\in F) $$
 
-**MCC 追加制約（凹凸性）**
-- **Recency 凸性**: 新しいほど確率の落ち幅が大きい（限界効果逓増）。
+**追加制約（凹凸性）**
+
+| モデル | Recency 凸性 | Frequency 凹性 |
+|--------|:-----------:|:-------------:|
+| `mono` | — | — |
+| `mrc`  | ✓ | — |
+| `mfc`  | — | ✓ |
+| `mcc`  | ✓ | ✓ |
+
+- **Recency 凸性**（`mrc`・`mcc`）: 新しいほど確率の落ち幅が大きい（限界効果逓増）。
 $$x_{r,f} - 2x_{r+1,f} + x_{r+2,f} \geq 0\ \ \ (r, r+1, r+2 \in R)$$
-- **Frequency 凹性**: 頻度が増えるほど確率の上昇幅が小さい（限界効用逓減）。
+- **Frequency 凹性**（`mfc`・`mcc`）: 頻度が増えるほど確率の上昇幅が小さい（限界効用逓減）。
 $$x_{r,f} - 2x_{r,f+1} + x_{r,f+2} \leq 0\ \ \ (f, f+1, f+2 \in F)$$
 
 **目的関数（共通）**
@@ -108,7 +117,7 @@ RecencyFrequencyScorer(user_col="user", item_col="item", datetime_col="datetime"
 |-----------|-----|-----------|------|
 | `r` | `int` | — | 最新度ランク（1が最も直近、数値が大きいほど古い。1以上） |
 | `f` | `int` | — | 頻度（観測期間の閲覧回数。1以上） |
-| `kind` | `str` | `"empirical"` | `"empirical"`・`"mono"`・`"mcc"` のいずれか |
+| `kind` | `str` | `"empirical"` | `"empirical"`・`"mono"`・`"mrc"`・`"mfc"`・`"mcc"` のいずれか |
 
 戻り値: `float`
 
@@ -120,7 +129,7 @@ RecencyFrequencyScorer(user_col="user", item_col="item", datetime_col="datetime"
 |-----------|-----|-----------|------|
 | `df` | `pd.DataFrame` | — | スコアリング対象の閲覧履歴 |
 | `target_date` | `str \| datetime` | — | 最新度・頻度の計算基準日 |
-| `kind` | `str` | `"empirical"` | `"empirical"`・`"mono"`・`"mcc"` のいずれか |
+| `kind` | `str` | `"empirical"` | `"empirical"`・`"mono"`・`"mrc"`・`"mfc"`・`"mcc"` のいずれか |
 | `user_col` | `str \| None` | `None` | ユーザーカラム名。省略時は `__init__` で設定した値を使用 |
 | `item_col` | `str \| None` | `None` | 商品カラム名。省略時は `__init__` で設定した値を使用 |
 | `datetime_col` | `str \| None` | `None` | 日付カラム名。省略時は `__init__` で設定した値を使用 |
@@ -146,11 +155,11 @@ RecencyFrequencyScorer(user_col="user", item_col="item", datetime_col="datetime"
 
 RF 制約を満たす最適化再閲覧確率を推定する。`fit()` または `fit_period()` の後に呼び出す。
 内部で `optimizer.py` の `RFOptimizer` を使用して凸2次計画問題を解く。
-結果は `kind` に対応する属性（`mono_probability_*` または `mcc_probability_*`）に格納されるため、両モデルの結果を同時に保持できる。
+結果は `kind` に対応する属性（`mono_probability_*`・`mrc_probability_*`・`mfc_probability_*`・`mcc_probability_*`）に格納されるため、複数モデルの結果を同時に保持できる。
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
-| `kind` | `str` | `"mono"` | `"mono"`（単調性制約のみ）または `"mcc"`（単調性 + Recency 凸性 + Frequency 凹性） |
+| `kind` | `str` | `"mono"` | `"mono"`（単調性のみ）・`"mrc"`（単調性 + Recency 凸性）・`"mfc"`（単調性 + Frequency 凹性）・`"mcc"`（単調性 + Recency 凸性 + Frequency 凹性）のいずれか |
 
 戻り値: `self`
 
@@ -160,7 +169,7 @@ RF 制約を満たす最適化再閲覧確率を推定する。`fit()` または
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
-| `kind` | `str` | `"empirical"` | `"empirical"`・`"mono"`・`"mcc"`・`"all"` のいずれか。`"all"` は3者をマージして出力（カラム: `empirical_probability`, `mono_probability`, `mcc_probability`） |
+| `kind` | `str` | `"empirical"` | `"empirical"`・`"mono"`・`"mrc"`・`"mfc"`・`"mcc"`・`"all"` のいずれか。`"all"` は5者をマージして出力（カラム: `empirical_probability`, `mono_probability`, `mrc_probability`, `mfc_probability`, `mcc_probability`） |
 | `path` | `str \| None` | `None` | 出力先。`None` の場合カレントディレクトリに `{kind}_probability.csv` を出力。ディレクトリを指定した場合はそのディレクトリにデフォルトファイル名で出力 |
 
 戻り値: なし
@@ -175,7 +184,7 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
-| `kind` | `str` | `"empirical"` | `"empirical"`・`"mono"`・`"mcc"` のいずれか |
+| `kind` | `str` | `"empirical"` | `"empirical"`・`"mono"`・`"mrc"`・`"mfc"`・`"mcc"` のいずれか |
 | `title` | `str \| None` | `None` | 図のタイトル。`None` の場合は表示しない |
 | `figsize` | `tuple[float, float]` | `(6, 5)` | 図のサイズ（インチ）。論文用途では最終印刷サイズに合わせる |
 | `fontsize` | `int` | `12` | 軸ラベル・目盛りのフォントサイズ。論文用途では対象ジャーナルの本文サイズ（通常 8〜10 pt）に合わせる |
@@ -236,6 +245,12 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 | `mono_probability_` | `pd.DataFrame` | mono モデル最適化再閲覧確率（カラム: `recency`, `frequency`, `probability`） | `optimize(kind="mono")` 後 |
 | `mono_probability_table_` | `pd.DataFrame` | mono モデル最適化再閲覧確率（横持ち） | `optimize(kind="mono")` 後 |
 | `mono_probability_dict_` | `dict` | mono モデル最適化再閲覧確率（キー: `(r, f)`、値: `probability`） | `optimize(kind="mono")` 後 |
+| `mrc_probability_` | `pd.DataFrame` | mrc モデル最適化再閲覧確率（カラム: `recency`, `frequency`, `probability`） | `optimize(kind="mrc")` 後 |
+| `mrc_probability_table_` | `pd.DataFrame` | mrc モデル最適化再閲覧確率（横持ち） | `optimize(kind="mrc")` 後 |
+| `mrc_probability_dict_` | `dict` | mrc モデル最適化再閲覧確率（キー: `(r, f)`、値: `probability`） | `optimize(kind="mrc")` 後 |
+| `mfc_probability_` | `pd.DataFrame` | mfc モデル最適化再閲覧確率（カラム: `recency`, `frequency`, `probability`） | `optimize(kind="mfc")` 後 |
+| `mfc_probability_table_` | `pd.DataFrame` | mfc モデル最適化再閲覧確率（横持ち） | `optimize(kind="mfc")` 後 |
+| `mfc_probability_dict_` | `dict` | mfc モデル最適化再閲覧確率（キー: `(r, f)`、値: `probability`） | `optimize(kind="mfc")` 後 |
 | `mcc_probability_` | `pd.DataFrame` | mcc モデル最適化再閲覧確率（カラム: `recency`, `frequency`, `probability`） | `optimize(kind="mcc")` 後 |
 | `mcc_probability_table_` | `pd.DataFrame` | mcc モデル最適化再閲覧確率（横持ち） | `optimize(kind="mcc")` 後 |
 | `mcc_probability_dict_` | `dict` | mcc モデル最適化再閲覧確率（キー: `(r, f)`、値: `probability`） | `optimize(kind="mcc")` 後 |
@@ -268,17 +283,12 @@ RF2N / RF2CV / RF2Prob
         │
         ├─  export_probability_csv(kind, path)  ─→ 確率テーブルを CSV に書き出す
         │
-        ▼  optimize(kind='mono')  ← RFOptimizer (optimizer.py) に委譲
-単調性制約付き凸2次計画問題を求解
+        ▼  optimize(kind='mono'|'mrc'|'mfc'|'mcc')  ← RFOptimizer (optimizer.py) に委譲
+RF 制約付き凸2次計画問題を求解（kind に応じた追加制約を適用）
         ▼
-mono_probability_ / mono_probability_table_ / mono_probability_dict_
-
-        ▼  optimize(kind='mcc')  ← RFOptimizer (optimizer.py) に委譲
-単調性 + 凹凸性制約付き凸2次計画問題を求解
-        ▼
-mcc_probability_ / mcc_probability_table_ / mcc_probability_dict_
+{mono|mrc|mfc|mcc}_probability_ / _table_ / _dict_
         │
-        └─  export_probability_csv(kind='all', path)  ─→ empirical + mono + mcc を併記した CSV を書き出す
+        └─  export_probability_csv(kind='all', path)  ─→ empirical + mono + mrc + mfc + mcc を併記した CSV を書き出す
 ```
 
 ## 入出力例
