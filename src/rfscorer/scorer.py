@@ -47,6 +47,12 @@ class RecencyFrequencyScorer:
         self.RF2N = {}  # 最新度と頻度に対して閲覧数合計を紐づける辞書
         self.RF2CV = {}  # 最新度と頻度に対して再閲覧数合計を紐づける辞書
         self.RF2Prob = {}  # 最新度と頻度に対して経験的再閲覧確率を紐づける辞書
+        self.R2N = {}  # 最新度に対して閲覧数合計を紐づける辞書
+        self.R2CV = {}  # 最新度に対して再閲覧数合計を紐づける辞書
+        self.R2Prob = {}  # 最新度に対して経験的再閲覧確率を紐づける辞書
+        self.F2N = {}  # 頻度に対して閲覧数合計を紐づける辞書
+        self.F2CV = {}  # 頻度に対して再閲覧数合計を紐づける辞書
+        self.F2Prob = {}  # 頻度に対して経験的再閲覧確率を紐づける辞書
 
         # empirical
         self.empirical_probability_ = None  # 経験的再閲覧確率データフレーム(縦持ち)
@@ -54,6 +60,8 @@ class RecencyFrequencyScorer:
         self.empirical_probability_dict_ = (
             None  # 経験的再閲覧確率データフレーム(辞書:キーは最新度と頻度のペア)
         )
+        self.recency_probability_ = None  # 最新度別経験的再閲覧確率データフレーム
+        self.frequency_probability_ = None  # 頻度別経験的再閲覧確率データフレーム
 
         # mono
         self.mono_probability_ = None
@@ -351,6 +359,22 @@ class RecencyFrequencyScorer:
             values="probability",
         )
 
+        # 最新度別の集約
+        df_r = self.empirical_probability_.groupby("recency")[["N", "cv"]].sum().reset_index()
+        df_r["probability"] = (df_r["cv"] / df_r["N"]).where(df_r["N"] > 0, 0.0)
+        self.recency_probability_ = df_r
+        self.R2N = dict(zip(df_r["recency"], df_r["N"]))
+        self.R2CV = dict(zip(df_r["recency"], df_r["cv"]))
+        self.R2Prob = dict(zip(df_r["recency"], df_r["probability"]))
+
+        # 頻度別の集約
+        df_f = self.empirical_probability_.groupby("frequency")[["N", "cv"]].sum().reset_index()
+        df_f["probability"] = (df_f["cv"] / df_f["N"]).where(df_f["N"] > 0, 0.0)
+        self.frequency_probability_ = df_f
+        self.F2N = dict(zip(df_f["frequency"], df_f["N"]))
+        self.F2CV = dict(zip(df_f["frequency"], df_f["cv"]))
+        self.F2Prob = dict(zip(df_f["frequency"], df_f["probability"]))
+
         return self
 
     def show(self):
@@ -454,6 +478,47 @@ class RecencyFrequencyScorer:
             zlabel="probability",
         )
         ax.plot_wireframe(X, Y, Z)
+        return fig
+
+    def plot_marginal_probability(self, axis="recency"):
+        """Plot empirical revisit probability aggregated along one RF dimension.
+
+        Visualizes R2Prob (when axis='recency') or F2Prob (when axis='frequency')
+        as a line chart with markers. Use this to verify monotonicity in each
+        RF signal before running optimize().
+
+        In Jupyter Lab / Colab the returned figure renders inline automatically.
+        To save to a file, call ``fig.savefig("output.png")`` on the returned figure.
+
+        Parameters
+        ----------
+        axis : {"recency", "frequency"}, default "recency"
+            Which dimension to aggregate and plot.
+            "recency" plots probability vs recency rank (expected: decreasing).
+            "frequency" plots probability vs frequency (expected: increasing).
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+        """
+        import matplotlib.pyplot as plt
+
+        if axis not in ("recency", "frequency"):
+            raise ValueError(f"axis must be 'recency' or 'frequency', got {axis!r}.")
+        if self.recency_probability_ is None:
+            raise RuntimeError("fit() must be called before plot_marginal_probability().")
+
+        if axis == "recency":
+            df = self.recency_probability_
+            x_col = "recency"
+        else:
+            df = self.frequency_probability_
+            x_col = "frequency"
+
+        fig, ax = plt.subplots()
+        ax.plot(df[x_col], df["probability"], marker="o")
+        ax.set_xlabel(x_col)
+        ax.set_ylabel("probability")
         return fig
 
     def export_probability_csv(self, kind="empirical", path=None):

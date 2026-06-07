@@ -178,6 +178,20 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 
 戻り値: `matplotlib.figure.Figure`
 
+##### `plot_marginal_probability(axis="recency")`
+
+最新度または頻度の一方向に集約した周辺的経験的再閲覧確率を折れ線グラフで可視化し、`matplotlib.figure.Figure` を返す。
+`optimize()` 前に単調性を確認する用途に使用する。
+
+Jupyter Lab / Colab では返り値がそのままインライン描画される。
+ファイルに保存する場合は `fig.savefig("output.png")` を呼ぶ。
+
+| パラメータ | 型 | デフォルト | 説明 |
+|-----------|-----|-----------|------|
+| `axis` | `str` | `"recency"` | `"recency"`（最新度方向）または `"frequency"`（頻度方向） |
+
+戻り値: `matplotlib.figure.Figure`
+
 ##### `show()`
 
 `fit()` または `fit_period()` 後の集計情報（レコード数・cv 数・期間・上限値）を標準出力に表示する。デバッグ・動作確認用。
@@ -195,7 +209,15 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 | `RF2N` | `dict` | `(r, f)` → サンプル数 $N_{r,f}$ のマッピング | `fit()` または `fit_period()` 後 |
 | `RF2CV` | `dict` | `(r, f)` → cv 数 $n_{r,f}$ のマッピング | `fit()` または `fit_period()` 後 |
 | `RF2Prob` | `dict` | `(r, f)` → 経験的再閲覧確率 $p_{r,f}$ のマッピング | `fit()` または `fit_period()` 後 |
+| `R2N` | `dict` | `r` → 最新度別サンプル数のマッピング（`RF2N` の $f$ 方向集約） | `fit()` または `fit_period()` 後 |
+| `R2CV` | `dict` | `r` → 最新度別 cv 数のマッピング | `fit()` または `fit_period()` 後 |
+| `R2Prob` | `dict` | `r` → 最新度別経験的再閲覧確率のマッピング | `fit()` または `fit_period()` 後 |
+| `F2N` | `dict` | `f` → 頻度別サンプル数のマッピング（`RF2N` の $r$ 方向集約） | `fit()` または `fit_period()` 後 |
+| `F2CV` | `dict` | `f` → 頻度別 cv 数のマッピング | `fit()` または `fit_period()` 後 |
+| `F2Prob` | `dict` | `f` → 頻度別経験的再閲覧確率のマッピング | `fit()` または `fit_period()` 後 |
 | `empirical_probability_` | `pd.DataFrame` | 経験的再閲覧確率（カラム: `recency`, `frequency`, `N`, `cv`, `probability`） | `fit()` または `fit_period()` 後 |
+| `recency_probability_` | `pd.DataFrame` | 最新度別経験的再閲覧確率（カラム: `recency`, `N`, `cv`, `probability`） | `fit()` または `fit_period()` 後 |
+| `frequency_probability_` | `pd.DataFrame` | 頻度別経験的再閲覧確率（カラム: `frequency`, `N`, `cv`, `probability`） | `fit()` または `fit_period()` 後 |
 | `empirical_probability_table_` | `pd.DataFrame` | 経験的再閲覧確率（横持ち。インデックス: `recency`、カラム: `frequency`） | `fit()` または `fit_period()` 後 |
 | `empirical_probability_dict_` | `dict` | 経験的再閲覧確率（キー: `(r, f)`、値: `probability`） | `fit()` または `fit_period()` 後 |
 | `mono_probability_` | `pd.DataFrame` | mono モデル最適化再閲覧確率（カラム: `recency`, `frequency`, `probability`） | `optimize(kind="mono")` 後 |
