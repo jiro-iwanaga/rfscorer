@@ -799,3 +799,152 @@ class TestPlotProbabilitySurface:
 
         fig = scorer_optimized_mcc.plot_probability_surface(kind="mcc")
         assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_figsize_applied(self, scorer_fitted):
+        fig = scorer_fitted.plot_probability_surface(figsize=(4, 3))
+        assert tuple(fig.get_size_inches()) == (4, 3)
+
+    def test_title_shown_when_set(self, scorer_fitted):
+        fig = scorer_fitted.plot_probability_surface(title="My Title")
+        ax = fig.axes[0]
+        assert ax.get_title() == "My Title"
+
+    def test_title_empty_when_none(self, scorer_fitted):
+        fig = scorer_fitted.plot_probability_surface(title=None)
+        ax = fig.axes[0]
+        assert ax.get_title() == ""
+
+    def test_fontsize_applied_to_labels(self, scorer_fitted):
+        fig = scorer_fitted.plot_probability_surface(fontsize=16)
+        ax = fig.axes[0]
+        assert ax.xaxis.label.get_size() == 16
+        assert ax.yaxis.label.get_size() == 16
+
+
+# ---------------------------------------------------------------------------
+# 周辺確率属性 (R2N / R2CV / R2Prob / F2N / F2CV / F2Prob)
+#
+# テストデータ (recency_limit=7, frequency_limit=3) での期待値:
+#   u1-item1: r=3, f=3, cv=1  u1-item2: r=6, f=1, cv=0
+#   u2-item1: r=4, f=1, cv=0  u2-item2: r=1, f=2, cv=1
+#
+#   R2N:  {1:1, 2:0, 3:1, 4:1, 5:0, 6:1, 7:0}
+#   R2CV: {1:1, 2:0, 3:1, 4:0, 5:0, 6:0, 7:0}
+#   R2Prob: {1:1.0, 3:1.0, 4:0.0, 6:0.0, 2/5/7:0.0}
+#   F2N:  {1:2, 2:1, 3:1}
+#   F2CV: {1:0, 2:1, 3:1}
+#   F2Prob: {1:0.0, 2:1.0, 3:1.0}
+# ---------------------------------------------------------------------------
+class TestMarginalProbabilityAttributes:
+    def test_r2n_known_values(self, scorer_fitted):
+        assert scorer_fitted.R2N[1] == pytest.approx(1.0)
+        assert scorer_fitted.R2N[3] == pytest.approx(1.0)
+        assert scorer_fitted.R2N[4] == pytest.approx(1.0)
+        assert scorer_fitted.R2N[6] == pytest.approx(1.0)
+        assert scorer_fitted.R2N[2] == pytest.approx(0.0)
+
+    def test_r2cv_known_values(self, scorer_fitted):
+        assert scorer_fitted.R2CV[1] == pytest.approx(1.0)
+        assert scorer_fitted.R2CV[3] == pytest.approx(1.0)
+        assert scorer_fitted.R2CV[4] == pytest.approx(0.0)
+        assert scorer_fitted.R2CV[6] == pytest.approx(0.0)
+
+    def test_r2prob_known_values(self, scorer_fitted):
+        assert scorer_fitted.R2Prob[1] == pytest.approx(1.0)
+        assert scorer_fitted.R2Prob[3] == pytest.approx(1.0)
+        assert scorer_fitted.R2Prob[4] == pytest.approx(0.0)
+        assert scorer_fitted.R2Prob[6] == pytest.approx(0.0)
+
+    def test_r2n_keys_match_r(self, scorer_fitted):
+        assert set(scorer_fitted.R2N.keys()) == set(scorer_fitted.R)
+
+    def test_f2n_known_values(self, scorer_fitted):
+        assert scorer_fitted.F2N[1] == pytest.approx(2.0)
+        assert scorer_fitted.F2N[2] == pytest.approx(1.0)
+        assert scorer_fitted.F2N[3] == pytest.approx(1.0)
+
+    def test_f2cv_known_values(self, scorer_fitted):
+        assert scorer_fitted.F2CV[1] == pytest.approx(0.0)
+        assert scorer_fitted.F2CV[2] == pytest.approx(1.0)
+        assert scorer_fitted.F2CV[3] == pytest.approx(1.0)
+
+    def test_f2prob_known_values(self, scorer_fitted):
+        assert scorer_fitted.F2Prob[1] == pytest.approx(0.0)
+        assert scorer_fitted.F2Prob[2] == pytest.approx(1.0)
+        assert scorer_fitted.F2Prob[3] == pytest.approx(1.0)
+
+    def test_f2n_keys_match_f(self, scorer_fitted):
+        assert set(scorer_fitted.F2N.keys()) == set(scorer_fitted.F)
+
+    def test_recency_probability_is_dataframe(self, scorer_fitted):
+        df = scorer_fitted.recency_probability_
+        assert isinstance(df, pd.DataFrame)
+        assert set(df.columns) == {"recency", "N", "cv", "probability"}
+
+    def test_recency_probability_row_count(self, scorer_fitted):
+        assert len(scorer_fitted.recency_probability_) == _RECENCY_LIMIT
+
+    def test_frequency_probability_is_dataframe(self, scorer_fitted):
+        df = scorer_fitted.frequency_probability_
+        assert isinstance(df, pd.DataFrame)
+        assert set(df.columns) == {"frequency", "N", "cv", "probability"}
+
+    def test_frequency_probability_row_count(self, scorer_fitted):
+        assert len(scorer_fitted.frequency_probability_) == _FREQUENCY_LIMIT
+
+    def test_r2n_f2n_sum_equals_record_num_target(self, scorer_fitted):
+        # R2N の合計 == F2N の合計 == 分析対象レコード数
+        assert sum(scorer_fitted.R2N.values()) == pytest.approx(scorer_fitted.record_num_target)
+        assert sum(scorer_fitted.F2N.values()) == pytest.approx(scorer_fitted.record_num_target)
+
+
+# ---------------------------------------------------------------------------
+# plot_marginal_probability
+# ---------------------------------------------------------------------------
+class TestPlotMarginalProbability:
+    @pytest.fixture(autouse=True)
+    def close_figures(self):
+        import matplotlib.pyplot as plt
+
+        yield
+        plt.close("all")
+
+    def test_before_fit_raises(self, scorer):
+        with pytest.raises(RuntimeError, match="fit"):
+            scorer.plot_marginal_probability()
+
+    def test_invalid_axis_raises(self, scorer_fitted):
+        with pytest.raises(ValueError, match="axis"):
+            scorer_fitted.plot_marginal_probability(axis="invalid")
+
+    def test_returns_figure_recency(self, scorer_fitted):
+        import matplotlib.figure
+
+        fig = scorer_fitted.plot_marginal_probability(axis="recency")
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_returns_figure_frequency(self, scorer_fitted):
+        import matplotlib.figure
+
+        fig = scorer_fitted.plot_marginal_probability(axis="frequency")
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_figsize_applied(self, scorer_fitted):
+        fig = scorer_fitted.plot_marginal_probability(figsize=(4, 3))
+        assert tuple(fig.get_size_inches()) == (4, 3)
+
+    def test_title_shown_when_set(self, scorer_fitted):
+        fig = scorer_fitted.plot_marginal_probability(title="My Title")
+        ax = fig.axes[0]
+        assert ax.get_title() == "My Title"
+
+    def test_title_empty_when_none(self, scorer_fitted):
+        fig = scorer_fitted.plot_marginal_probability(title=None)
+        ax = fig.axes[0]
+        assert ax.get_title() == ""
+
+    def test_fontsize_applied_to_labels(self, scorer_fitted):
+        fig = scorer_fitted.plot_marginal_probability(fontsize=16)
+        ax = fig.axes[0]
+        assert ax.xaxis.label.get_size() == 16
+        assert ax.yaxis.label.get_size() == 16

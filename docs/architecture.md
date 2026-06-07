@@ -7,7 +7,13 @@
 | `pandas` | データ操作・集計・出力形式 |
 | `cvxpy` | 凸2次計画問題のソルバー |
 | `numpy` | `plot_probability_surface()` 内のグリッド生成（遅延インポート） |
-| `matplotlib` | `plot_probability_surface()` 内の3次元ワイヤーフレーム描画・`Figure` 返却（遅延インポート） |
+| `matplotlib` | `plot_probability_surface()` / `plot_marginal_probability()` 内の描画・`Figure` 返却（遅延インポート） |
+
+オプション依存 (`pip install rfscorer[ja]`):
+
+| ライブラリ | 用途 |
+|-----------|------|
+| `japanize-matplotlib` | 軸ラベル・タイトルへの日本語使用（`plot_probability_surface()` / `plot_marginal_probability()`） |
 
 開発依存:
 

@@ -36,6 +36,9 @@ dependencies = [
 [project.urls]
 Repository = "https://github.com/jiro-iwanaga/rfscorer"
 
+[project.optional-dependencies]
+ja = ["japanize-matplotlib"]
+
 [dependency-groups]
 dev = [
     "ipykernel>=7.2.0",

@@ -47,6 +47,12 @@ class RecencyFrequencyScorer:
         self.RF2N = {}  # 最新度と頻度に対して閲覧数合計を紐づける辞書
         self.RF2CV = {}  # 最新度と頻度に対して再閲覧数合計を紐づける辞書
         self.RF2Prob = {}  # 最新度と頻度に対して経験的再閲覧確率を紐づける辞書
+        self.R2N = {}  # 最新度に対して閲覧数合計を紐づける辞書
+        self.R2CV = {}  # 最新度に対して再閲覧数合計を紐づける辞書
+        self.R2Prob = {}  # 最新度に対して経験的再閲覧確率を紐づける辞書
+        self.F2N = {}  # 頻度に対して閲覧数合計を紐づける辞書
+        self.F2CV = {}  # 頻度に対して再閲覧数合計を紐づける辞書
+        self.F2Prob = {}  # 頻度に対して経験的再閲覧確率を紐づける辞書
 
         # empirical
         self.empirical_probability_ = None  # 経験的再閲覧確率データフレーム(縦持ち)
@@ -54,6 +60,8 @@ class RecencyFrequencyScorer:
         self.empirical_probability_dict_ = (
             None  # 経験的再閲覧確率データフレーム(辞書:キーは最新度と頻度のペア)
         )
+        self.recency_probability_ = None  # 最新度別経験的再閲覧確率データフレーム
+        self.frequency_probability_ = None  # 頻度別経験的再閲覧確率データフレーム
 
         # mono
         self.mono_probability_ = None
@@ -351,6 +359,22 @@ class RecencyFrequencyScorer:
             values="probability",
         )
 
+        # 最新度別の集約
+        df_r = self.empirical_probability_.groupby("recency")[["N", "cv"]].sum().reset_index()
+        df_r["probability"] = (df_r["cv"] / df_r["N"]).where(df_r["N"] > 0, 0.0)
+        self.recency_probability_ = df_r
+        self.R2N = dict(zip(df_r["recency"], df_r["N"]))
+        self.R2CV = dict(zip(df_r["recency"], df_r["cv"]))
+        self.R2Prob = dict(zip(df_r["recency"], df_r["probability"]))
+
+        # 頻度別の集約
+        df_f = self.empirical_probability_.groupby("frequency")[["N", "cv"]].sum().reset_index()
+        df_f["probability"] = (df_f["cv"] / df_f["N"]).where(df_f["N"] > 0, 0.0)
+        self.frequency_probability_ = df_f
+        self.F2N = dict(zip(df_f["frequency"], df_f["N"]))
+        self.F2CV = dict(zip(df_f["frequency"], df_f["cv"]))
+        self.F2Prob = dict(zip(df_f["frequency"], df_f["probability"]))
+
         return self
 
     def show(self):
@@ -397,7 +421,16 @@ class RecencyFrequencyScorer:
             print("empirical_probability_table_:")
             print(self.empirical_probability_table_.round(3).to_string())
 
-    def plot_probability_surface(self, kind="empirical"):
+    def plot_probability_surface(
+        self,
+        kind="empirical",
+        title=None,
+        figsize=(6, 5),
+        fontsize=12,
+        recency_label="recency",
+        frequency_label="frequency",
+        probability_label="probability",
+    ):
         """Plot revisit probabilities as a 3D surface.
 
         Visualizes the probability table as a 3D wireframe with recency on
@@ -412,6 +445,22 @@ class RecencyFrequencyScorer:
         kind : {"empirical", "mono", "mcc"}, default "empirical"
             Which probability to visualize. "empirical" uses fit() or
             fit_period() results; "mono" and "mcc" use optimize() results.
+        title : str or None, default None
+            Figure title. If None, no title is shown.
+        figsize : tuple[float, float], default (6, 5)
+            Figure size in inches as (width, height). For publication, set this
+            to the final printed size (e.g., (3.5, 3.0) for a single-column
+            figure in a two-column journal).
+        fontsize : int, default 12
+            Font size for axis labels and tick labels. For publication, match
+            this to the body text size of the target journal (typically 8–10 pt)
+            and set figsize to the final printed size so the font is not scaled.
+        recency_label : str, default "recency"
+            Label for the x-axis (recency dimension).
+        frequency_label : str, default "frequency"
+            Label for the y-axis (frequency dimension).
+        probability_label : str, default "probability"
+            Label for the z-axis (probability dimension).
 
         Returns
         -------
@@ -445,15 +494,87 @@ class RecencyFrequencyScorer:
         X, Y = np.meshgrid(recency, frequency)
         Z = table.values.T
 
-        fig = plt.figure()
-        ax = fig.add_subplot(
-            111,
-            projection="3d",
-            xlabel="recency",
-            ylabel="frequency",
-            zlabel="probability",
+        fig = plt.figure(figsize=figsize)
+        ax = fig.add_subplot(111, projection="3d")
+        ax.plot_wireframe(X, Y, Z, color="black")
+        ax.set_xlabel(recency_label, fontsize=fontsize)
+        ax.set_ylabel(frequency_label, fontsize=fontsize)
+        ax.set_zlabel(probability_label, fontsize=fontsize, labelpad=10)
+        ax.tick_params(labelsize=fontsize)
+        for pane in (ax.xaxis.pane, ax.yaxis.pane, ax.zaxis.pane):
+            pane.fill = False
+        if title is not None:
+            ax.set_title(title, fontsize=fontsize)
+        return fig
+
+    def plot_marginal_probability(
+        self,
+        axis="recency",
+        title=None,
+        figsize=(5, 4),
+        fontsize=12,
+        xlabel=None,
+        probability_label="probability",
+    ):
+        """Plot empirical revisit probability aggregated along one RF dimension.
+
+        Visualizes R2Prob (when axis='recency') or F2Prob (when axis='frequency')
+        as a line chart with markers. Use this to verify monotonicity in each
+        RF signal before running optimize().
+
+        In Jupyter Lab / Colab the returned figure renders inline automatically.
+        To save to a file, call ``fig.savefig("output.png")`` on the returned figure.
+
+        Parameters
+        ----------
+        axis : {"recency", "frequency"}, default "recency"
+            Which dimension to aggregate and plot.
+            "recency" plots probability vs recency rank (expected: decreasing).
+            "frequency" plots probability vs frequency (expected: increasing).
+        title : str or None, default None
+            Figure title. If None, no title is shown.
+        figsize : tuple[float, float], default (5, 4)
+            Figure size in inches as (width, height). For publication, set this
+            to the final printed size (e.g., (3.5, 2.8) for a single-column
+            figure in a two-column journal).
+        fontsize : int, default 12
+            Font size for axis labels and tick labels. For publication, match
+            this to the body text size of the target journal (typically 8–10 pt)
+            and set figsize to the final printed size so the font is not scaled.
+        xlabel : str or None, default None
+            Label for the x-axis. If None, defaults to the value of axis
+            ("recency" or "frequency").
+        probability_label : str, default "probability"
+            Label for the y-axis (probability dimension).
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+        """
+        import matplotlib.pyplot as plt
+
+        if axis not in ("recency", "frequency"):
+            raise ValueError(f"axis must be 'recency' or 'frequency', got {axis!r}.")
+        if self.recency_probability_ is None:
+            raise RuntimeError("fit() must be called before plot_marginal_probability().")
+
+        if axis == "recency":
+            df = self.recency_probability_
+            x_col = "recency"
+        else:
+            df = self.frequency_probability_
+            x_col = "frequency"
+
+        fig, ax = plt.subplots(figsize=figsize)
+        ax.plot(
+            df[x_col], df["probability"], color="black", marker="o", linewidth=1.5, markersize=6
         )
-        ax.plot_wireframe(X, Y, Z)
+        ax.set_xlabel(xlabel if xlabel is not None else x_col, fontsize=fontsize)
+        ax.set_ylabel(probability_label, fontsize=fontsize)
+        ax.tick_params(labelsize=fontsize)
+        if title is not None:
+            ax.set_title(title, fontsize=fontsize)
+        fig.tight_layout()
         return fig
 
     def export_probability_csv(self, kind="empirical", path=None):
@@ -833,6 +954,8 @@ if __name__ == "__main__":
     target_date = "2015-07-07"
     scorer.fit(df_train, target_date)
     scorer.plot_probability_surface("empirical").savefig("surface_empirical_probability.png")
+    scorer.plot_marginal_probability("recency").savefig("marginal_recency_probability.png")
+    scorer.plot_marginal_probability("frequency").savefig("marginal_frequency_probability.png")
     scorer.show()
 
     # 最適化(Mono)
