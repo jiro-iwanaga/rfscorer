@@ -165,30 +165,43 @@ RF 制約を満たす最適化再閲覧確率を推定する。`fit()` または
 
 戻り値: なし
 
-##### `plot_probability_surface(kind="empirical")`
+##### `plot_probability_surface(kind="empirical", title=None, figsize=(6, 5), fontsize=12, recency_label="recency", frequency_label="frequency", probability_label="probability")`
 
 再閲覧確率を3次元ワイヤーフレームで可視化し、`matplotlib.figure.Figure` を返す。
 
 Jupyter Lab / Colab では返り値がそのままインライン描画される。
 ファイルに保存する場合は `fig.savefig("output.png")` を呼ぶ。
+日本語軸ラベルを使用する場合は `pip install rfscorer[ja]` で `japanize-matplotlib` を導入する。
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
 | `kind` | `str` | `"empirical"` | `"empirical"`・`"mono"`・`"mcc"` のいずれか |
+| `title` | `str \| None` | `None` | 図のタイトル。`None` の場合は表示しない |
+| `figsize` | `tuple[float, float]` | `(6, 5)` | 図のサイズ（インチ）。論文用途では最終印刷サイズに合わせる |
+| `fontsize` | `int` | `12` | 軸ラベル・目盛りのフォントサイズ。論文用途では対象ジャーナルの本文サイズ（通常 8〜10 pt）に合わせる |
+| `recency_label` | `str` | `"recency"` | x 軸（最新度）のラベル |
+| `frequency_label` | `str` | `"frequency"` | y 軸（頻度）のラベル |
+| `probability_label` | `str` | `"probability"` | z 軸（確率）のラベル |
 
 戻り値: `matplotlib.figure.Figure`
 
-##### `plot_marginal_probability(axis="recency")`
+##### `plot_marginal_probability(axis="recency", title=None, figsize=(5, 4), fontsize=12, xlabel=None, probability_label="probability")`
 
 最新度または頻度の一方向に集約した周辺的経験的再閲覧確率を折れ線グラフで可視化し、`matplotlib.figure.Figure` を返す。
 `optimize()` 前に単調性を確認する用途に使用する。
 
 Jupyter Lab / Colab では返り値がそのままインライン描画される。
 ファイルに保存する場合は `fig.savefig("output.png")` を呼ぶ。
+日本語軸ラベルを使用する場合は `pip install rfscorer[ja]` で `japanize-matplotlib` を導入する。
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
 | `axis` | `str` | `"recency"` | `"recency"`（最新度方向）または `"frequency"`（頻度方向） |
+| `title` | `str \| None` | `None` | 図のタイトル。`None` の場合は表示しない |
+| `figsize` | `tuple[float, float]` | `(5, 4)` | 図のサイズ（インチ）。論文用途では最終印刷サイズに合わせる |
+| `fontsize` | `int` | `12` | 軸ラベル・目盛りのフォントサイズ。論文用途では対象ジャーナルの本文サイズ（通常 8〜10 pt）に合わせる |
+| `xlabel` | `str \| None` | `None` | x 軸のラベル。`None` の場合は `axis` の値（`"recency"` または `"frequency"`）を使用 |
+| `probability_label` | `str` | `"probability"` | y 軸（確率）のラベル |
 
 戻り値: `matplotlib.figure.Figure`
 
