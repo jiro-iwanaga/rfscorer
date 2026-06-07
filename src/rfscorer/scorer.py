@@ -1106,12 +1106,12 @@ class RecencyFrequencyScorer:
         "empirical": "emp",
         "empirical_recency": "er",
         "empirical_frequency": "ef",
-        "monotone": "mono",
-        "monotone_recency": "mr",
-        "monotone_frequency": "mf",
-        "monotone_recency_convex": "mrc",
-        "monotone_frequency_concave": "mfc",
-        "monotone_convex_concave": "mcc",
+        "monotonic": "mono",
+        "monotonic_recency": "mr",
+        "monotonic_frequency": "mf",
+        "monotonic_recency_convex": "mrc",
+        "monotonic_frequency_concave": "mfc",
+        "monotonic_convex_concave": "mcc",
     }
 
     def _normalize_kind(self, kind):

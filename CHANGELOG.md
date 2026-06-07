@@ -12,10 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `optimize(kind='mr')`: new 1-D optimization model for the recency axis.
-  Enforces monotone decreasing + convex constraints on the marginal recency probability R2Prob,
+  Enforces monotonically decreasing + convex constraints on the marginal recency probability R2Prob,
   then broadcasts the result across all frequency values.
 - `optimize(kind='mf')`: new 1-D optimization model for the frequency axis.
-  Enforces monotone increasing + concave constraints on the marginal frequency probability F2Prob,
+  Enforces monotonically increasing + concave constraints on the marginal frequency probability F2Prob,
   then broadcasts the result across all recency values.
 - `er` model: empirical recency marginal probability (R2Prob) broadcast to the full RF grid.
   Computed automatically inside `fit()` / `fit_period()`; no extra call needed.
@@ -36,12 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   | `empirical` | `emp` |
   | `empirical_recency` | `er` |
   | `empirical_frequency` | `ef` |
-  | `monotone` | `mono` |
-  | `monotone_recency` | `mr` |
-  | `monotone_frequency` | `mf` |
-  | `monotone_recency_convex` | `mrc` |
-  | `monotone_frequency_concave` | `mfc` |
-  | `monotone_convex_concave` | `mcc` |
+  | `monotonic` | `mono` |
+  | `monotonic_recency` | `mr` |
+  | `monotonic_frequency` | `mf` |
+  | `monotonic_recency_convex` | `mrc` |
+  | `monotonic_frequency_concave` | `mfc` |
+  | `monotonic_convex_concave` | `mcc` |
 
 - `plot_marginal_probability()` now accepts a `kind` parameter (`"emp"`, `"mr"`, `"mf"`, `"all"`).
   `kind="all"` overlays the empirical and optimized 1-D series on the same axes

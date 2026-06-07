@@ -74,12 +74,12 @@ RF スコアリング手法を Python パッケージとして PyPI に公開し
 | `emp` | `empirical` |
 | `er` | `empirical_recency` |
 | `ef` | `empirical_frequency` |
-| `mono` | `monotone` |
-| `mr` | `monotone_recency` |
-| `mf` | `monotone_frequency` |
-| `mrc` | `monotone_recency_convex` |
-| `mfc` | `monotone_frequency_concave` |
-| `mcc` | `monotone_convex_concave` |
+| `mono` | `monotonic` |
+| `mr` | `monotonic_recency` |
+| `mf` | `monotonic_frequency` |
+| `mrc` | `monotonic_recency_convex` |
+| `mfc` | `monotonic_frequency_concave` |
+| `mcc` | `monotonic_convex_concave` |
 
 ### API
 

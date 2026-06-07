@@ -81,7 +81,7 @@ $$\sum_{r\in R, f\in F} N_{r,f} \cdot(p_{r,f} - x_{r,f})^2$$
 
 周辺確率 $p_r$・$p_f$ を目標として1次元で最適化し、結果を RF グリッド全体にブロードキャストする。
 
-- **`mr`**（Monotone Recency）: $r$ 方向の単調性と凸性を同時に制約。
+- **`mr`**（Monotonic Recency）: $r$ 方向の単調性と凸性を同時に制約。
   - 変数: $x_r\ (r \in R)$
   - 単調性: $x_{r_k} \geq x_{r_{k+1}} + \varepsilon$（隣接する $r_k < r_{k+1}$）
   - 凸性: $x_r - 2x_{r+1} + x_{r+2} \geq 0$
@@ -89,7 +89,7 @@ $$\sum_{r\in R, f\in F} N_{r,f} \cdot(p_{r,f} - x_{r,f})^2$$
   - ブロードキャスト: $x_{r,f} = x_r\ (f \in F)$
   - $\varepsilon$ の上限: $\max(p_r) / (\lvert R\rvert - 1)$
 
-- **`mf`**（Monotone Frequency）: $f$ 方向の単調性と凹性を同時に制約。
+- **`mf`**（Monotonic Frequency）: $f$ 方向の単調性と凹性を同時に制約。
   - 変数: $x_f\ (f \in F)$
   - 単調性: $x_{f_k} + \varepsilon \leq x_{f_{k+1}}$（隣接する $f_k < f_{k+1}$）
   - 凹性: $x_f - 2x_{f+1} + x_{f+2} \leq 0$
