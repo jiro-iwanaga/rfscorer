@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-06-07
+
+### Added
+
+- `optimize(kind='mr')`: new 1-D optimization model for the recency axis.
+  Enforces monotone decreasing + convex constraints on the marginal recency probability R2Prob,
+  then broadcasts the result across all frequency values.
+- `optimize(kind='mf')`: new 1-D optimization model for the frequency axis.
+  Enforces monotone increasing + concave constraints on the marginal frequency probability F2Prob,
+  then broadcasts the result across all recency values.
+- `er` model: empirical recency marginal probability (R2Prob) broadcast to the full RF grid.
+  Computed automatically inside `fit()` / `fit_period()`; no extra call needed.
+- `ef` model: empirical frequency marginal probability (F2Prob) broadcast to the full RF grid.
+  Computed automatically inside `fit()` / `fit_period()`; no extra call needed.
+- Corresponding attributes populated by `optimize(kind='mr')`:
+  `mr_probability_`, `mr_probability_table_`, `mr_probability_dict_`
+- Corresponding attributes populated by `optimize(kind='mf')`:
+  `mf_probability_`, `mf_probability_table_`, `mf_probability_dict_`
+- Corresponding attributes populated by `fit()` / `fit_period()`:
+  `er_probability_`, `er_probability_table_`, `er_probability_dict_`,
+  `ef_probability_`, `ef_probability_table_`, `ef_probability_dict_`
+- Kind alias system: long descriptive names are accepted everywhere and normalized to their
+  canonical short forms via `_normalize_kind()`.
+
+  | Alias | Canonical |
+  |---|---|
+  | `empirical` | `emp` |
+  | `empirical_recency` | `er` |
+  | `empirical_frequency` | `ef` |
+  | `monotone` | `mono` |
+  | `monotone_recency` | `mr` |
+  | `monotone_frequency` | `mf` |
+  | `monotone_recency_convex` | `mrc` |
+  | `monotone_frequency_concave` | `mfc` |
+  | `monotone_convex_concave` | `mcc` |
+
+- `plot_marginal_probability()` now accepts a `kind` parameter (`"emp"`, `"mr"`, `"mf"`, `"all"`).
+  `kind="all"` overlays the empirical and optimized 1-D series on the same axes
+  (solid line for `emp`, dashed line for `mr` / `mf`).
+
+### Changed
+
+- Internal canonical kind name changed from `"empirical"` to `"emp"` for consistency with all other
+  short-form kind names (`mono`, `mr`, `mf`, `mrc`, `mfc`, `mcc`).
+  The string `"empirical"` continues to work as an alias.
+- `plot_marginal_probability()`: replaced `xlabel` parameter with `recency_label` / `frequency_label`
+  to match the naming convention of `plot_probability_surface()`.
+- `img/surface_empirical_probability.png` renamed to `img/surface_emp_probability.png`.
+- `export_probability_csv(kind='all')` now outputs all nine models:
+  `emp`, `er`, `ef`, `mono`, `mr`, `mf`, `mrc`, `mfc`, `mcc`.
+
+## [0.2.7] - 2026-06-07
+
 ### Added
 
 - `optimize(kind='mrc')`: new optimization model applying monotonicity + recency convexity constraint.
