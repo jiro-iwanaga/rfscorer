@@ -421,7 +421,16 @@ class RecencyFrequencyScorer:
             print("empirical_probability_table_:")
             print(self.empirical_probability_table_.round(3).to_string())
 
-    def plot_probability_surface(self, kind="empirical", title=None, figsize=(6, 5), fontsize=12):
+    def plot_probability_surface(
+        self,
+        kind="empirical",
+        title=None,
+        figsize=(6, 5),
+        fontsize=12,
+        recency_label="recency",
+        frequency_label="frequency",
+        probability_label="probability",
+    ):
         """Plot revisit probabilities as a 3D surface.
 
         Visualizes the probability table as a 3D wireframe with recency on
@@ -446,6 +455,12 @@ class RecencyFrequencyScorer:
             Font size for axis labels and tick labels. For publication, match
             this to the body text size of the target journal (typically 8–10 pt)
             and set figsize to the final printed size so the font is not scaled.
+        recency_label : str, default "recency"
+            Label for the x-axis (recency dimension).
+        frequency_label : str, default "frequency"
+            Label for the y-axis (frequency dimension).
+        probability_label : str, default "probability"
+            Label for the z-axis (probability dimension).
 
         Returns
         -------
@@ -482,9 +497,9 @@ class RecencyFrequencyScorer:
         fig = plt.figure(figsize=figsize)
         ax = fig.add_subplot(111, projection="3d")
         ax.plot_wireframe(X, Y, Z, color="black")
-        ax.set_xlabel("recency", fontsize=fontsize)
-        ax.set_ylabel("frequency", fontsize=fontsize)
-        ax.set_zlabel("probability", fontsize=fontsize)
+        ax.set_xlabel(recency_label, fontsize=fontsize)
+        ax.set_ylabel(frequency_label, fontsize=fontsize)
+        ax.set_zlabel(probability_label, fontsize=fontsize, labelpad=10)
         ax.tick_params(labelsize=fontsize)
         for pane in (ax.xaxis.pane, ax.yaxis.pane, ax.zaxis.pane):
             pane.fill = False
@@ -492,7 +507,15 @@ class RecencyFrequencyScorer:
             ax.set_title(title, fontsize=fontsize)
         return fig
 
-    def plot_marginal_probability(self, axis="recency", title=None, figsize=(5, 4), fontsize=12):
+    def plot_marginal_probability(
+        self,
+        axis="recency",
+        title=None,
+        figsize=(5, 4),
+        fontsize=12,
+        xlabel=None,
+        probability_label="probability",
+    ):
         """Plot empirical revisit probability aggregated along one RF dimension.
 
         Visualizes R2Prob (when axis='recency') or F2Prob (when axis='frequency')
@@ -518,6 +541,11 @@ class RecencyFrequencyScorer:
             Font size for axis labels and tick labels. For publication, match
             this to the body text size of the target journal (typically 8–10 pt)
             and set figsize to the final printed size so the font is not scaled.
+        xlabel : str or None, default None
+            Label for the x-axis. If None, defaults to the value of axis
+            ("recency" or "frequency").
+        probability_label : str, default "probability"
+            Label for the y-axis (probability dimension).
 
         Returns
         -------
@@ -541,8 +569,8 @@ class RecencyFrequencyScorer:
         ax.plot(
             df[x_col], df["probability"], color="black", marker="o", linewidth=1.5, markersize=6
         )
-        ax.set_xlabel(x_col, fontsize=fontsize)
-        ax.set_ylabel("probability", fontsize=fontsize)
+        ax.set_xlabel(xlabel if xlabel is not None else x_col, fontsize=fontsize)
+        ax.set_ylabel(probability_label, fontsize=fontsize)
         ax.tick_params(labelsize=fontsize)
         if title is not None:
             ax.set_title(title, fontsize=fontsize)
