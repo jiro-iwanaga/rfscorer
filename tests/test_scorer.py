@@ -713,6 +713,88 @@ class TestOptimize:
         for val in scorer_optimized_mcc.mcc_probability_dict_.values():
             assert -tol <= val <= 1 + tol
 
+    # --- eps ---
+
+    def test_optimize_eps_negative_raises(self, scorer, df):
+        scorer.fit_period(
+            df,
+            _OBS_PERIOD,
+            _EVAL_PERIOD,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        with pytest.raises(ValueError, match="eps"):
+            scorer.optimize(kind="mono", eps=-1e-6)
+
+    def test_optimize_eps_too_large_mono_raises(self, scorer, df):
+        # eps_max(2D) = max(RF2Prob) / min(nr-1, nf-1) = 1.0 / min(6, 2) = 0.5
+        scorer.fit_period(
+            df,
+            _OBS_PERIOD,
+            _EVAL_PERIOD,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        with pytest.raises(ValueError, match="eps"):
+            scorer.optimize(kind="mono", eps=0.5 + 1e-9)
+
+    def test_optimize_eps_too_large_mr_raises(self, scorer, df):
+        # eps_max(mr) = max(R2Prob) / (nr - 1) = 1.0 / 6 ≈ 0.1667
+        scorer.fit_period(
+            df,
+            _OBS_PERIOD,
+            _EVAL_PERIOD,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        with pytest.raises(ValueError, match="eps"):
+            scorer.optimize(kind="mr", eps=1.0 / 6 + 1e-9)
+
+    def test_optimize_eps_too_large_mf_raises(self, scorer, df):
+        # eps_max(mf) = max(F2Prob) / (nf - 1) = 1.0 / 2 = 0.5
+        scorer.fit_period(
+            df,
+            _OBS_PERIOD,
+            _EVAL_PERIOD,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        with pytest.raises(ValueError, match="eps"):
+            scorer.optimize(kind="mf", eps=0.5 + 1e-9)
+
+    def test_optimize_with_eps_mono_produces_results(self, scorer, df):
+        scorer.fit_period(
+            df,
+            _OBS_PERIOD,
+            _EVAL_PERIOD,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        scorer.optimize(kind="mono", eps=1e-4)
+        assert scorer.mono_probability_dict_ is not None
+
+    def test_optimize_with_eps_mr_produces_results(self, scorer, df):
+        scorer.fit_period(
+            df,
+            _OBS_PERIOD,
+            _EVAL_PERIOD,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        scorer.optimize(kind="mr", eps=1e-4)
+        assert scorer.mr_probability_dict_ is not None
+
+    def test_optimize_with_eps_mf_produces_results(self, scorer, df):
+        scorer.fit_period(
+            df,
+            _OBS_PERIOD,
+            _EVAL_PERIOD,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        scorer.optimize(kind="mf", eps=1e-4)
+        assert scorer.mf_probability_dict_ is not None
+
 
 # ---------------------------------------------------------------------------
 # predict

@@ -49,6 +49,7 @@ RF スコアリング手法を Python パッケージとして PyPI に公開し
 | 周辺的経験的再閲覧確率の推定（`er` / `ef`） | `fit()` 時に自動計算。最新度方向（`er`）・頻度方向（`ef`）の周辺確率を RF グリッド全体にブロードキャストした確率面 |
 | 1次元最適化再閲覧確率の推定（`mr` / `mf`） | 周辺確率を目標とした1次元の凸2次計画問題を解く。`mr` は Recency 単調性 + 凸性、`mf` は Frequency 単調性 + 凹性を制約として課す。結果を RF グリッド全体にブロードキャスト |
 | 2次元最適化再閲覧確率の推定（`mono` / `mrc` / `mfc` / `mcc`） | RF 制約と最小二乗誤差を目的関数にもつ凸2次計画問題を解いて推定する。制約の組み合わせにより `mono`（単調性のみ）・`mrc`（+ Recency 凸性）・`mfc`（+ Frequency 凹性）・`mcc`（+ 両凹凸性）の4モデルを提供する |
+| 狭義単調性（`eps` パラメータ） | `optimize(eps=ε)` に正の値を指定すると、隣接する最新度・頻度の確率値が必ず $\varepsilon$ 以上離れる狭義単調性制約を付与する。デフォルト（`eps=0.0`）は従来の弱単調性と等価 |
 
 ### 出力
 
@@ -94,17 +95,20 @@ df_emp = scorer.empirical_probability_  # 経験的確率（2次元）
 df_er  = scorer.er_probability_         # 経験的 Recency 周辺（fit 時に自動計算）
 df_ef  = scorer.ef_probability_         # 経験的 Frequency 周辺（fit 時に自動計算）
 
-scorer.optimize(kind="mr")   # 1次元: Recency 単調性 + 凸性
+scorer.optimize(kind="mr")             # 1次元: Recency 単調性 + 凸性（弱単調性）
 df_mr = scorer.mr_probability_
 
-scorer.optimize(kind="mf")   # 1次元: Frequency 単調性 + 凹性
+scorer.optimize(kind="mf")             # 1次元: Frequency 単調性 + 凹性（弱単調性）
 df_mf = scorer.mf_probability_
 
-scorer.optimize(kind="mono")
+scorer.optimize(kind="mono")           # 2次元: 単調性のみ（弱単調性）
 df_mono = scorer.mono_probability_
 
-scorer.optimize(kind="mcc")
+scorer.optimize(kind="mcc")            # 2次元: 単調性 + 両凹凸性
 df_mcc = scorer.mcc_probability_
+
+scorer.optimize(kind="mono", eps=1e-4) # 狭義単調性: 隣接値の差を 1e-4 以上に保証
+df_mono_strict = scorer.mono_probability_
 ```
 
 ## 非機能要求
