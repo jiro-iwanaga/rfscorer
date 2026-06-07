@@ -54,6 +54,26 @@ def opt_solved_mono():
 
 
 @pytest.fixture(scope="module")
+def opt_solved_mrc():
+    o = RFOptimizer()
+    o.set_data(_R, _F, _RF2N, _RF2Prob)
+    o.build_model(kind="mrc")
+    o.solve()
+    o.postprocess()
+    return o
+
+
+@pytest.fixture(scope="module")
+def opt_solved_mfc():
+    o = RFOptimizer()
+    o.set_data(_R, _F, _RF2N, _RF2Prob)
+    o.build_model(kind="mfc")
+    o.solve()
+    o.postprocess()
+    return o
+
+
+@pytest.fixture(scope="module")
 def opt_solved_mcc():
     o = RFOptimizer()
     o.set_data(_R, _F, _RF2N, _RF2Prob)
@@ -155,7 +175,7 @@ class TestSetData:
 # ---------------------------------------------------------------------------
 class TestBuildModel:
     def test_invalid_kind_raises(self, opt_with_data):
-        with pytest.raises(ValueError, match="kind must be"):
+        with pytest.raises(ValueError, match="kind must be 'mono', 'mrc', 'mfc', or 'mcc'"):
             opt_with_data.build_model(kind="invalid")
 
     def test_before_set_data_raises(self, opt):
@@ -165,6 +185,14 @@ class TestBuildModel:
     def test_sets_kind_mono(self, opt_with_data):
         opt_with_data.build_model(kind="mono")
         assert opt_with_data.kind == "mono"
+
+    def test_sets_kind_mrc(self, opt_with_data):
+        opt_with_data.build_model(kind="mrc")
+        assert opt_with_data.kind == "mrc"
+
+    def test_sets_kind_mfc(self, opt_with_data):
+        opt_with_data.build_model(kind="mfc")
+        assert opt_with_data.kind == "mfc"
 
     def test_sets_kind_mcc(self, opt_with_data):
         opt_with_data.build_model(kind="mcc")
@@ -179,6 +207,16 @@ class TestBuildModel:
         opt_with_data.build_model(kind="mono")
         # 範囲: 9+9=18、Recency: (3-1)*3=6、Frequency: 3*(3-1)=6 → 合計 30
         assert opt_with_data.num_constraints == 30
+
+    def test_num_constraints_mrc(self, opt_with_data):
+        opt_with_data.build_model(kind="mrc")
+        # mono 30 + Recency凸性: (3-2)*3=3 → 合計 33
+        assert opt_with_data.num_constraints == 33
+
+    def test_num_constraints_mfc(self, opt_with_data):
+        opt_with_data.build_model(kind="mfc")
+        # mono 30 + Frequency凹性: 3*(3-2)=3 → 合計 33
+        assert opt_with_data.num_constraints == 33
 
     def test_num_constraints_mcc(self, opt_with_data):
         opt_with_data.build_model(kind="mcc")
@@ -261,6 +299,62 @@ class TestMonoConstraints:
             for j in range(len(_F) - 1):
                 f, f_next = _F[j], _F[j + 1]
                 assert opt_solved_mono.RF2X[r, f] <= opt_solved_mono.RF2X[r, f_next] + _TOL
+
+
+# ---------------------------------------------------------------------------
+# 制約充足: mrc
+# ---------------------------------------------------------------------------
+class TestMRCConstraints:
+    def test_recency_monotonicity(self, opt_solved_mrc):
+        for f in _F:
+            for i in range(len(_R) - 1):
+                r, r_next = _R[i], _R[i + 1]
+                assert opt_solved_mrc.RF2X[r, f] >= opt_solved_mrc.RF2X[r_next, f] - _TOL
+
+    def test_frequency_monotonicity(self, opt_solved_mrc):
+        for r in _R:
+            for j in range(len(_F) - 1):
+                f, f_next = _F[j], _F[j + 1]
+                assert opt_solved_mrc.RF2X[r, f] <= opt_solved_mrc.RF2X[r, f_next] + _TOL
+
+    def test_recency_convexity(self, opt_solved_mrc):
+        for f in _F:
+            for i in range(len(_R) - 2):
+                r0, r1, r2 = _R[i], _R[i + 1], _R[i + 2]
+                second_diff = (
+                    opt_solved_mrc.RF2X[r0, f]
+                    - 2 * opt_solved_mrc.RF2X[r1, f]
+                    + opt_solved_mrc.RF2X[r2, f]
+                )
+                assert second_diff >= -_TOL
+
+
+# ---------------------------------------------------------------------------
+# 制約充足: mfc
+# ---------------------------------------------------------------------------
+class TestMFCConstraints:
+    def test_recency_monotonicity(self, opt_solved_mfc):
+        for f in _F:
+            for i in range(len(_R) - 1):
+                r, r_next = _R[i], _R[i + 1]
+                assert opt_solved_mfc.RF2X[r, f] >= opt_solved_mfc.RF2X[r_next, f] - _TOL
+
+    def test_frequency_monotonicity(self, opt_solved_mfc):
+        for r in _R:
+            for j in range(len(_F) - 1):
+                f, f_next = _F[j], _F[j + 1]
+                assert opt_solved_mfc.RF2X[r, f] <= opt_solved_mfc.RF2X[r, f_next] + _TOL
+
+    def test_frequency_concavity(self, opt_solved_mfc):
+        for r in _R:
+            for j in range(len(_F) - 2):
+                f0, f1, f2 = _F[j], _F[j + 1], _F[j + 2]
+                second_diff = (
+                    opt_solved_mfc.RF2X[r, f0]
+                    - 2 * opt_solved_mfc.RF2X[r, f1]
+                    + opt_solved_mfc.RF2X[r, f2]
+                )
+                assert second_diff <= _TOL
 
 
 # ---------------------------------------------------------------------------

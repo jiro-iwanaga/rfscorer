@@ -40,7 +40,7 @@
 | `evaluate(df_rec, UIrevisit, order=1, ...)` | 推薦結果と正解データを比較し precision・recall・f1 等の評価指標を返すメソッド。`user_col`・`item_col` は省略すると `__init__` の設定値を使用する |
 | `plot_probability_surface(kind='empirical', title=None, figsize=(6,5), fontsize=12, recency_label='recency', frequency_label='frequency', probability_label='probability')` | 再閲覧確率を3次元ワイヤーフレームで可視化し `matplotlib.figure.Figure` を返すメソッド。軸ラベル・タイトル・図サイズ・フォントサイズを指定可能。日本語ラベルには `rfscorer[ja]` が必要。`fit()` または `fit_period()` 後（`kind='mono'` または `'mcc'` の場合は `optimize()` 後）に利用可能 |
 | `plot_marginal_probability(axis='recency', title=None, figsize=(5,4), fontsize=12, xlabel=None, probability_label='probability')` | 最新度または頻度の一方向に集約した周辺的経験的再閲覧確率を折れ線グラフで可視化し `matplotlib.figure.Figure` を返すメソッド。`optimize()` 前の単調性確認に使用する。日本語ラベルには `rfscorer[ja]` が必要。`fit()` または `fit_period()` 後に利用可能 |
-| `optimize(kind='mono')` | `fit()` または `fit_period()` の結果を用いて、RF 制約付きの最適化再閲覧確率を推定するメソッド。`kind='mono'`（単調性制約のみ）または `'mcc'`（単調性 + 凹凸性制約）を指定する |
+| `optimize(kind='mono')` | `fit()` または `fit_period()` の結果を用いて、RF 制約付きの最適化再閲覧確率を推定するメソッド。`kind='mono'`（単調性のみ）・`'mrc'`（単調性 + Recency 凸性）・`'mfc'`（単調性 + Frequency 凹性）・`'mcc'`（単調性 + 両凹凸性）を指定する |
 | `show()` | `fit()` または `fit_period()` 後の集計情報（レコード数・cv 数・期間・上限値）を標準出力に表示するデバッグ用メソッド |
 | `R` | `fit()` または `fit_period()` 後に参照できる最新度のリスト |
 | `F` | `fit()` または `fit_period()` 後に参照できる頻度のリスト |
@@ -50,6 +50,12 @@
 | `mono_probability_` | `optimize(kind='mono')` 後に参照できる最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`） |
 | `mono_probability_table_` | `optimize(kind='mono')` 後に参照できる最適化再閲覧確率（横持ち）。`pd.DataFrame`（インデックス: `recency`、カラム: `frequency`） |
 | `mono_probability_dict_` | `optimize(kind='mono')` 後に参照できる最適化再閲覧確率。`dict`（キー: `(r, f)`） |
+| `mrc_probability_` | `optimize(kind='mrc')` 後に参照できる最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`） |
+| `mrc_probability_table_` | `optimize(kind='mrc')` 後に参照できる最適化再閲覧確率（横持ち）。`pd.DataFrame`（インデックス: `recency`、カラム: `frequency`） |
+| `mrc_probability_dict_` | `optimize(kind='mrc')` 後に参照できる最適化再閲覧確率。`dict`（キー: `(r, f)`） |
+| `mfc_probability_` | `optimize(kind='mfc')` 後に参照できる最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`） |
+| `mfc_probability_table_` | `optimize(kind='mfc')` 後に参照できる最適化再閲覧確率（横持ち）。`pd.DataFrame`（インデックス: `recency`、カラム: `frequency`） |
+| `mfc_probability_dict_` | `optimize(kind='mfc')` 後に参照できる最適化再閲覧確率。`dict`（キー: `(r, f)`） |
 | `mcc_probability_` | `optimize(kind='mcc')` 後に参照できる最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`） |
 | `mcc_probability_table_` | `optimize(kind='mcc')` 後に参照できる最適化再閲覧確率（横持ち）。`pd.DataFrame`（インデックス: `recency`、カラム: `frequency`） |
 | `mcc_probability_dict_` | `optimize(kind='mcc')` 後に参照できる最適化再閲覧確率。`dict`（キー: `(r, f)`） |
