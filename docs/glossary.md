@@ -37,21 +37,33 @@
 |------|------|
 | `RecencyFrequencyScorer` | RF スコアリングの主クラス。コンストラクタでカラム名を受け取る |
 | `fit(df_obs, df_eval, ref_date=None, recency_limit=None, frequency_limit=None)` | 観測ログ `df_obs` と評価ログ `df_eval` を直接受け取り、経験的再閲覧確率を推定するメソッド。scikit-learn スタイルの主要 fit メソッド。`ref_date` は最新度計算の基準日（`None` の場合は `df_obs` の最大日付を使用） |
-| `fit_date(df, target_date, observation_days=28, evaluation_days=7, recency_limit=None, frequency_limit=None)` | 閲覧履歴 DataFrame と基準日 `target_date` を受け取り、観測・評価ウィンドウを自動導出して経験的再閲覧確率を推定するメソッド。`observation_days`・`evaluation_days` でウィンドウ幅を調整できる（`None` でデータ全範囲）。`fit()` のラッパー |
+| `fit_date(df, target_date, observation_days=28, evaluation_days=7, recency_limit=None, frequency_limit=None)` | 閲覧履歴 DataFrame と基準日 `target_date` を受け取り、観測・評価ウィンドウを自動導出して経験的再閲覧確率を推定するメソッド。`observation_days`・`evaluation_days` でウィンドウ幅を調整できる（`None` でデータ全範囲）。内部で `_fit_impl()` を直接呼び出す |
 | `fit_period(df, observation_period, evaluation_period, recency_limit=None, frequency_limit=None)` | 観測期間・評価期間を tuple で明示指定して経験的再閲覧確率を推定するメソッド。`fit_date()` より細かい期間制御が必要な場合に使用する |
 | `predict(r, f, kind='emp')` | 指定した最新度 `r`・頻度 `f` の再閲覧確率を返すメソッド。`r` は1が最も直近（数値が大きいほど古い）、`f` は観測期間の閲覧回数。`fit()`・`fit_date()` または `fit_period()` 後に利用可能 |
 | `transform(df, ref_date=None, kind='emp', ...)` | 入力 DataFrame の各 user×item ペアに最新度・頻度・再閲覧確率・順位を付与して返すメソッド。`ref_date` は最新度計算の基準日（`None` の場合は `df` の最大日付を使用）。`user_col`・`item_col`・`datetime_col` は省略すると `__init__` の設定値を使用する。`fit()`・`fit_date()` または `fit_period()` 後に利用可能 |
 | `transform_date(df, target_date, kind='emp', ...)` | `target_date` を明示指定する `transform()` のラッパー。`fit()`・`fit_date()` または `fit_period()` 後に利用可能 |
 | `evaluate(df_rec, df_eval, order=1, ...)` | 推薦結果と評価期間のイベント履歴 `df_eval` を比較し precision・recall・f1 等の評価指標を返すメソッド。`user_col`・`item_col` は省略すると `__init__` の設定値を使用する |
 | `plot_probability_surface(kind='emp', title=None, figsize=(6, 5), fontsize=12, recency_label='recency', frequency_label='frequency', probability_label='probability')` | 再閲覧確率を3次元ワイヤーフレームで可視化し `matplotlib.figure.Figure` を返すメソッド。軸ラベル・タイトル・図サイズ・フォントサイズを指定可能。日本語ラベルには `rfscorer[ja]` が必要。`fit()`・`fit_date()` または `fit_period()` 後（`kind='mono'` または `'mcc'` の場合は `optimize()` 後）に利用可能 |
-| `plot_marginal_probability(axis='recency', kind='emp', title=None, figsize=(5, 4), fontsize=12, recency_label='recency', frequency_label='frequency', probability_label='probability')` | 最新度または頻度の一方向に集約した周辺的経験的再閲覧確率を折れ線グラフで可視化し `matplotlib.figure.Figure` を返すメソッド。`optimize()` 前の単調性確認に使用する。日本語ラベルには `rfscorer[ja]` が必要。`fit()`・`fit_date()` または `fit_period()` 後に利用可能 |
-| `optimize(kind='mono', eps=0.0)` | `fit()`・`fit_date()` または `fit_period()` の結果を用いて、RF 制約付きの最適化再閲覧確率を推定するメソッド。`kind='mono'`（単調性のみ）・`'mrc'`（単調性 + Recency 凸性）・`'mfc'`（単調性 + Frequency 凹性）・`'mcc'`（単調性 + 両凹凸性）・`'mr'`（1次元 Recency）・`'mf'`（1次元 Frequency）を指定する。`eps > 0` で狭義単調性を適用する |
+| `plot_marginal_probability(axis='recency', kind='emp', title=None, figsize=(5, 4), fontsize=12, recency_label='recency', frequency_label='frequency', probability_label='probability')` | 最新度または頻度の一方向の再閲覧確率を折れ線グラフで可視化し `matplotlib.figure.Figure` を返すメソッド。`kind='emp'` で経験的周辺確率のみ、`kind='mr'/'mf'` で1次元最適化確率のみ、`kind='all'` で両者を重ねて表示する。単調性確認や最適化前後の比較に使用する。日本語ラベルには `rfscorer[ja]` が必要。`fit()`・`fit_date()` または `fit_period()` 後に利用可能（`kind='mr'/'mf'/'all'` の場合は `optimize()` 後も必要） |
+| `optimize(kind='mono', eps=0.0)` | `fit()`・`fit_date()` または `fit_period()` の結果を用いて、RF 制約付きの最適化再閲覧確率を推定するメソッド。`kind='mono'`（単調性のみ）・`'mrc'`（単調性 + Recency 凸性）・`'mfc'`（単調性 + Frequency 凹性）・`'mcc'`（単調性 + 両凹凸性）・`'mr'`（1次元 Recency）・`'mf'`（1次元 Frequency）を指定する（長名エイリアスも使用可）。`eps > 0` で狭義単調性を適用する |
 | `show()` | `fit()`・`fit_date()` または `fit_period()` 後の集計情報（レコード数・cv 数・期間・上限値）を標準出力に表示するデバッグ用メソッド |
 | `R` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる最新度のリスト |
 | `F` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる頻度のリスト |
 | `empirical_probability_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる経験的再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `N`, `cv`, `probability`） |
 | `empirical_probability_table_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる経験的再閲覧確率（横持ち）。`pd.DataFrame`（インデックス: `recency`、カラム: `frequency`） |
 | `empirical_probability_dict_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる経験的再閲覧確率。`dict`（キー: `(r, f)`） |
+| `er_probability_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる周辺的経験的再閲覧確率（Recency 方向）。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`） |
+| `er_probability_table_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる周辺的経験的再閲覧確率（横持ち） |
+| `er_probability_dict_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる周辺的経験的再閲覧確率。`dict`（キー: `(r, f)`） |
+| `ef_probability_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる周辺的経験的再閲覧確率（Frequency 方向）。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`） |
+| `ef_probability_table_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる周辺的経験的再閲覧確率（横持ち） |
+| `ef_probability_dict_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる周辺的経験的再閲覧確率。`dict`（キー: `(r, f)`） |
+| `mr_probability_` | `optimize(kind='mr')` 後に参照できる1次元最適化再閲覧確率（全 f にブロードキャスト）。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`） |
+| `mr_probability_table_` | `optimize(kind='mr')` 後に参照できる1次元最適化再閲覧確率（横持ち） |
+| `mr_probability_dict_` | `optimize(kind='mr')` 後に参照できる1次元最適化再閲覧確率。`dict`（キー: `(r, f)`） |
+| `mf_probability_` | `optimize(kind='mf')` 後に参照できる1次元最適化再閲覧確率（全 r にブロードキャスト）。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`） |
+| `mf_probability_table_` | `optimize(kind='mf')` 後に参照できる1次元最適化再閲覧確率（横持ち） |
+| `mf_probability_dict_` | `optimize(kind='mf')` 後に参照できる1次元最適化再閲覧確率。`dict`（キー: `(r, f)`） |
 | `mono_probability_` | `optimize(kind='mono')` 後に参照できる最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`） |
 | `mono_probability_table_` | `optimize(kind='mono')` 後に参照できる最適化再閲覧確率（横持ち）。`pd.DataFrame`（インデックス: `recency`、カラム: `frequency`） |
 | `mono_probability_dict_` | `optimize(kind='mono')` 後に参照できる最適化再閲覧確率。`dict`（キー: `(r, f)`） |
