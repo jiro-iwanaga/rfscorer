@@ -156,6 +156,21 @@ def scorer_optimized_mcc():
 
 
 @pytest.fixture(scope="module")
+def scorer_all_optimized():
+    s = RecencyFrequencyScorer()
+    s.fit_period(
+        _make_df(),
+        _OBS_PERIOD,
+        _EVAL_PERIOD,
+        recency_limit=_RECENCY_LIMIT,
+        frequency_limit=_FREQUENCY_LIMIT,
+    )
+    for kind in ("mono", "mr", "mf", "mrc", "mfc", "mcc"):
+        s.optimize(kind=kind)
+    return s
+
+
+@pytest.fixture(scope="module")
 def df_rec(scorer_fitted):
     return scorer_fitted.transform_date(_make_df(), _FIT_TARGET_DATE)
 
@@ -928,6 +943,34 @@ class TestOptimize:
 
 
 # ---------------------------------------------------------------------------
+# optimize — kind エイリアス
+# ---------------------------------------------------------------------------
+class TestOptimizeAliases:
+    @pytest.mark.parametrize(
+        "alias,canonical",
+        [
+            ("monotonic", "mono"),
+            ("monotonic_recency", "mr"),
+            ("monotonic_frequency", "mf"),
+            ("monotonic_recency_convex", "mrc"),
+            ("monotonic_frequency_concave", "mfc"),
+            ("monotonic_convex_concave", "mcc"),
+        ],
+    )
+    def test_optimize_alias_sets_probability(self, alias, canonical, df):
+        s = RecencyFrequencyScorer()
+        s.fit_period(
+            df,
+            _OBS_PERIOD,
+            _EVAL_PERIOD,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        s.optimize(kind=alias)
+        assert getattr(s, f"{canonical}_probability_dict_") is not None
+
+
+# ---------------------------------------------------------------------------
 # predict
 # ---------------------------------------------------------------------------
 class TestPredict:
@@ -1639,3 +1682,107 @@ class TestPlotMarginalProbability:
         fig = scorer_fitted.plot_marginal_probability(axis="recency", kind="emp")
         ax = fig.axes[0]
         assert ax.get_legend() is None
+
+
+# ---------------------------------------------------------------------------
+# export_probability_csv
+# ---------------------------------------------------------------------------
+class TestExportProbabilityCsv:
+    def test_before_fit_raises(self, scorer):
+        with pytest.raises(RuntimeError, match="fit"):
+            scorer.export_probability_csv()
+
+    def test_invalid_kind_raises(self, scorer_fitted):
+        with pytest.raises(ValueError, match="kind"):
+            scorer_fitted.export_probability_csv(kind="invalid")
+
+    def test_before_optimize_mono_raises(self, scorer_fitted):
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer_fitted.export_probability_csv(kind="mono")
+
+    def test_before_optimize_mr_raises(self, scorer_fitted):
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer_fitted.export_probability_csv(kind="mr")
+
+    def test_before_optimize_mf_raises(self, scorer_fitted):
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer_fitted.export_probability_csv(kind="mf")
+
+    def test_returns_none(self, scorer_fitted, tmp_path):
+        result = scorer_fitted.export_probability_csv(kind="emp", path=tmp_path / "out.csv")
+        assert result is None
+
+    def test_default_path_creates_file(self, scorer_fitted, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        scorer_fitted.export_probability_csv(kind="emp")
+        assert (tmp_path / "emp_probability.csv").exists()
+
+    def test_explicit_file_path(self, scorer_fitted, tmp_path):
+        out = tmp_path / "my_output.csv"
+        scorer_fitted.export_probability_csv(kind="emp", path=str(out))
+        assert out.exists()
+
+    def test_directory_path_creates_file_inside(self, scorer_fitted, tmp_path):
+        scorer_fitted.export_probability_csv(kind="emp", path=str(tmp_path))
+        assert (tmp_path / "emp_probability.csv").exists()
+
+    def test_emp_output_columns(self, scorer_fitted, tmp_path):
+        out = tmp_path / "emp.csv"
+        scorer_fitted.export_probability_csv(kind="emp", path=str(out))
+        df = pd.read_csv(out)
+        assert set(df.columns) == {"recency", "frequency", "N", "cv", "probability"}
+
+    def test_er_output_columns(self, scorer_fitted, tmp_path):
+        out = tmp_path / "er.csv"
+        scorer_fitted.export_probability_csv(kind="er", path=str(out))
+        df = pd.read_csv(out)
+        assert set(df.columns) == {"recency", "frequency", "probability"}
+
+    def test_ef_output_columns(self, scorer_fitted, tmp_path):
+        out = tmp_path / "ef.csv"
+        scorer_fitted.export_probability_csv(kind="ef", path=str(out))
+        df = pd.read_csv(out)
+        assert set(df.columns) == {"recency", "frequency", "probability"}
+
+    def test_mono_output_columns(self, scorer_optimized_mono, tmp_path):
+        out = tmp_path / "mono.csv"
+        scorer_optimized_mono.export_probability_csv(kind="mono", path=str(out))
+        df = pd.read_csv(out)
+        assert set(df.columns) == {"recency", "frequency", "probability"}
+
+    def test_emp_row_count(self, scorer_fitted, tmp_path):
+        out = tmp_path / "emp.csv"
+        scorer_fitted.export_probability_csv(kind="emp", path=str(out))
+        df = pd.read_csv(out)
+        assert len(df) == _RECENCY_LIMIT * _FREQUENCY_LIMIT
+
+    def test_all_output_columns(self, scorer_all_optimized, tmp_path):
+        out = tmp_path / "all.csv"
+        scorer_all_optimized.export_probability_csv(kind="all", path=str(out))
+        df = pd.read_csv(out)
+        assert set(df.columns) == {
+            "recency",
+            "frequency",
+            "N",
+            "cv",
+            "empirical_probability",
+            "er_probability",
+            "ef_probability",
+            "mono_probability",
+            "mr_probability",
+            "mf_probability",
+            "mrc_probability",
+            "mfc_probability",
+            "mcc_probability",
+        }
+
+    def test_all_row_count(self, scorer_all_optimized, tmp_path):
+        out = tmp_path / "all.csv"
+        scorer_all_optimized.export_probability_csv(kind="all", path=str(out))
+        df = pd.read_csv(out)
+        assert len(df) == _RECENCY_LIMIT * _FREQUENCY_LIMIT
+
+    def test_empirical_alias(self, scorer_fitted, tmp_path):
+        out = tmp_path / "out.csv"
+        scorer_fitted.export_probability_csv(kind="empirical", path=str(out))
+        assert out.exists()
