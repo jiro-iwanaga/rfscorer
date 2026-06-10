@@ -28,7 +28,8 @@ _FREQUENCY_LIMIT = 3
 _AUTO_RECENCY_LIMIT = 3
 _AUTO_FREQUENCY_LIMIT = 3
 
-_UIREVISIT = {("u1", "item1"), ("u2", "item2")}  # 評価期間に再閲覧したペア
+# fit_date のテスト基準日: obs=Jan01-07, eval=Jan08-10 (fit_period の全期間指定と等価)
+_FIT_TARGET_DATE = "2024-01-07"
 
 
 def _make_df():
@@ -156,7 +157,13 @@ def scorer_optimized_mcc():
 
 @pytest.fixture(scope="module")
 def df_rec(scorer_fitted):
-    return scorer_fitted.transform(_make_df(), _FIT_TARGET_DATE)
+    return scorer_fitted.transform_date(_make_df(), _FIT_TARGET_DATE)
+
+
+@pytest.fixture(scope="module")
+def df_eval():
+    df = _make_df()
+    return df[pd.to_datetime(df["datetime"]) >= _EVAL_PERIOD[0]]
 
 
 # ---------------------------------------------------------------------------
@@ -433,49 +440,77 @@ class TestFitPeriodResult:
 
 
 # ---------------------------------------------------------------------------
-# fit — バリデーション
+# fit_date — バリデーション
 # ---------------------------------------------------------------------------
-class TestFitValidation:
+class TestFitDateValidation:
     def test_not_dataframe_raises(self, scorer):
         with pytest.raises(TypeError, match="pandas DataFrame"):
-            scorer.fit("not_a_df", "2024-01-07")
+            scorer.fit_date("not_a_df", "2024-01-07")
 
     def test_missing_datetime_col_raises(self, scorer, df):
         with pytest.raises(ValueError, match="Missing required columns"):
-            scorer.fit(df.drop(columns="datetime"), "2024-01-07")
+            scorer.fit_date(df.drop(columns="datetime"), "2024-01-07")
 
     def test_invalid_target_date_raises(self, scorer, df):
         with pytest.raises(ValueError, match="target_date could not be parsed"):
-            scorer.fit(df, "not-a-date")
+            scorer.fit_date(df, "not-a-date")
 
 
 # ---------------------------------------------------------------------------
-# fit — 正常系
+# fit — バリデーション (新 API: df_obs, df_eval)
 # ---------------------------------------------------------------------------
-# テストデータ (2024-01-01 〜 2024-01-10) に対して target_date="2024-01-07" を使用:
-#   obs: 2024-01-01 〜 2024-01-07 (observation_days=28 → df_min=Jan01 が floor)
-#   eval: 2024-01-08 〜 2024-01-10 (evaluation_days=7 → df_max=Jan10 が ceil)
-# fit_period(_OBS_PERIOD, ("2024-01-08","2024-01-10")) と等価
-_FIT_TARGET_DATE = "2024-01-07"
+class TestFitValidation:
+    def test_obs_not_dataframe_raises(self, scorer, df):
+        df_eval = df[pd.to_datetime(df["datetime"]) > "2024-01-07"]
+        with pytest.raises(TypeError, match="pandas DataFrame"):
+            scorer.fit("not_a_df", df_eval)
+
+    def test_eval_not_dataframe_raises(self, scorer, df):
+        df_obs = df[pd.to_datetime(df["datetime"]) <= "2024-01-07"]
+        with pytest.raises(TypeError, match="pandas DataFrame"):
+            scorer.fit(df_obs, "not_a_df")
+
+    def test_missing_col_in_obs_raises(self, scorer, df):
+        df_obs = df[pd.to_datetime(df["datetime"]) <= "2024-01-07"].drop(columns="item")
+        df_eval = df[pd.to_datetime(df["datetime"]) > "2024-01-07"]
+        with pytest.raises(ValueError, match="df_obs"):
+            scorer.fit(df_obs, df_eval)
+
+    def test_missing_col_in_eval_raises(self, scorer, df):
+        df_obs = df[pd.to_datetime(df["datetime"]) <= "2024-01-07"]
+        df_eval = df[pd.to_datetime(df["datetime"]) > "2024-01-07"].drop(columns="item")
+        with pytest.raises(ValueError, match="df_eval"):
+            scorer.fit(df_obs, df_eval)
+
+    def test_invalid_ref_date_raises(self, scorer, df):
+        df_obs = df[pd.to_datetime(df["datetime"]) <= "2024-01-07"]
+        df_eval = df[pd.to_datetime(df["datetime"]) > "2024-01-07"]
+        with pytest.raises(ValueError, match="ref_date could not be parsed"):
+            scorer.fit(df_obs, df_eval, ref_date="not-a-date")
 
 
-class TestFitResult:
+# ---------------------------------------------------------------------------
+# fit_date — 正常系
+# ---------------------------------------------------------------------------
+class TestFitDateResult:
     def test_returns_self(self, scorer, df):
-        result = scorer.fit(
+        result = scorer.fit_date(
             df, _FIT_TARGET_DATE, recency_limit=_RECENCY_LIMIT, frequency_limit=_FREQUENCY_LIMIT
         )
         assert result is scorer
 
     def test_periods_match_target_date(self, df):
         s = RecencyFrequencyScorer()
-        s.fit(df, _FIT_TARGET_DATE, recency_limit=_RECENCY_LIMIT, frequency_limit=_FREQUENCY_LIMIT)
+        s.fit_date(
+            df, _FIT_TARGET_DATE, recency_limit=_RECENCY_LIMIT, frequency_limit=_FREQUENCY_LIMIT
+        )
         assert s.observation_end_date_ == pd.Timestamp(_FIT_TARGET_DATE)
         assert s.evaluation_start_date_ == pd.Timestamp("2024-01-08")
 
     def test_observation_start_bounded_by_observation_days(self, df):
         # observation_days=3 → obs_start = max(Jan01, Jan07-3d) = Jan04
         s = RecencyFrequencyScorer()
-        s.fit(
+        s.fit_date(
             df,
             _FIT_TARGET_DATE,
             observation_days=3,
@@ -487,7 +522,7 @@ class TestFitResult:
 
     def test_observation_days_none_uses_df_min(self, df):
         s = RecencyFrequencyScorer()
-        s.fit(
+        s.fit_date(
             df,
             _FIT_TARGET_DATE,
             observation_days=None,
@@ -499,7 +534,7 @@ class TestFitResult:
     def test_evaluation_end_bounded_by_evaluation_days(self, df):
         # evaluation_days=2 → eval_end = min(Jan10, Jan07+2d) = Jan09
         s = RecencyFrequencyScorer()
-        s.fit(
+        s.fit_date(
             df,
             _FIT_TARGET_DATE,
             evaluation_days=2,
@@ -510,7 +545,7 @@ class TestFitResult:
 
     def test_evaluation_days_none_uses_df_max(self, df):
         s = RecencyFrequencyScorer()
-        s.fit(
+        s.fit_date(
             df,
             _FIT_TARGET_DATE,
             evaluation_days=None,
@@ -520,9 +555,9 @@ class TestFitResult:
         assert s.evaluation_end_date_ == pd.Timestamp("2024-01-10")
 
     def test_same_result_as_fit_period(self, df):
-        # fit(target_date, obs_days=None, eval_days=None) == fit_period(full range)
+        # fit_date(target_date, obs_days=None, eval_days=None) == fit_period(full range)
         s1 = RecencyFrequencyScorer()
-        s1.fit(
+        s1.fit_date(
             df,
             _FIT_TARGET_DATE,
             observation_days=None,
@@ -542,7 +577,103 @@ class TestFitResult:
 
     def test_empirical_probability_dict_populated(self, df):
         s = RecencyFrequencyScorer()
-        s.fit(df, _FIT_TARGET_DATE, recency_limit=_RECENCY_LIMIT, frequency_limit=_FREQUENCY_LIMIT)
+        s.fit_date(
+            df, _FIT_TARGET_DATE, recency_limit=_RECENCY_LIMIT, frequency_limit=_FREQUENCY_LIMIT
+        )
+        assert s.empirical_probability_dict_ is not None
+
+
+# ---------------------------------------------------------------------------
+# fit — 正常系 (新 API: df_obs, df_eval)
+# ---------------------------------------------------------------------------
+class TestFitResult:
+    def _make_obs(self):
+        df = _make_df()
+        return df[pd.to_datetime(df["datetime"]) <= _OBS_PERIOD[1]]
+
+    def _make_eval(self):
+        df = _make_df()
+        return df[pd.to_datetime(df["datetime"]) >= _EVAL_PERIOD[0]]
+
+    def test_returns_self(self, scorer):
+        result = scorer.fit(
+            self._make_obs(),
+            self._make_eval(),
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        assert result is scorer
+
+    def test_same_probabilities_as_fit_period(self):
+        # fit(df_obs, df_eval) == fit_period(df, obs_period, eval_period)
+        s1 = RecencyFrequencyScorer()
+        s1.fit(
+            self._make_obs(),
+            self._make_eval(),
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        s2 = RecencyFrequencyScorer()
+        s2.fit_period(
+            _make_df(),
+            _OBS_PERIOD,
+            _EVAL_PERIOD,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        assert s1.empirical_probability_dict_ == s2.empirical_probability_dict_
+
+    def test_ref_date_default_is_obs_max(self):
+        # ref_date=None → df_obs の最大日 (2024-01-07) が observation_end_date_
+        s = RecencyFrequencyScorer()
+        s.fit(
+            self._make_obs(),
+            self._make_eval(),
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        assert s.observation_end_date_ == pd.Timestamp("2024-01-07")
+
+    def test_ref_date_explicit(self):
+        s = RecencyFrequencyScorer()
+        s.fit(
+            self._make_obs(),
+            self._make_eval(),
+            ref_date="2024-01-07",
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        assert s.observation_end_date_ == pd.Timestamp("2024-01-07")
+
+    def test_observation_start_from_data(self):
+        s = RecencyFrequencyScorer()
+        s.fit(
+            self._make_obs(),
+            self._make_eval(),
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        assert s.observation_start_date_ == pd.Timestamp("2024-01-01")
+
+    def test_evaluation_dates_from_data(self):
+        s = RecencyFrequencyScorer()
+        s.fit(
+            self._make_obs(),
+            self._make_eval(),
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        assert s.evaluation_start_date_ == pd.Timestamp("2024-01-09")
+        assert s.evaluation_end_date_ == pd.Timestamp("2024-01-10")
+
+    def test_empirical_probability_dict_populated(self):
+        s = RecencyFrequencyScorer()
+        s.fit(
+            self._make_obs(),
+            self._make_eval(),
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
         assert s.empirical_probability_dict_ is not None
 
 
@@ -954,15 +1085,80 @@ class TestPredict:
 
 
 # ---------------------------------------------------------------------------
-# transform
+# transform — 新 API (ref_date, 事前フィルタ済み df)
 # ---------------------------------------------------------------------------
 class TestTransform:
+    def _make_obs(self):
+        df = _make_df()
+        return df[pd.to_datetime(df["datetime"]) <= _OBS_PERIOD[1]]
+
     def test_before_fit_raises(self, scorer, df):
         with pytest.raises(RuntimeError, match="fit"):
-            scorer.transform(df, "2024-01-07")
+            scorer.transform(self._make_obs())
+
+    def test_returns_dataframe_with_expected_columns(self, scorer_fitted):
+        result = scorer_fitted.transform(self._make_obs())
+        assert set(result.columns) == {
+            "user",
+            "item",
+            "recency",
+            "frequency",
+            "probability",
+            "order",
+        }
+
+    def test_sorted_by_user_and_probability(self, scorer_fitted):
+        result = scorer_fitted.transform(self._make_obs())
+        for user, grp in result.groupby("user"):
+            assert list(grp["probability"]) == sorted(grp["probability"], reverse=True)
+            assert list(grp["order"]) == list(range(1, len(grp) + 1))
+
+    def test_ref_date_none_uses_data_max(self, scorer_fitted):
+        # ref_date=None → df_obs の最大日 (2024-01-07) が基準になることを確認
+        # u2-item2 は Jan07 に閲覧 → ref_date=Jan07 なら recency=1
+        result = scorer_fitted.transform(self._make_obs())
+        u2_item2 = result[(result["user"] == "u2") & (result["item"] == "item2")].iloc[0]
+        assert u2_item2["recency"] == 1
+
+    def test_ref_date_explicit(self, scorer_fitted):
+        # ref_date="2024-01-08" → u2-item2 (最終閲覧 Jan07) の recency = 2
+        result = scorer_fitted.transform(self._make_obs(), ref_date="2024-01-08")
+        u2_item2 = result[(result["user"] == "u2") & (result["item"] == "item2")].iloc[0]
+        assert u2_item2["recency"] == 2
+
+    def test_same_result_as_transform_date(self, scorer_fitted):
+        # transform(df_obs, ref_date) と transform_date(df, target_date) が一致
+        df = _make_df()
+        result_new = scorer_fitted.transform(self._make_obs(), ref_date=_FIT_TARGET_DATE)
+        result_old = scorer_fitted.transform_date(df, _FIT_TARGET_DATE)
+        assert list(result_new.sort_values(["user", "item"])["probability"]) == pytest.approx(
+            list(result_old.sort_values(["user", "item"])["probability"])
+        )
+
+    def test_explicit_col_names_override_init(self, scorer_fitted):
+        df_b = _make_df().rename(columns={"user": "uid", "item": "iid", "datetime": "ts"})
+        df_b_obs = df_b[pd.to_datetime(df_b["ts"]) <= _OBS_PERIOD[1]]
+        result = scorer_fitted.transform(
+            df_b_obs, ref_date=_FIT_TARGET_DATE, user_col="uid", item_col="iid", datetime_col="ts"
+        )
+        assert "uid" in result.columns
+        assert "iid" in result.columns
+
+    def test_emp_alias_equals_empirical(self, scorer_fitted):
+        result_emp = scorer_fitted.transform(self._make_obs(), kind="emp")
+        result_empirical = scorer_fitted.transform(self._make_obs(), kind="empirical")
+        assert list(result_emp["probability"]) == list(result_empirical["probability"])
+
+
+# ---------------------------------------------------------------------------
+# transform_date — 後方互換 API (target_date でフィルタ)
+# ---------------------------------------------------------------------------
+class TestTransformDate:
+    def test_before_fit_raises(self, scorer, df):
+        with pytest.raises(RuntimeError, match="fit"):
+            scorer.transform_date(df, "2024-01-07")
 
     def test_uses_init_col_names_by_default(self):
-        # カスタムカラム名で初期化 → transform に渡さなくても動作する
         df_custom = _make_df().rename(columns={"user": "uid", "item": "iid", "datetime": "ts"})
         s = RecencyFrequencyScorer(user_col="uid", item_col="iid", datetime_col="ts")
         s.fit_period(
@@ -972,18 +1168,16 @@ class TestTransform:
             recency_limit=_RECENCY_LIMIT,
             frequency_limit=_FREQUENCY_LIMIT,
         )
-        result = s.transform(df_custom, "2024-01-07")
+        result = s.transform_date(df_custom, "2024-01-07")
         assert "uid" in result.columns
         assert "iid" in result.columns
 
     def test_default_col_names_work_without_args(self, scorer_fitted, df):
-        # デフォルトカラム名 (user/item/datetime) の場合も引数なしで動作する
-        result = scorer_fitted.transform(df, "2024-01-07")
+        result = scorer_fitted.transform_date(df, "2024-01-07")
         assert "user" in result.columns
         assert "item" in result.columns
 
     def test_explicit_col_names_override_init(self):
-        # __init__ と異なるカラム名を持つ DataFrame も明示指定で動作する
         df_a = _make_df()
         df_b = _make_df().rename(columns={"user": "uid", "item": "iid", "datetime": "ts"})
         s = RecencyFrequencyScorer()
@@ -994,12 +1188,14 @@ class TestTransform:
             recency_limit=_RECENCY_LIMIT,
             frequency_limit=_FREQUENCY_LIMIT,
         )
-        result = s.transform(df_b, "2024-01-07", user_col="uid", item_col="iid", datetime_col="ts")
+        result = s.transform_date(
+            df_b, "2024-01-07", user_col="uid", item_col="iid", datetime_col="ts"
+        )
         assert "uid" in result.columns
         assert "iid" in result.columns
 
     def test_returns_dataframe_with_expected_columns(self, scorer_fitted, df):
-        result = scorer_fitted.transform(df, "2024-01-07")
+        result = scorer_fitted.transform_date(df, "2024-01-07")
         assert set(result.columns) == {
             "user",
             "item",
@@ -1010,14 +1206,14 @@ class TestTransform:
         }
 
     def test_sorted_by_user_and_probability(self, scorer_fitted, df):
-        result = scorer_fitted.transform(df, "2024-01-07")
+        result = scorer_fitted.transform_date(df, "2024-01-07")
         for user, grp in result.groupby("user"):
             assert list(grp["probability"]) == sorted(grp["probability"], reverse=True)
             assert list(grp["order"]) == list(range(1, len(grp) + 1))
 
     def test_emp_alias_equals_empirical(self, scorer_fitted, df):
-        result_emp = scorer_fitted.transform(df, "2024-01-07", kind="emp")
-        result_empirical = scorer_fitted.transform(df, "2024-01-07", kind="empirical")
+        result_emp = scorer_fitted.transform_date(df, "2024-01-07", kind="emp")
+        result_empirical = scorer_fitted.transform_date(df, "2024-01-07", kind="empirical")
         assert list(result_emp["probability"]) == list(result_empirical["probability"])
 
 
@@ -1026,11 +1222,11 @@ class TestTransform:
 # ---------------------------------------------------------------------------
 # テストデータの期待値 (scorer_fitted: recency_limit=7, frequency_limit=3)
 #
-# transform(df, "2024-01-07") の結果:
+# transform_date(df, "2024-01-07") の結果:
 #   u1: item1(r=3,f=3,prob=1.0,order=1), item2(r=6,f=1,prob=0.0,order=2)
 #   u2: item2(r=1,f=2,prob=1.0,order=1), item1(r=4,f=1,prob=0.0,order=2)
 #
-# _UIREVISIT = {(u1,item1),(u2,item2)} → len=2
+# df_eval: u1-item1(Jan09), u2-item2(Jan10) → 再閲覧ペア数=2
 #
 # order=1: UIrec={(u1,item1),(u2,item2)}, n_hit=2, n_rec=2
 #   precision=1.0, recall=1.0, f1=1.0, recall_norm=1.0, f1_norm=1.0
@@ -1038,12 +1234,12 @@ class TestTransform:
 #   precision=0.5, recall=1.0, f1≈0.667
 # ---------------------------------------------------------------------------
 class TestEvaluate:
-    def test_returns_dataframe(self, scorer_fitted, df_rec):
-        result = scorer_fitted.evaluate(df_rec, _UIREVISIT, order=1)
+    def test_returns_dataframe(self, scorer_fitted, df_rec, df_eval):
+        result = scorer_fitted.evaluate(df_rec, df_eval, order=1)
         assert isinstance(result, pd.DataFrame)
 
-    def test_columns(self, scorer_fitted, df_rec):
-        result = scorer_fitted.evaluate(df_rec, _UIREVISIT, order=1)
+    def test_columns(self, scorer_fitted, df_rec, df_eval):
+        result = scorer_fitted.evaluate(df_rec, df_eval, order=1)
         assert set(result.columns) == {
             "order",
             "n_recommended",
@@ -1055,57 +1251,59 @@ class TestEvaluate:
             "f1_norm",
         }
 
-    def test_row_count_with_order_1(self, scorer_fitted, df_rec):
+    def test_row_count_with_order_1(self, scorer_fitted, df_rec, df_eval):
         # order=1 でも order_max(=2) の行が追加されるので 2 行
-        result = scorer_fitted.evaluate(df_rec, _UIREVISIT, order=1)
+        result = scorer_fitted.evaluate(df_rec, df_eval, order=1)
         assert len(result) == 2
 
-    def test_order_max_always_included(self, scorer_fitted, df_rec):
-        result = scorer_fitted.evaluate(df_rec, _UIREVISIT, order=1)
+    def test_order_max_always_included(self, scorer_fitted, df_rec, df_eval):
+        result = scorer_fitted.evaluate(df_rec, df_eval, order=1)
         assert df_rec["order"].max() in result["order"].values
 
-    def test_n_recommended_at_order1(self, scorer_fitted, df_rec):
-        result = scorer_fitted.evaluate(df_rec, _UIREVISIT, order=1)
+    def test_n_recommended_at_order1(self, scorer_fitted, df_rec, df_eval):
+        result = scorer_fitted.evaluate(df_rec, df_eval, order=1)
         row = result[result["order"] == 1].iloc[0]
         assert row["n_recommended"] == 2  # 2ユーザー × 1推薦
 
-    def test_n_hit_at_order1(self, scorer_fitted, df_rec):
-        result = scorer_fitted.evaluate(df_rec, _UIREVISIT, order=1)
+    def test_n_hit_at_order1(self, scorer_fitted, df_rec, df_eval):
+        result = scorer_fitted.evaluate(df_rec, df_eval, order=1)
         row = result[result["order"] == 1].iloc[0]
         assert row["n_hit"] == 2
 
-    def test_precision_at_order1(self, scorer_fitted, df_rec):
-        result = scorer_fitted.evaluate(df_rec, _UIREVISIT, order=1)
+    def test_precision_at_order1(self, scorer_fitted, df_rec, df_eval):
+        result = scorer_fitted.evaluate(df_rec, df_eval, order=1)
         row = result[result["order"] == 1].iloc[0]
         assert row["precision"] == pytest.approx(1.0)
 
-    def test_recall_at_order1(self, scorer_fitted, df_rec):
-        result = scorer_fitted.evaluate(df_rec, _UIREVISIT, order=1)
+    def test_recall_at_order1(self, scorer_fitted, df_rec, df_eval):
+        result = scorer_fitted.evaluate(df_rec, df_eval, order=1)
         row = result[result["order"] == 1].iloc[0]
         assert row["recall"] == pytest.approx(1.0)
 
-    def test_f1_at_order1(self, scorer_fitted, df_rec):
-        result = scorer_fitted.evaluate(df_rec, _UIREVISIT, order=1)
+    def test_f1_at_order1(self, scorer_fitted, df_rec, df_eval):
+        result = scorer_fitted.evaluate(df_rec, df_eval, order=1)
         row = result[result["order"] == 1].iloc[0]
         assert row["f1"] == pytest.approx(1.0)
 
-    def test_precision_at_order_max(self, scorer_fitted, df_rec):
+    def test_precision_at_order_max(self, scorer_fitted, df_rec, df_eval):
         # order=2: 4推薦中2ヒット → precision=0.5
-        result = scorer_fitted.evaluate(df_rec, _UIREVISIT, order=2)
+        result = scorer_fitted.evaluate(df_rec, df_eval, order=2)
         row = result[result["order"] == 2].iloc[0]
         assert row["precision"] == pytest.approx(0.5)
 
-    def test_recall_norm_with_unseen_revisits(self, scorer_fitted, df_rec):
-        # UIrevisit に df_rec に存在しないペアを追加すると recall < recall_norm
-        extended = _UIREVISIT | {("u3", "item3")}  # len=3
-        result = scorer_fitted.evaluate(df_rec, extended, order=1)
+    def test_recall_norm_with_unseen_revisits(self, scorer_fitted, df_rec, df_eval):
+        # df_eval に存在しないペアを行追加すると recall < recall_norm
+        extra = pd.DataFrame([("u3", "item3", "2024-01-11")], columns=["user", "item", "datetime"])
+        df_eval_extended = pd.concat([df_eval, extra], ignore_index=True)
+        result = scorer_fitted.evaluate(df_rec, df_eval_extended, order=1)
         row = result[result["order"] == 1].iloc[0]
         assert row["recall"] == pytest.approx(2 / 3)
         assert row["recall_norm"] == pytest.approx(1.0)
 
-    def test_f1_norm_with_unseen_revisits(self, scorer_fitted, df_rec):
-        extended = _UIREVISIT | {("u3", "item3")}
-        result = scorer_fitted.evaluate(df_rec, extended, order=1)
+    def test_f1_norm_with_unseen_revisits(self, scorer_fitted, df_rec, df_eval):
+        extra = pd.DataFrame([("u3", "item3", "2024-01-11")], columns=["user", "item", "datetime"])
+        df_eval_extended = pd.concat([df_eval, extra], ignore_index=True)
+        result = scorer_fitted.evaluate(df_rec, df_eval_extended, order=1)
         row = result[result["order"] == 1].iloc[0]
         # recall_norm=1.0, precision=1.0 → f1_norm=1.0 > f1
         assert row["f1_norm"] == pytest.approx(1.0)
@@ -1121,21 +1319,26 @@ class TestEvaluate:
             recency_limit=_RECENCY_LIMIT,
             frequency_limit=_FREQUENCY_LIMIT,
         )
-        df_rec_custom = s.transform(df_custom, _FIT_TARGET_DATE)
-        uirevisit = {("u1", "item1"), ("u2", "item2")}
-        result = s.evaluate(df_rec_custom, uirevisit)  # user_col/item_col 省略
+        df_rec_custom = s.transform_date(df_custom, _FIT_TARGET_DATE)
+        df_eval_custom = df_custom[pd.to_datetime(df_custom["ts"]) >= _EVAL_PERIOD[0]]
+        result = s.evaluate(df_rec_custom, df_eval_custom)  # user_col/item_col 省略
         assert isinstance(result, pd.DataFrame)
 
-    def test_explicit_col_override(self, scorer_fitted, df_rec):
+    def test_explicit_col_override(self, scorer_fitted, df_rec, df_eval):
         df_rec_renamed = df_rec.rename(columns={"user": "uid", "item": "iid"})
+        df_eval_renamed = df_eval.rename(columns={"user": "uid", "item": "iid"})
         result = scorer_fitted.evaluate(
-            df_rec_renamed, _UIREVISIT, order=1, user_col="uid", item_col="iid"
+            df_rec_renamed, df_eval_renamed, order=1, user_col="uid", item_col="iid"
         )
         assert isinstance(result, pd.DataFrame)
 
-    def test_invalid_uirevisit_type_raises(self, scorer_fitted, df_rec):
-        with pytest.raises(ValueError, match="UIrevisit"):
+    def test_invalid_df_eval_type_raises(self, scorer_fitted, df_rec):
+        with pytest.raises(TypeError, match="pandas DataFrame"):
             scorer_fitted.evaluate(df_rec, 12345, order=1)
+
+    def test_missing_col_in_df_eval_raises(self, scorer_fitted, df_rec, df_eval):
+        with pytest.raises(ValueError, match="df_eval"):
+            scorer_fitted.evaluate(df_rec, df_eval.drop(columns="item"), order=1)
 
 
 # ---------------------------------------------------------------------------
