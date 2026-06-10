@@ -38,12 +38,18 @@ RF スコアリング手法を Python パッケージとして PyPI に公開し
   - `df_obs`: 観測期間の閲覧履歴 DataFrame。同一ユーザー × 商品の組み合わせが複数行存在することを想定（リピート閲覧）
   - `df_eval`: 評価期間のイベント履歴 DataFrame（閲覧・購買・CV など推定対象のイベント）。`df_obs` と同じカラム構成
   - `ref_date`: 最新度計算の基準日（省略時は `df_obs` の最大日付を使用）
+  - `recency_limit`: 最新度の上限値（省略時は累積 cv の 95% をカバーする値を自動設定）
+  - `frequency_limit`: 頻度の上限値（省略時は累積 cv の 95% をカバーする値を自動設定）
 - 単一 DataFrame と基準日から期間を自動導出したい場合は `fit_date()` を使用する
   - `df`: 閲覧履歴全体の DataFrame
   - `target_date`: 観測期間と評価期間の分割点となる基準日。観測期間は `target_date` まで（デフォルト: 28日遡る）、評価期間は `target_date` の翌日から（デフォルト: 7日分）
+  - `recency_limit`: 最新度の上限値（省略時は自動設定）
+  - `frequency_limit`: 頻度の上限値（省略時は自動設定）
 - 期間を明示的に指定したい場合は `fit_period()` を使用する
   - `observation_period`: 観測期間の開始日・終了日の tuple
   - `evaluation_period`: 評価期間の開始日・終了日の tuple
+  - `recency_limit`: 最新度の上限値（省略時は自動設定）
+  - `frequency_limit`: 頻度の上限値（省略時は自動設定）
 
 ### 機能
 
@@ -55,6 +61,11 @@ RF スコアリング手法を Python パッケージとして PyPI に公開し
 | 2次元最適化再閲覧確率の推定（`mono` / `mrc` / `mfc` / `mcc`） | RF 制約と最小二乗誤差を目的関数にもつ凸2次計画問題を解いて推定する。制約の組み合わせにより `mono`（単調性のみ）・`mrc`（+ Recency 凸性）・`mfc`（+ Frequency 凹性）・`mcc`（+ 両凹凸性）の4モデルを提供する |
 | 狭義単調性（`eps` パラメータ） | `optimize(eps=ε)` に正の値を指定すると、隣接する最新度・頻度の確率値が必ず $\varepsilon$ 以上離れる狭義単調性制約を付与する。デフォルト（`eps=0.0`）は従来の広義単調性と等価 |
 | 推薦精度の評価（`evaluate`） | 推薦結果と評価期間のイベント履歴を比較し、各順位カットオフでの precision・recall・f1 を返す |
+| 推薦スコアリング（`transform`） | 観測期間の閲覧履歴 DataFrame の各 user×item ペアに最新度・頻度・再閲覧確率・推薦順位を付与して返す |
+| 個別確率取得（`predict`） | 指定した最新度 $r$・頻度 $f$ に対応する再閲覧確率を1件返す |
+| 確率面の3次元可視化（`plot_probability_surface`） | 再閲覧確率を recency × frequency の3次元ワイヤーフレームで可視化し `Figure` を返す |
+| 周辺確率の折れ線可視化（`plot_marginal_probability`） | 最新度または頻度の一方向の再閲覧確率を折れ線グラフで可視化し `Figure` を返す。経験的確率と最適化確率を重ねて表示可能 |
+| 確率テーブルの CSV 出力（`export_probability_csv`） | 任意のモデルの再閲覧確率テーブルを CSV ファイルに書き出す。`kind="all"` で全モデルを1ファイルにまとめて出力 |
 
 ### 出力
 
