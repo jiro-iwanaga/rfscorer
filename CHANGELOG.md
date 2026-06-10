@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-06-10
+
+### Fixed
+
+- `examples/basic_usage.ipynb`: corrected `transform()` call to use a pre-filtered observation
+  window (`df_test_obs`) instead of the full test log, matching the documented API contract.
+- `README.md`: rewrote the Usage section to reflect the current API — `fit()` now takes
+  pre-split `df_obs` / `df_eval` DataFrames, and `transform()` requires a pre-filtered
+  observation window. Added `plot_probability_surface()` commands alongside each surface image.
+
+### Added
+
+- Tests for `optimize()` kind aliases (`monotonic`, `monotonic_recency`, etc.) and
+  `export_probability_csv()`.
+
 ## [0.3.0] - 2026-06-07
 
 ### Added
