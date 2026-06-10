@@ -4,15 +4,20 @@
 
 ```
 rfscorer/
+├── .devcontainer/
+│   └── devcontainer.json             # 開発コンテナ設定
+├── .github/
+│   └── workflows/
+│       └── ci.yml                    # GitHub Actions CI 設定
 ├── .gitignore
 ├── .steering/                        # 作業単位のドキュメント（開発ごとに作成）
 │   └── YYYYMMDD-development-title/
 │       ├── requirements.md
 │       ├── design.md
 │       └── tasklist.md
+├── CHANGELOG.md                      # 変更履歴
 ├── LICENSE
 ├── README.md
-├── CLAUDE.md
 ├── pyproject.toml                    # パッケージ設定・依存関係
 ├── uv.lock                           # 依存関係ロック
 ├── src/
@@ -24,9 +29,8 @@ rfscorer/
 │   ├── test_scorer.py
 │   └── test_optimizer.py
 ├── examples/
-│   ├── README.md                         # サンプルデータのライセンス表記
-│   ├── access_log.csv
 │   └── basic_usage.ipynb
+├── img/                              # README 向け画像
 └── docs/                             # 永続的ドキュメント
     ├── product-requirements.md       # プロダクト要求定義書
     ├── functional-design.md          # 機能設計書
@@ -45,7 +49,19 @@ rfscorer/
 | `pyproject.toml` | パッケージのメタデータ、依存関係、ビルド設定、ruff 設定を管理する |
 | `uv.lock` | `uv` が生成する依存関係ロックファイル。バージョン管理に含める |
 | `README.md` | PyPI および GitHub 向けのパッケージ説明。インストール方法と使用例を含む |
-| `CLAUDE.md` | Claude Code 向けの開発ガイダンス |
+| `CHANGELOG.md` | バージョンごとの変更履歴 |
+
+### `.devcontainer/`
+
+| パス | 説明 |
+|------|------|
+| `devcontainer.json` | VS Code Dev Containers / GitHub Codespaces 向けの開発コンテナ設定 |
+
+### `.github/`
+
+| パス | 説明 |
+|------|------|
+| `workflows/ci.yml` | GitHub Actions による CI 設定（テスト・リント） |
 
 ### `src/rfscorer/`
 
@@ -66,9 +82,13 @@ rfscorer/
 
 | パス | 説明 |
 |------|------|
-| `README.md` | サンプルデータのライセンス表記 |
-| `access_log.csv` | サンプルデータ（閲覧履歴）。ohmsha/PyOptBook より MIT ライセンスで利用 |
 | `basic_usage.ipynb` | 基本的な使用例を示す Jupyter ノートブック |
+
+サンプルデータ（`access_log*.csv`）は ohmsha/PyOptBook より MIT ライセンスで利用しているが、gitignore 対象のため git 管理外。
+
+### `img/`
+
+README.md に埋め込む確率面ワイヤーフレームの画像を配置する。
 
 ### `docs/`
 
