@@ -203,6 +203,10 @@ class TestInit:
         assert scorer.empirical_probability_ is None
         assert scorer.empirical_probability_dict_ is None
         assert scorer.record_num is None
+        assert scorer.recency_limit is None
+        assert scorer.frequency_limit is None
+        assert scorer.mr_probability_dict_ is None
+        assert scorer.mf_probability_dict_ is None
 
 
 # ---------------------------------------------------------------------------
@@ -422,6 +426,13 @@ class TestFitPeriodResult:
         assert scorer_fitted.ef_probability_ is not None
         assert scorer_fitted.ef_probability_dict_ is not None
         assert scorer_fitted.ef_probability_table_ is not None
+
+    def test_mr_probability_dict_none_after_fit(self, scorer_fitted):
+        # optimize() 前は 1D 属性が None のまま (1D 分離設計の invariant)
+        assert scorer_fitted.mr_probability_dict_ is None
+
+    def test_mf_probability_dict_none_after_fit(self, scorer_fitted):
+        assert scorer_fitted.mf_probability_dict_ is None
 
     def test_er_constant_across_frequency(self, scorer_fitted):
         tol = 1e-9
@@ -742,6 +753,21 @@ class TestOptimize:
         assert tbl is not None
         assert tbl.shape == (_RECENCY_LIMIT, _FREQUENCY_LIMIT)
 
+    def test_mrc_sets_probability_table(self, scorer_optimized_mrc):
+        tbl = scorer_optimized_mrc.mrc_probability_table_
+        assert tbl is not None
+        assert tbl.shape == (_RECENCY_LIMIT, _FREQUENCY_LIMIT)
+
+    def test_mfc_sets_probability_table(self, scorer_optimized_mfc):
+        tbl = scorer_optimized_mfc.mfc_probability_table_
+        assert tbl is not None
+        assert tbl.shape == (_RECENCY_LIMIT, _FREQUENCY_LIMIT)
+
+    def test_mcc_sets_probability_table(self, scorer_optimized_mcc):
+        tbl = scorer_optimized_mcc.mcc_probability_table_
+        assert tbl is not None
+        assert tbl.shape == (_RECENCY_LIMIT, _FREQUENCY_LIMIT)
+
     def test_mono_probability_values_in_bounds(self, scorer_optimized_mono):
         tol = 1e-6
         for val in scorer_optimized_mono.mono_probability_dict_.values():
@@ -750,16 +776,12 @@ class TestOptimize:
     def test_mr_sets_probability(self, scorer_optimized_mr):
         assert scorer_optimized_mr.mr_probability_ is not None
         assert isinstance(scorer_optimized_mr.mr_probability_, pd.DataFrame)
-        assert set(scorer_optimized_mr.mr_probability_.columns) == {
-            "recency",
-            "frequency",
-            "probability",
-        }
+        assert set(scorer_optimized_mr.mr_probability_.columns) == {"recency", "probability"}
 
     def test_mr_sets_probability_dict(self, scorer_optimized_mr):
         d = scorer_optimized_mr.mr_probability_dict_
         assert d is not None
-        expected = {(r, f) for r in scorer_optimized_mr.R for f in scorer_optimized_mr.F}
+        expected = set(scorer_optimized_mr.R)
         assert set(d.keys()) == expected
 
     def test_mr_probability_values_in_bounds(self, scorer_optimized_mr):
@@ -767,37 +789,21 @@ class TestOptimize:
         for val in scorer_optimized_mr.mr_probability_dict_.values():
             assert -tol <= val <= 1 + tol
 
-    def test_mr_constant_across_frequency(self, scorer_optimized_mr):
-        tol = 1e-6
-        for r in scorer_optimized_mr.R:
-            vals = [scorer_optimized_mr.mr_probability_dict_[r, f] for f in scorer_optimized_mr.F]
-            assert all(abs(v - vals[0]) < tol for v in vals)
-
     def test_mf_sets_probability(self, scorer_optimized_mf):
         assert scorer_optimized_mf.mf_probability_ is not None
         assert isinstance(scorer_optimized_mf.mf_probability_, pd.DataFrame)
-        assert set(scorer_optimized_mf.mf_probability_.columns) == {
-            "recency",
-            "frequency",
-            "probability",
-        }
+        assert set(scorer_optimized_mf.mf_probability_.columns) == {"frequency", "probability"}
 
     def test_mf_sets_probability_dict(self, scorer_optimized_mf):
         d = scorer_optimized_mf.mf_probability_dict_
         assert d is not None
-        expected = {(r, f) for r in scorer_optimized_mf.R for f in scorer_optimized_mf.F}
+        expected = set(scorer_optimized_mf.F)
         assert set(d.keys()) == expected
 
     def test_mf_probability_values_in_bounds(self, scorer_optimized_mf):
         tol = 1e-6
         for val in scorer_optimized_mf.mf_probability_dict_.values():
             assert -tol <= val <= 1 + tol
-
-    def test_mf_constant_across_recency(self, scorer_optimized_mf):
-        tol = 1e-6
-        for f in scorer_optimized_mf.F:
-            vals = [scorer_optimized_mf.mf_probability_dict_[r, f] for r in scorer_optimized_mf.R]
-            assert all(abs(v - vals[0]) < tol for v in vals)
 
     def test_mrc_sets_probability(self, scorer_optimized_mrc):
         assert scorer_optimized_mrc.mrc_probability_ is not None
@@ -907,6 +913,18 @@ class TestOptimize:
         )
         with pytest.raises(ValueError, match="eps"):
             scorer.optimize(kind="mf", eps=0.5 + 1e-9)
+
+    def test_optimize_eps_too_large_mrc_raises(self, scorer, df):
+        # 2D eps 上限は mono と共通: min(p_max/(nr-1), p_max/(nf-1)) = min(1.0/6, 1.0/2) = 1.0/6
+        scorer.fit_period(
+            df,
+            _OBS_PERIOD,
+            _EVAL_PERIOD,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        with pytest.raises(ValueError, match="eps"):
+            scorer.optimize(kind="mrc", eps=0.5 + 1e-9)
 
     def test_optimize_with_eps_mono_produces_results(self, scorer, df):
         scorer.fit_period(
@@ -1022,6 +1040,28 @@ class TestPredict:
         with pytest.raises(RuntimeError, match="optimize"):
             scorer.predict(1, 1, kind="mcc")
 
+    def test_before_optimize_mr_raises(self, scorer, df):
+        scorer.fit_period(
+            df,
+            _OBS_PERIOD,
+            _EVAL_PERIOD,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer.predict(1, 1, kind="mr")
+
+    def test_before_optimize_mf_raises(self, scorer, df):
+        scorer.fit_period(
+            df,
+            _OBS_PERIOD,
+            _EVAL_PERIOD,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer.predict(1, 1, kind="mf")
+
     def test_invalid_kind_raises(self, scorer_fitted):
         with pytest.raises(ValueError, match="kind"):
             scorer_fitted.predict(1, 1, kind="invalid")
@@ -1071,6 +1111,18 @@ class TestPredict:
             expected = scorer_fitted.empirical_probability_dict_[r, _FREQUENCY_LIMIT]
             assert scorer_fitted.predict(r, f_over) == pytest.approx(expected)
 
+    def test_clamps_r_to_recency_limit_mr(self, scorer_optimized_mr):
+        # mr: r > recency_limit のとき recency_limit にクランプされる
+        r_over = _RECENCY_LIMIT + 10
+        expected = scorer_optimized_mr.mr_probability_dict_[_RECENCY_LIMIT]
+        assert scorer_optimized_mr.predict(r_over, 1, kind="mr") == pytest.approx(expected)
+
+    def test_clamps_f_to_frequency_limit_mf(self, scorer_optimized_mf):
+        # mf: f > frequency_limit のとき frequency_limit にクランプされる
+        f_over = _FREQUENCY_LIMIT + 10
+        expected = scorer_optimized_mf.mf_probability_dict_[_FREQUENCY_LIMIT]
+        assert scorer_optimized_mf.predict(1, f_over, kind="mf") == pytest.approx(expected)
+
     def test_mono_kind(self, scorer_optimized_mono):
         # 型・範囲に加えて、mono_probability_dict_ から値を引いていることを確認
         prob = scorer_optimized_mono.predict(1, 1, kind="mono")
@@ -1082,13 +1134,27 @@ class TestPredict:
         prob = scorer_optimized_mr.predict(1, 1, kind="mr")
         assert isinstance(prob, float)
         assert 0.0 - 1e-6 <= prob <= 1.0 + 1e-6
-        assert prob == pytest.approx(scorer_optimized_mr.mr_probability_dict_[1, 1])
+        # mr は 1D: recency=1 のみで参照
+        assert prob == pytest.approx(scorer_optimized_mr.mr_probability_dict_[1])
 
     def test_mf_kind(self, scorer_optimized_mf):
         prob = scorer_optimized_mf.predict(1, 1, kind="mf")
         assert isinstance(prob, float)
         assert 0.0 - 1e-6 <= prob <= 1.0 + 1e-6
-        assert prob == pytest.approx(scorer_optimized_mf.mf_probability_dict_[1, 1])
+        # mf は 1D: frequency=1 のみで参照
+        assert prob == pytest.approx(scorer_optimized_mf.mf_probability_dict_[1])
+
+    def test_mr_ignores_f(self, scorer_optimized_mr):
+        # mr は 1D モデル: f の値が変わっても確率は変わらない
+        assert scorer_optimized_mr.predict(1, 1, kind="mr") == scorer_optimized_mr.predict(
+            1, 999, kind="mr"
+        )
+
+    def test_mf_ignores_r(self, scorer_optimized_mf):
+        # mf は 1D モデル: r の値が変わっても確率は変わらない
+        assert scorer_optimized_mf.predict(1, 1, kind="mf") == scorer_optimized_mf.predict(
+            999, 1, kind="mf"
+        )
 
     def test_mrc_kind(self, scorer_optimized_mrc):
         # 型・範囲に加えて、mrc_probability_dict_ から値を引いていることを確認
@@ -1192,6 +1258,56 @@ class TestTransform:
         result_empirical = scorer_fitted.transform(self._make_obs(), kind="empirical")
         assert list(result_emp["probability"]) == list(result_empirical["probability"])
 
+    def test_before_optimize_mr_raises(self, scorer_fitted):
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer_fitted.transform(self._make_obs(), kind="mr")
+
+    def test_before_optimize_mf_raises(self, scorer_fitted):
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer_fitted.transform(self._make_obs(), kind="mf")
+
+    def test_mr_probability_matches_dict(self, scorer_optimized_mr):
+        result = scorer_optimized_mr.transform(
+            self._make_obs(), ref_date=_FIT_TARGET_DATE, kind="mr"
+        )
+        for _, row in result.iterrows():
+            r_adj = min(int(row["recency"]), _RECENCY_LIMIT)
+            expected = scorer_optimized_mr.mr_probability_dict_[r_adj]
+            assert row["probability"] == pytest.approx(expected)
+
+    def test_mf_probability_matches_dict(self, scorer_optimized_mf):
+        result = scorer_optimized_mf.transform(
+            self._make_obs(), ref_date=_FIT_TARGET_DATE, kind="mf"
+        )
+        for _, row in result.iterrows():
+            f_adj = min(int(row["frequency"]), _FREQUENCY_LIMIT)
+            expected = scorer_optimized_mf.mf_probability_dict_[f_adj]
+            assert row["probability"] == pytest.approx(expected)
+
+    def test_clamps_recency_above_limit(self, scorer_fitted):
+        # recency > recency_limit の行は limit にクランプして確率を引く
+        # 2023-12-30 → ref_date Jan07 との差 = 8日 → recency = 9 > limit=7
+        extra = pd.DataFrame([("u3", "item3", "2023-12-30")], columns=["user", "item", "datetime"])
+        df_obs = pd.concat([self._make_obs(), extra], ignore_index=True)
+        result = scorer_fitted.transform(df_obs, ref_date=_FIT_TARGET_DATE)
+        u3_row = result[(result["user"] == "u3") & (result["item"] == "item3")].iloc[0]
+        assert u3_row["recency"] == 9  # 出力の recency は元値を保持
+        expected = scorer_fitted.empirical_probability_dict_[_RECENCY_LIMIT, 1]
+        assert u3_row["probability"] == pytest.approx(expected)
+
+    def test_clamps_frequency_above_limit(self, scorer_fitted):
+        # frequency > frequency_limit の行は limit にクランプして確率を引く
+        # Jan04〜Jan07 の4回閲覧 → frequency=4 > limit=3
+        extra_rows = [("u3", "item3", f"2024-01-0{d}") for d in range(4, 8)]
+        extra = pd.DataFrame(extra_rows, columns=["user", "item", "datetime"])
+        df_obs = pd.concat([self._make_obs(), extra], ignore_index=True)
+        result = scorer_fitted.transform(df_obs, ref_date=_FIT_TARGET_DATE)
+        u3_row = result[(result["user"] == "u3") & (result["item"] == "item3")].iloc[0]
+        assert u3_row["frequency"] == 4  # 出力の frequency は元値を保持
+        # min recency = Jan07→recency=1, frequency_adj = min(4, 3) = 3
+        expected = scorer_fitted.empirical_probability_dict_[1, _FREQUENCY_LIMIT]
+        assert u3_row["probability"] == pytest.approx(expected)
+
 
 # ---------------------------------------------------------------------------
 # transform_date — 後方互換 API (target_date でフィルタ)
@@ -1258,6 +1374,17 @@ class TestTransformDate:
         result_emp = scorer_fitted.transform_date(df, "2024-01-07", kind="emp")
         result_empirical = scorer_fitted.transform_date(df, "2024-01-07", kind="empirical")
         assert list(result_emp["probability"]) == list(result_empirical["probability"])
+
+    def test_target_date_is_inclusive(self, scorer_fitted, df):
+        # target_date 当日の行が含まれること
+        # u2-item2 は Jan06 と Jan07 に閲覧 → target_date="2024-01-07" なら frequency=2
+        result = scorer_fitted.transform_date(df, "2024-01-07")
+        u2_item2 = result[(result["user"] == "u2") & (result["item"] == "item2")].iloc[0]
+        assert u2_item2["frequency"] == 2
+
+    def test_invalid_target_date_raises(self, scorer_fitted, df):
+        with pytest.raises(ValueError, match="target_date could not be parsed"):
+            scorer_fitted.transform_date(df, "not-a-date")
 
 
 # ---------------------------------------------------------------------------
@@ -1407,12 +1534,12 @@ class TestPlotProbabilitySurface:
         with pytest.raises(RuntimeError, match="optimize"):
             scorer_fitted.plot_probability_surface(kind="mono")
 
-    def test_before_optimize_mr_raises(self, scorer_fitted):
-        with pytest.raises(RuntimeError, match="optimize"):
+    def test_mr_raises_value_error(self, scorer_fitted):
+        with pytest.raises(ValueError, match="1D marginal"):
             scorer_fitted.plot_probability_surface(kind="mr")
 
-    def test_before_optimize_mf_raises(self, scorer_fitted):
-        with pytest.raises(RuntimeError, match="optimize"):
+    def test_mf_raises_value_error(self, scorer_fitted):
+        with pytest.raises(ValueError, match="1D marginal"):
             scorer_fitted.plot_probability_surface(kind="mf")
 
     def test_before_optimize_mrc_raises(self, scorer_fitted):
@@ -1439,17 +1566,15 @@ class TestPlotProbabilitySurface:
         fig = scorer_optimized_mono.plot_probability_surface(kind="mono")
         assert isinstance(fig, matplotlib.figure.Figure)
 
-    def test_returns_figure_mr(self, scorer_optimized_mr):
-        import matplotlib.figure
+    def test_mr_always_raises(self, scorer_optimized_mr):
+        # mr は 1D モデルのためサーフェス描画不可
+        with pytest.raises(ValueError, match="1D marginal"):
+            scorer_optimized_mr.plot_probability_surface(kind="mr")
 
-        fig = scorer_optimized_mr.plot_probability_surface(kind="mr")
-        assert isinstance(fig, matplotlib.figure.Figure)
-
-    def test_returns_figure_mf(self, scorer_optimized_mf):
-        import matplotlib.figure
-
-        fig = scorer_optimized_mf.plot_probability_surface(kind="mf")
-        assert isinstance(fig, matplotlib.figure.Figure)
+    def test_mf_always_raises(self, scorer_optimized_mf):
+        # mf は 1D モデルのためサーフェス描画不可
+        with pytest.raises(ValueError, match="1D marginal"):
+            scorer_optimized_mf.plot_probability_surface(kind="mf")
 
     def test_returns_figure_mrc(self, scorer_optimized_mrc):
         import matplotlib.figure
@@ -1749,6 +1874,18 @@ class TestExportProbabilityCsv:
         scorer_optimized_mono.export_probability_csv(kind="mono", path=str(out))
         df = pd.read_csv(out)
         assert set(df.columns) == {"recency", "frequency", "probability"}
+
+    def test_mr_output_columns(self, scorer_optimized_mr, tmp_path):
+        out = tmp_path / "mr.csv"
+        scorer_optimized_mr.export_probability_csv(kind="mr", path=str(out))
+        df = pd.read_csv(out)
+        assert set(df.columns) == {"recency", "probability"}
+
+    def test_mf_output_columns(self, scorer_optimized_mf, tmp_path):
+        out = tmp_path / "mf.csv"
+        scorer_optimized_mf.export_probability_csv(kind="mf", path=str(out))
+        df = pd.read_csv(out)
+        assert set(df.columns) == {"frequency", "probability"}
 
     def test_emp_row_count(self, scorer_fitted, tmp_path):
         out = tmp_path / "emp.csv"

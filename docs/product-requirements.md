@@ -57,7 +57,7 @@ RF スコアリング手法を Python パッケージとして PyPI に公開し
 |------|------|
 | 経験的再閲覧確率の推定（`emp`） | 観測期間における最新度 $r$・頻度 $f$ 別に、評価期間での再閲覧比率を直接推定する |
 | 周辺的経験的再閲覧確率の推定（`er` / `ef`） | `fit()`・`fit_date()` または `fit_period()` 時に自動計算。最新度方向（`er`）・頻度方向（`ef`）の周辺確率を RF グリッド全体にブロードキャストした確率面 |
-| 1次元最適化再閲覧確率の推定（`mr` / `mf`） | 周辺確率を目標とした1次元の凸2次計画問題を解く。`mr` は Recency 単調性 + 凸性、`mf` は Frequency 単調性 + 凹性を制約として課す。結果を RF グリッド全体にブロードキャスト |
+| 1次元最適化再閲覧確率の推定（`mr` / `mf`） | 周辺確率を目標とした1次元の凸2次計画問題を解く。`mr` は Recency 単調性 + 凸性、`mf` は Frequency 単調性 + 凹性を制約として課す。結果は1次元 dict に格納され、2次元グリッドへのブロードキャストは行わない |
 | 2次元最適化再閲覧確率の推定（`mono` / `mrc` / `mfc` / `mcc`） | RF 制約と最小二乗誤差を目的関数にもつ凸2次計画問題を解いて推定する。制約の組み合わせにより `mono`（単調性のみ）・`mrc`（+ Recency 凸性）・`mfc`（+ Frequency 凹性）・`mcc`（+ 両凹凸性）の4モデルを提供する |
 | 狭義単調性（`eps` パラメータ） | `optimize(eps=ε)` に正の値を指定すると、隣接する最新度・頻度の確率値が必ず $\varepsilon$ 以上離れる狭義単調性制約を付与する。デフォルト（`eps=0.0`）は従来の広義単調性と等価 |
 | 推薦精度の評価（`evaluate`） | 推薦結果と評価期間のイベント履歴を比較し、各順位カットオフでの precision・recall・f1 を返す |
@@ -74,8 +74,8 @@ RF スコアリング手法を Python パッケージとして PyPI に公開し
 | `empirical_probability_` | 経験的再閲覧確率（`emp`）。`pd.DataFrame`（カラム: `recency`, `frequency`, `N`, `cv`, `probability`）。`fit()`・`fit_date()` または `fit_period()` 後にアクセス可能 |
 | `er_probability_` | 周辺的経験的再閲覧確率（`er`）。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`fit()`・`fit_date()` または `fit_period()` 後にアクセス可能 |
 | `ef_probability_` | 周辺的経験的再閲覧確率（`ef`）。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`fit()`・`fit_date()` または `fit_period()` 後にアクセス可能 |
-| `mr_probability_` | mr モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mr')` 後にアクセス可能 |
-| `mf_probability_` | mf モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mf')` 後にアクセス可能 |
+| `mr_probability_` | mr モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `probability`）。`optimize(kind='mr')` 後にアクセス可能 |
+| `mf_probability_` | mf モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `frequency`, `probability`）。`optimize(kind='mf')` 後にアクセス可能 |
 | `mono_probability_` | mono モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mono')` 後にアクセス可能 |
 | `mrc_probability_` | mrc モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mrc')` 後にアクセス可能 |
 | `mfc_probability_` | mfc モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mfc')` 後にアクセス可能 |

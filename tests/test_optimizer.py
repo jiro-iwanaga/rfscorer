@@ -51,7 +51,7 @@ def opt_solved_mr():
     o = RFOptimizer()
     o.set_data(_R, _F, _RF2N, _RF2Prob)
     o.set_marginal_data(_R2N, _R2Prob, _F2N, _F2Prob)
-    o.build_model(kind="mr")
+    o.build_marginal_model(axis="r")
     o.solve()
     o.postprocess()
     return o
@@ -62,7 +62,7 @@ def opt_solved_mf():
     o = RFOptimizer()
     o.set_data(_R, _F, _RF2N, _RF2Prob)
     o.set_marginal_data(_R2N, _R2Prob, _F2N, _F2Prob)
-    o.build_model(kind="mf")
+    o.build_marginal_model(axis="f")
     o.solve()
     o.postprocess()
     return o
@@ -70,6 +70,16 @@ def opt_solved_mf():
 
 @pytest.fixture(scope="module")
 def opt_after_solve():
+    o = RFOptimizer()
+    o.set_data(_R, _F, _RF2N, _RF2Prob)
+    o.build_model(kind="mono")
+    o.solve()
+    return o
+
+
+@pytest.fixture(scope="module")
+def opt_solved_not_postprocessed():
+    """show_result のみを目的とした未後処理フィクスチャ。opt_after_solve と分離。"""
     o = RFOptimizer()
     o.set_data(_R, _F, _RF2N, _RF2Prob)
     o.build_model(kind="mono")
@@ -127,10 +137,13 @@ class TestInit:
         assert opt.RF2N == {}
         assert opt.RF2Prob == {}
         assert opt.kind is None
+        assert opt.axis is None
         assert opt.x is None
         assert opt.problem is None
         assert opt.status is None
         assert opt.RF2X == {}
+        assert opt.R2X == {}
+        assert opt.F2X == {}
 
 
 # ---------------------------------------------------------------------------
@@ -205,12 +218,80 @@ class TestSetData:
 
 
 # ---------------------------------------------------------------------------
+# set_marginal_data
+# ---------------------------------------------------------------------------
+class TestSetMarginalData:
+    def test_valid(self, opt_with_data):
+        opt_with_data.set_marginal_data(_R2N, _R2Prob, _F2N, _F2Prob)
+        assert opt_with_data.R2N == _R2N
+        assert opt_with_data.R2Prob == _R2Prob
+        assert opt_with_data.F2N == _F2N
+        assert opt_with_data.F2Prob == _F2Prob
+
+    def test_copies_inputs(self, opt_with_data):
+        R2N = dict(_R2N)
+        R2Prob = dict(_R2Prob)
+        F2N = dict(_F2N)
+        F2Prob = dict(_F2Prob)
+        opt_with_data.set_marginal_data(R2N, R2Prob, F2N, F2Prob)
+        R2N[1] = 999
+        R2Prob[1] = 0.0
+        F2N[1] = 999
+        F2Prob[1] = 0.0
+        assert opt_with_data.R2N[1] == _R2N[1]
+        assert opt_with_data.R2Prob[1] == _R2Prob[1]
+        assert opt_with_data.F2N[1] == _F2N[1]
+        assert opt_with_data.F2Prob[1] == _F2Prob[1]
+
+    def test_before_set_data_raises(self, opt):
+        with pytest.raises(RuntimeError, match="set_data"):
+            opt.set_marginal_data(_R2N, _R2Prob, _F2N, _F2Prob)
+
+    def test_missing_R2N_key_raises(self, opt_with_data):
+        R2N_incomplete = dict(_R2N)
+        del R2N_incomplete[1]
+        with pytest.raises(ValueError, match="R2N is missing 1"):
+            opt_with_data.set_marginal_data(R2N_incomplete, _R2Prob, _F2N, _F2Prob)
+
+    def test_missing_R2Prob_key_raises(self, opt_with_data):
+        R2Prob_incomplete = dict(_R2Prob)
+        del R2Prob_incomplete[2]
+        with pytest.raises(ValueError, match="R2Prob is missing 1"):
+            opt_with_data.set_marginal_data(_R2N, R2Prob_incomplete, _F2N, _F2Prob)
+
+    def test_missing_F2N_key_raises(self, opt_with_data):
+        F2N_incomplete = dict(_F2N)
+        del F2N_incomplete[1]
+        with pytest.raises(ValueError, match="F2N is missing 1"):
+            opt_with_data.set_marginal_data(_R2N, _R2Prob, F2N_incomplete, _F2Prob)
+
+    def test_missing_F2Prob_key_raises(self, opt_with_data):
+        F2Prob_incomplete = dict(_F2Prob)
+        del F2Prob_incomplete[3]
+        with pytest.raises(ValueError, match="F2Prob is missing 1"):
+            opt_with_data.set_marginal_data(_R2N, _R2Prob, _F2N, F2Prob_incomplete)
+
+    def test_missing_multiple_keys_truncates(self, opt_with_data):
+        # R2N から r=1,2,3 の全3キーより多い欠損は存在できないので F2Prob で "..." テスト
+        # R=3 なので R2N から全3件欠損 → 3件ちょうどは "..." なし; F側で4件欠損は不可能
+        # よって R2Prob から2件欠損させて suffix なしを確認し、別途 truncation は
+        # set_data 側でカバー済み
+        # R2N から全件除去して3件欠損のケース（3件以下なので "..." は付かない）
+        with pytest.raises(ValueError, match="R2N is missing 3"):
+            opt_with_data.set_marginal_data({}, _R2Prob, _F2N, _F2Prob)
+
+
+# ---------------------------------------------------------------------------
 # build_model
 # ---------------------------------------------------------------------------
 class TestBuildModel:
     def test_invalid_kind_raises(self, opt_with_data):
         with pytest.raises(ValueError, match="kind must be 'mono'"):
             opt_with_data.build_model(kind="invalid")
+
+    def test_invalid_axis_raises(self, opt_with_marginal_data):
+        with pytest.raises(ValueError, match="axis"):
+            opt_with_marginal_data.build_marginal_model(axis="invalid")
 
     def test_before_set_data_raises(self, opt):
         with pytest.raises(RuntimeError, match="set_data"):
@@ -220,13 +301,17 @@ class TestBuildModel:
         opt_with_data.build_model(kind="mono")
         assert opt_with_data.kind == "mono"
 
-    def test_sets_kind_mr(self, opt_with_marginal_data):
-        opt_with_marginal_data.build_model(kind="mr")
-        assert opt_with_marginal_data.kind == "mr"
+    def test_build_model_sets_axis_none(self, opt_with_data):
+        opt_with_data.build_model(kind="mono")
+        assert opt_with_data.axis is None
 
-    def test_sets_kind_mf(self, opt_with_marginal_data):
-        opt_with_marginal_data.build_model(kind="mf")
-        assert opt_with_marginal_data.kind == "mf"
+    def test_sets_axis_r(self, opt_with_marginal_data):
+        opt_with_marginal_data.build_marginal_model(axis="r")
+        assert opt_with_marginal_data.axis == "r"
+
+    def test_sets_axis_f(self, opt_with_marginal_data):
+        opt_with_marginal_data.build_marginal_model(axis="f")
+        assert opt_with_marginal_data.axis == "f"
 
     def test_sets_kind_mrc(self, opt_with_data):
         opt_with_data.build_model(kind="mrc")
@@ -242,11 +327,11 @@ class TestBuildModel:
 
     def test_mr_requires_marginal_data(self, opt_with_data):
         with pytest.raises(RuntimeError, match="set_marginal_data"):
-            opt_with_data.build_model(kind="mr")
+            opt_with_data.build_marginal_model(axis="r")
 
     def test_mf_requires_marginal_data(self, opt_with_data):
         with pytest.raises(RuntimeError, match="set_marginal_data"):
-            opt_with_data.build_model(kind="mf")
+            opt_with_data.build_marginal_model(axis="f")
 
     def test_num_variables(self, opt_with_data):
         opt_with_data.build_model()
@@ -254,22 +339,22 @@ class TestBuildModel:
         assert opt_with_data.num_variables == 9
 
     def test_num_variables_mr(self, opt_with_marginal_data):
-        opt_with_marginal_data.build_model(kind="mr")
+        opt_with_marginal_data.build_marginal_model(axis="r")
         # 1D: |R| = 3
         assert opt_with_marginal_data.num_variables == 3
 
     def test_num_variables_mf(self, opt_with_marginal_data):
-        opt_with_marginal_data.build_model(kind="mf")
+        opt_with_marginal_data.build_marginal_model(axis="f")
         # 1D: |F| = 3
         assert opt_with_marginal_data.num_variables == 3
 
     def test_num_constraints_mr(self, opt_with_marginal_data):
-        opt_with_marginal_data.build_model(kind="mr")
+        opt_with_marginal_data.build_marginal_model(axis="r")
         # 範囲: 3+3=6、単調性: (3-1)=2、凸性: (3-2)=1 → 合計 9
         assert opt_with_marginal_data.num_constraints == 9
 
     def test_num_constraints_mf(self, opt_with_marginal_data):
-        opt_with_marginal_data.build_model(kind="mf")
+        opt_with_marginal_data.build_marginal_model(axis="f")
         # 範囲: 3+3=6、単調性: (3-1)=2、凹性: (3-2)=1 → 合計 9
         assert opt_with_marginal_data.num_constraints == 9
 
@@ -301,6 +386,8 @@ class TestBuildModel:
         assert opt_with_data.status is None
         assert opt_with_data.objective_value is None
         assert opt_with_data.RF2X == {}
+        assert opt_with_data.R2X == {}
+        assert opt_with_data.F2X == {}
 
     def test_eps_default_is_zero(self, opt_with_data):
         opt_with_data.build_model()
@@ -314,6 +401,10 @@ class TestBuildModel:
         with pytest.raises(ValueError, match="eps"):
             opt_with_data.build_model(eps=-1e-6)
 
+    def test_negative_eps_marginal_raises(self, opt_with_marginal_data):
+        with pytest.raises(ValueError, match="eps"):
+            opt_with_marginal_data.build_marginal_model(axis="r", eps=-1e-6)
+
     def test_eps_exceeds_max_2d_raises(self, opt_with_data):
         # eps_max = max(RF2Prob) / (nr - 1) = 0.90 / 2 = 0.45
         with pytest.raises(ValueError, match="eps"):
@@ -325,36 +416,36 @@ class TestBuildModel:
     def test_eps_exceeds_max_mr_raises(self, opt_with_marginal_data):
         # eps_max = max(R2Prob) / (nr - 1) = 0.82 / 2 = 0.41
         with pytest.raises(ValueError, match="eps"):
-            opt_with_marginal_data.build_model(kind="mr", eps=0.41 + 1e-9)
+            opt_with_marginal_data.build_marginal_model(axis="r", eps=0.41 + 1e-9)
 
     def test_eps_at_max_mr_ok(self, opt_with_marginal_data):
-        opt_with_marginal_data.build_model(kind="mr", eps=0.41)  # 上界ちょうどは許容
+        opt_with_marginal_data.build_marginal_model(axis="r", eps=0.41)  # 上界ちょうどは許容
 
     def test_eps_exceeds_max_mf_raises(self, opt_with_marginal_data):
         # eps_max = max(F2Prob) / (nf - 1) = 0.70 / 2 = 0.35
         with pytest.raises(ValueError, match="eps"):
-            opt_with_marginal_data.build_model(kind="mf", eps=0.35 + 1e-9)
+            opt_with_marginal_data.build_marginal_model(axis="f", eps=0.35 + 1e-9)
 
     def test_eps_at_max_mf_ok(self, opt_with_marginal_data):
-        opt_with_marginal_data.build_model(kind="mf", eps=0.35)  # 上界ちょうどは許容
+        opt_with_marginal_data.build_marginal_model(axis="f", eps=0.35)  # 上界ちょうどは許容
 
     def test_strict_mono_recency_enforced(self, opt_with_marginal_data):
         """eps > 0 の場合、最適化後の recency 隣接値の差が eps 以上になること。"""
         eps = 1e-4
-        opt_with_marginal_data.build_model(kind="mr", eps=eps)
+        opt_with_marginal_data.build_marginal_model(axis="r", eps=eps)
         opt_with_marginal_data.solve()
         opt_with_marginal_data.postprocess()
-        vals = [opt_with_marginal_data.x.value[i] for i in range(len(opt_with_marginal_data.R))]
+        vals = [opt_with_marginal_data.R2X[r] for r in opt_with_marginal_data.R]
         for i in range(len(vals) - 1):
             assert vals[i] >= vals[i + 1] + eps - 1e-9
 
     def test_strict_mono_frequency_enforced(self, opt_with_marginal_data):
         """eps > 0 の場合、最適化後の frequency 隣接値の差が eps 以上になること。"""
         eps = 1e-4
-        opt_with_marginal_data.build_model(kind="mf", eps=eps)
+        opt_with_marginal_data.build_marginal_model(axis="f", eps=eps)
         opt_with_marginal_data.solve()
         opt_with_marginal_data.postprocess()
-        vals = [opt_with_marginal_data.x.value[i] for i in range(len(opt_with_marginal_data.F))]
+        vals = [opt_with_marginal_data.F2X[f] for f in opt_with_marginal_data.F]
         for i in range(len(vals) - 1):
             assert vals[i + 1] >= vals[i] + eps - 1e-9
 
@@ -365,7 +456,7 @@ class TestBuildModel:
 class TestSolve:
     def test_before_build_model_raises(self, opt_with_data):
         with pytest.raises(RuntimeError, match="build_model"):
-            opt_with_data.solve()
+            opt_with_data.solve()  # matches "build_model() or build_marginal_model()"
 
     def test_sets_status(self, opt_after_solve):
         assert opt_after_solve.status is not None
@@ -408,6 +499,12 @@ class TestPostprocess:
         tol = 1e-6
         for val in opt_solved_mono.RF2X.values():
             assert -tol <= val <= 1 + tol
+
+    def test_R2X_empty_after_2D(self, opt_solved_mono):
+        assert opt_solved_mono.R2X == {}
+
+    def test_F2X_empty_after_2D(self, opt_solved_mono):
+        assert opt_solved_mono.F2X == {}
 
 
 # ---------------------------------------------------------------------------
@@ -484,65 +581,59 @@ class TestMFCConstraints:
 
 
 # ---------------------------------------------------------------------------
-# 制約充足: mr
+# 制約充足: mr (1D recency marginal → R2X)
 # ---------------------------------------------------------------------------
 class TestMRConstraints:
     def test_recency_monotonicity(self, opt_solved_mr):
         for i in range(len(_R) - 1):
             r, r_next = _R[i], _R[i + 1]
-            for f in _F:
-                assert opt_solved_mr.RF2X[r, f] >= opt_solved_mr.RF2X[r_next, f] - _TOL
+            assert opt_solved_mr.R2X[r] >= opt_solved_mr.R2X[r_next] - _TOL
 
     def test_recency_convexity(self, opt_solved_mr):
         for i in range(len(_R) - 2):
             r0, r1, r2 = _R[i], _R[i + 1], _R[i + 2]
-            for f in _F:
-                second_diff = (
-                    opt_solved_mr.RF2X[r0, f]
-                    - 2 * opt_solved_mr.RF2X[r1, f]
-                    + opt_solved_mr.RF2X[r2, f]
-                )
-                assert second_diff >= -_TOL
+            second_diff = opt_solved_mr.R2X[r0] - 2 * opt_solved_mr.R2X[r1] + opt_solved_mr.R2X[r2]
+            assert second_diff >= -_TOL
 
-    def test_constant_across_frequency(self, opt_solved_mr):
-        # 1D モデルなので f によらず同じ値
-        for r in _R:
-            vals = [opt_solved_mr.RF2X[r, f] for f in _F]
-            assert all(abs(v - vals[0]) < _TOL for v in vals)
+    def test_R2X_covers_all_recency(self, opt_solved_mr):
+        assert set(opt_solved_mr.R2X.keys()) == set(_R)
 
-    def test_RF2X_covers_all_pairs(self, opt_solved_mr):
-        assert set(opt_solved_mr.RF2X.keys()) == {(r, f) for r in _R for f in _F}
+    def test_R2X_values_in_bounds(self, opt_solved_mr):
+        tol = 1e-6
+        for val in opt_solved_mr.R2X.values():
+            assert -tol <= val <= 1 + tol
+
+    def test_RF2X_empty(self, opt_solved_mr):
+        # 1D モデルなので RF2X はブロードキャストされない
+        assert opt_solved_mr.RF2X == {}
 
 
 # ---------------------------------------------------------------------------
-# 制約充足: mf
+# 制約充足: mf (1D frequency marginal → F2X)
 # ---------------------------------------------------------------------------
 class TestMFConstraints:
     def test_frequency_monotonicity(self, opt_solved_mf):
         for j in range(len(_F) - 1):
             f, f_next = _F[j], _F[j + 1]
-            for r in _R:
-                assert opt_solved_mf.RF2X[r, f] <= opt_solved_mf.RF2X[r, f_next] + _TOL
+            assert opt_solved_mf.F2X[f] <= opt_solved_mf.F2X[f_next] + _TOL
 
     def test_frequency_concavity(self, opt_solved_mf):
         for j in range(len(_F) - 2):
             f0, f1, f2 = _F[j], _F[j + 1], _F[j + 2]
-            for r in _R:
-                second_diff = (
-                    opt_solved_mf.RF2X[r, f0]
-                    - 2 * opt_solved_mf.RF2X[r, f1]
-                    + opt_solved_mf.RF2X[r, f2]
-                )
-                assert second_diff <= _TOL
+            second_diff = opt_solved_mf.F2X[f0] - 2 * opt_solved_mf.F2X[f1] + opt_solved_mf.F2X[f2]
+            assert second_diff <= _TOL
 
-    def test_constant_across_recency(self, opt_solved_mf):
-        # 1D モデルなので r によらず同じ値
-        for f in _F:
-            vals = [opt_solved_mf.RF2X[r, f] for r in _R]
-            assert all(abs(v - vals[0]) < _TOL for v in vals)
+    def test_F2X_covers_all_frequency(self, opt_solved_mf):
+        assert set(opt_solved_mf.F2X.keys()) == set(_F)
 
-    def test_RF2X_covers_all_pairs(self, opt_solved_mf):
-        assert set(opt_solved_mf.RF2X.keys()) == {(r, f) for r in _R for f in _F}
+    def test_F2X_values_in_bounds(self, opt_solved_mf):
+        tol = 1e-6
+        for val in opt_solved_mf.F2X.values():
+            assert -tol <= val <= 1 + tol
+
+    def test_RF2X_empty(self, opt_solved_mf):
+        # 1D モデルなので RF2X はブロードキャストされない
+        assert opt_solved_mf.RF2X == {}
 
 
 # ---------------------------------------------------------------------------
@@ -622,6 +713,6 @@ class TestShowMethods:
         out = capsys.readouterr().out
         assert "show result" in out
 
-    def test_show_result_before_postprocess_raises(self, opt_after_solve):
+    def test_show_result_before_postprocess_raises(self, opt_solved_not_postprocessed):
         with pytest.raises(RuntimeError, match="postprocess"):
-            opt_after_solve.show_result()
+            opt_solved_not_postprocessed.show_result()
