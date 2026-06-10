@@ -1364,17 +1364,17 @@ if __name__ == "__main__":
     # データの読み込み（オーム社『Pythonではじめる数理最適化』サポートデータより引用）
     url = "https://raw.githubusercontent.com/ohmsha/PyOptBook/main/7.recommendation/access_log.csv"
     df = pd.read_csv(url)
-    df_train = df[df.user_id.map(lambda x: hash(x) % 10 < 8)]
-    df_test = df[df.user_id.map(lambda x: hash(x) % 10 >= 8)]
+    df.columns = ["user", "item", "datetime"]
+    df_train = df[df.user.map(lambda x: hash(x) % 10 < 8)]
+    df_test = df[df.user.map(lambda x: hash(x) % 10 >= 8)]
 
-    scorer = RecencyFrequencyScorer(user_col="user_id", item_col="item_id", datetime_col="date")
+    scorer = RecencyFrequencyScorer()
 
     target_date = "2015-07-07"
 
     # 観測期間・評価期間に分割してから fit
-    df_train_dates = pd.to_datetime(df_train["date"])
-    df_train_obs = df_train[df_train_dates <= target_date]
-    df_train_eval = df_train[df_train_dates > target_date]
+    df_train_obs = df_train[df_train.datetime <= target_date]
+    df_train_eval = df_train[df_train.datetime > target_date]
     scorer.fit(df_train_obs, df_train_eval)
 
     scorer.plot_probability_surface("empirical").savefig("surface_emp_probability.png")
@@ -1411,9 +1411,8 @@ if __name__ == "__main__":
     scorer.plot_probability_surface("mcc").savefig("surface_mcc_probability.png")
     scorer.export_probability_csv("all")
 
-    df_test_dates = pd.to_datetime(df_test["date"])
-    df_test_obs = df_test[df_test_dates <= target_date]
-    df_test_eval = df_test[df_test_dates > target_date]
+    df_test_obs = df_test[df_test.datetime <= target_date]
+    df_test_eval = df_test[df_test.datetime > target_date]
 
     for kind in ("emp", "er", "ef", "mr", "mf", "mono", "mrc", "mfc", "mcc"):
         print(f"--- {kind} ---")
