@@ -12,7 +12,7 @@
 |------|---------|
 | 依存関係のインストール | `uv sync --dev` |
 | テスト実行 | `uv run pytest` |
-| 単一テスト実行 | `uv run pytest tests/test_scorer.py::test_name` |
+| 単一テスト実行 | `uv run pytest tests/test_scorer.py::ClassName::test_method_name` |
 | リント | `uv run ruff check .` |
 | フォーマット | `uv run ruff format .` |
 | パッケージビルド | `uv build` |
@@ -37,7 +37,7 @@
 
 - テストコードは `tests/` に配置する
 - `pytest` を使用する
-- `fit()`・`fit_date()`・`fit_period()`・`transform()`・`transform_date()`・`evaluate()`・`optimize()` の正常系・異常系をカバーする
+- `fit()`・`fit_date()`・`fit_period()`・`predict()`・`transform()`・`transform_date()`・`evaluate()`・`optimize()`・`export_probability_csv()` の正常系・異常系をカバーする
 
 ## ドキュメント管理
 
@@ -87,4 +87,4 @@
 1. `pyproject.toml` のバージョンを更新する
 2. `uv build` でパッケージをビルドする
 3. `uv publish` で PyPI に公開する
-4. GitHub にバージョンタグを付ける（例: `git tag v0.1.0`）
+4. GitHub にバージョンタグを付けてプッシュする（例: `git tag v0.1.0 && git push origin v0.1.0`）
