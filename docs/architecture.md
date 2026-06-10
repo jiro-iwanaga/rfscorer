@@ -1,5 +1,25 @@
 # 技術仕様書
 
+## モジュール構成
+
+| モジュール | クラス | 役割 |
+|-----------|--------|------|
+| `scorer.py` | `RecencyFrequencyScorer` | 公開 API。fit・transform・optimize・evaluate・plot・export の各メソッドを提供する |
+| `optimizer.py` | `RFOptimizer` | 内部モジュール。`optimize()` から委譲された凸2次計画問題を cvxpy で求解する |
+| `__init__.py` | — | `RecencyFrequencyScorer` のみを公開する |
+
+## 遅延インポート方針
+
+重い依存ライブラリは使用するメソッドの内部でのみインポートする。`import rfscorer` 自体は軽量に保ち、不要な依存関係をユーザーに強制しない。
+
+| ライブラリ | インポートのタイミング |
+|-----------|----------------------|
+| `numpy` | `plot_probability_surface()` 呼び出し時 |
+| `matplotlib` | `plot_probability_surface()` / `plot_marginal_probability()` 呼び出し時 |
+| `cvxpy`（`optimizer.py` 経由） | `optimize()` 呼び出し時 |
+
+この方針により、経験的確率の推定（`fit`・`transform`・`evaluate`）のみを使用するユーザーは `cvxpy` をインストールしなくても動作する。
+
 ## 外部依存ライブラリ
 
 | ライブラリ | 用途 |
