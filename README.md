@@ -29,16 +29,12 @@ pip install rfscorer
 ## Usage
 
 ```python
+import pandas as pd
 from rfscorer import RecencyFrequencyScorer
 ```
 
-Prepare an interaction log with at least three columns: user ID, item ID, and timestamp.
-Split it into a training set and a test set.
-
-```python
-df_train = ...  # training interaction log (columns: user, item, datetime)
-df_test  = ...  # test interaction log  (columns: user, item, datetime)
-```
+Prepare an interaction log with three columns: `user`, `item`, and `datetime`.
+The same user-item pair may appear multiple times, representing repeat visits.
 
 | user  | item  | datetime   |
 |-------|-------|------------|
@@ -48,26 +44,28 @@ df_test  = ...  # test interaction log  (columns: user, item, datetime)
 | u_002 | i_011 | 2026-07-02 |
 | u_002 | i_058 | 2026-07-04 |
 
-The same user-item pair may appear multiple times, representing repeat visits.
+Split users into training and test sets, then split each by `target_date` into an observation window and an evaluation window.
 
-Instantiate the scorer, specifying the column names if they differ from the defaults (`user`, `item`, `datetime`).
+```python
+target_date = "2026-07-07"
+
+df_train_obs  = df_train[df_train.datetime <= target_date]
+df_train_eval = df_train[df_train.datetime >  target_date]
+```
+
+Call `fit()` to estimate empirical revisit probabilities.
+Recency and frequency are computed from the observation window; the evaluation window provides ground-truth revisit labels.
 
 ```python
 scorer = RecencyFrequencyScorer()
-```
-
-Call `fit()` to estimate empirical revisit probabilities from the training log.
-Pass `target_date` as the split point: data up to `target_date` forms the observation window (default: 28 days back), and data after `target_date` forms the evaluation window (default: 7 days forward).
-
-```python
-scorer.fit(df_train, target_date="2026-07-07")
+scorer.fit(df_train_obs, df_train_eval)
 ```
 
 The empirical surface reflects raw revisit rates and may be irregular due to sparse data.
 
 ![empirical probability surface](https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/surface_emp_probability.png)
 
-Optionally, call `optimize()` to smooth the surface under RF monotonicity constraints using convex quadratic programming.
+Call `optimize()` to smooth the surface under RF monotonicity constraints using convex quadratic programming.
 `kind="mono"` enforces recency and frequency monotonicity.
 
 ```python
@@ -84,12 +82,14 @@ scorer.optimize(kind="mcc")
 
 ![mcc probability surface](https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/surface_mcc_probability.png)
 
-Call `transform()` to score each user-item pair in the test log.
+Call `transform()` to score each user-item pair in the test observation window.
 It returns a DataFrame with columns `user`, `item`, `recency`, `frequency`, `probability`, and `order` (rank within each user, sorted by probability descending).
-Pass `kind="empirical"`, `kind="mono"`, or `kind="mcc"` to select which probabilities to use.
 
 ```python
-df_rec_mcc = scorer.transform(df_test, target_date="2026-07-07", kind="mcc")
+df_test_obs  = df_test[df_test.datetime <= target_date]
+df_test_eval = df_test[df_test.datetime >  target_date]
+
+df_rec = scorer.transform(df_test_obs, target_date, kind="mcc")
 ```
 
 | user   | item   | recency | frequency | probability | order |
@@ -101,6 +101,13 @@ df_rec_mcc = scorer.transform(df_test, target_date="2026-07-07", kind="mcc")
 | u_002  | i_058  |       4 |         1 |      0.0182 |     2 |
 
 Within each user, rows are sorted by `probability` descending; `order` represents the recommendation rank.
+
+Call `evaluate()` to measure recommendation quality at each rank cutoff.
+It returns precision, recall, and F1 for each cutoff from 1 to `order`.
+
+```python
+scorer.evaluate(df_rec, df_test_eval, order=5)
+```
 
 ## Examples
 
