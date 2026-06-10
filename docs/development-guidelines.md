@@ -28,7 +28,7 @@
 
 ## API 設計方針
 
-- scikit-learn スタイル（`fit` / `fit_period` / `optimize`）に準拠する
+- scikit-learn スタイル（`fit` / `transform` / `optimize`）に準拠する。`fit_date`・`fit_period` は期間指定の補助メソッドとして提供する
 - 推定後の属性名は末尾に `_` をつける（例: `empirical_probability_`）
 - `from rfscorer import RecencyFrequencyScorer` でインポートできるようにする
 - 解釈可能性を重視し、スコアの算出根拠を説明できる設計にする
@@ -37,7 +37,7 @@
 
 - テストコードは `tests/` に配置する
 - `pytest` を使用する
-- `fit()`・`fit_period()` と `optimize()` の正常系・異常系をカバーする
+- `fit()`・`fit_date()`・`fit_period()`・`transform()`・`transform_date()`・`evaluate()`・`optimize()` の正常系・異常系をカバーする
 
 ## ドキュメント管理
 
@@ -57,7 +57,7 @@
 
 ### 作業単位のドキュメント: `.steering/`
 
-個別の開発作業ごとに作成する。作業完了後も意思決定・変更経緯の記録として保持する。  
+重要な判断をともなう開発をする際に作成する。作業完了後も意思決定・変更経緯の記録として保持する。  
 ディレクトリ名は `YYYYMMDD-development-title` 形式。
 
 ```

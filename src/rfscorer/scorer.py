@@ -114,6 +114,86 @@ class RecencyFrequencyScorer:
 
     def fit(
         self,
+        df_obs,
+        df_eval,
+        ref_date=None,
+        recency_limit=None,
+        frequency_limit=None,
+    ):
+        """Estimate empirical revisit probabilities from pre-split interaction data.
+
+        Accepts observation and evaluation DataFrames that have already been
+        filtered to the respective periods by the caller.  This is the primary
+        fitting method; for convenience wrappers that perform date-based
+        splitting automatically, see fit_date() and fit_period().
+
+        Parameters
+        ----------
+        df_obs : pd.DataFrame
+            Observation period interaction log. Must already be filtered to
+            the observation period by the caller.
+        df_eval : pd.DataFrame
+            Evaluation period event log (revisits, purchases, conversions,
+            etc.). Must already be filtered to the evaluation period by the caller.
+        ref_date : str or datetime, optional
+            Reference date for recency computation. Recency of each
+            user-item pair is the minimum number of days from any of its
+            interactions to ref_date, plus 1 (so the most recent interaction
+            on ref_date itself has recency 1). When None, defaults to the
+            latest datetime in df_obs.
+        recency_limit : int, optional
+            Maximum recency rank to include. If None, automatically set to
+            the recency rank covering 95% of cumulative revisits.
+        frequency_limit : int, optional
+            Maximum frequency to include. If None, automatically set to
+            the frequency covering 95% of cumulative revisits.
+
+        Returns
+        -------
+        self
+        """
+        if not isinstance(df_obs, pd.DataFrame):
+            raise TypeError("df_obs must be a pandas DataFrame.")
+        if not isinstance(df_eval, pd.DataFrame):
+            raise TypeError("df_eval must be a pandas DataFrame.")
+
+        required_columns = [self.user_col, self.item_col, self.datetime_col]
+        missing_obs = [c for c in required_columns if c not in df_obs.columns]
+        if missing_obs:
+            raise ValueError(f"Missing required columns in df_obs: {missing_obs}")
+        missing_eval = [c for c in required_columns if c not in df_eval.columns]
+        if missing_eval:
+            raise ValueError(f"Missing required columns in df_eval: {missing_eval}")
+
+        obs_log = self._to_internal(df_obs)
+        eval_log = self._to_internal(df_eval)
+
+        self.record_num = len(obs_log) + len(eval_log)
+
+        if ref_date is None:
+            ref_date = obs_log[self._DATETIME_COL].max()
+        else:
+            try:
+                ref_date = pd.to_datetime(ref_date)
+            except (ValueError, TypeError) as e:
+                raise ValueError(f"ref_date could not be parsed as a date: {ref_date}") from e
+
+        self.observation_start_date_ = (
+            obs_log[self._DATETIME_COL].min() if len(obs_log) > 0 else None
+        )
+        self.observation_end_date_ = ref_date
+        self.evaluation_start_date_ = (
+            eval_log[self._DATETIME_COL].min() if len(eval_log) > 0 else None
+        )
+        self.evaluation_end_date_ = (
+            eval_log[self._DATETIME_COL].max() if len(eval_log) > 0 else None
+        )
+
+        self._fit_impl(obs_log, eval_log, ref_date, recency_limit, frequency_limit)
+        return self
+
+    def fit_date(
+        self,
         df,
         target_date,
         observation_days=28,
@@ -180,13 +260,25 @@ class RecencyFrequencyScorer:
         else:
             eval_end = min(df_max, target_date + pd.Timedelta(days=evaluation_days))
 
-        return self.fit_period(
-            df,
-            observation_period=(obs_start, obs_end),
-            evaluation_period=(eval_start, eval_end),
-            recency_limit=recency_limit,
-            frequency_limit=frequency_limit,
-        )
+        interaction_log = self._to_internal(df)
+        self.record_num = len(interaction_log)
+
+        obs_log = interaction_log[
+            (obs_start <= interaction_log[self._DATETIME_COL])
+            & (interaction_log[self._DATETIME_COL] <= obs_end)
+        ]
+        eval_log = interaction_log[
+            (eval_start <= interaction_log[self._DATETIME_COL])
+            & (interaction_log[self._DATETIME_COL] <= eval_end)
+        ]
+
+        self.observation_start_date_ = obs_start
+        self.observation_end_date_ = obs_end
+        self.evaluation_start_date_ = eval_start
+        self.evaluation_end_date_ = eval_end
+
+        self._fit_impl(obs_log, eval_log, obs_end, recency_limit, frequency_limit)
+        return self
 
     def fit_period(
         self,
@@ -199,7 +291,8 @@ class RecencyFrequencyScorer:
         """Estimate empirical revisit probabilities from interaction history.
 
         Use this when you need explicit control over both periods.
-        For the common case of splitting on a single date, prefer fit().
+        For the common case of splitting on a single date, prefer fit_date().
+        For a sklearn-style interface with pre-split DataFrames, prefer fit().
 
         Parameters
         ----------
@@ -221,8 +314,6 @@ class RecencyFrequencyScorer:
         -------
         self
         """
-
-        # df のバリデーションと内部形式への変換
         if not isinstance(df, pd.DataFrame):
             raise TypeError("df must be a pandas DataFrame.")
 
@@ -231,21 +322,6 @@ class RecencyFrequencyScorer:
         if missing_columns:
             raise ValueError(f"Missing required columns: {missing_columns}")
 
-        interaction_log = df[[self.user_col, self.item_col, self.datetime_col]].copy()
-        interaction_log.columns = [self._USER_COL, self._ITEM_COL, self._DATETIME_COL]
-
-        if not is_string_dtype(interaction_log[self._USER_COL]):
-            interaction_log[self._USER_COL] = interaction_log[self._USER_COL].astype(str)
-        if not is_string_dtype(interaction_log[self._ITEM_COL]):
-            interaction_log[self._ITEM_COL] = interaction_log[self._ITEM_COL].astype(str)
-        if not is_datetime64_any_dtype(interaction_log[self._DATETIME_COL]):
-            interaction_log[self._DATETIME_COL] = pd.to_datetime(
-                interaction_log[self._DATETIME_COL]
-            )
-
-        self.record_num = len(interaction_log)
-
-        # 観測期間の開始日と終了日、評価期間の開始日と終了日を datetime 型に変換
         if len(observation_period) != 2:
             raise ValueError("observation_period must be a tuple of (start, end).")
         try:
@@ -264,45 +340,61 @@ class RecencyFrequencyScorer:
                 f"evaluation_period could not be parsed as dates: {evaluation_period}"
             ) from e
 
-        # 観測期間の開始日と終了日、評価期間の開始日と終了日のバリデーション
         if obs_start > obs_end:
             raise ValueError("observation_period must be ordered as (start, end).")
         if eval_start > eval_end:
             raise ValueError("evaluation_period must be ordered as (start, end).")
         if obs_end >= eval_start:
             raise ValueError("observation_period must end before evaluation_period starts.")
+
+        interaction_log = self._to_internal(df)
+        self.record_num = len(interaction_log)
+
+        obs_log = interaction_log[
+            (obs_start <= interaction_log[self._DATETIME_COL])
+            & (interaction_log[self._DATETIME_COL] <= obs_end)
+        ]
+        eval_log = interaction_log[
+            (eval_start <= interaction_log[self._DATETIME_COL])
+            & (interaction_log[self._DATETIME_COL] <= eval_end)
+        ]
+
         self.observation_start_date_ = obs_start
         self.observation_end_date_ = obs_end
         self.evaluation_start_date_ = eval_start
         self.evaluation_end_date_ = eval_end
 
-        # 観測期間のデータフレームの作成
-        df_obs = interaction_log[
-            (self.observation_start_date_ <= interaction_log.datetime)
-            & (interaction_log.datetime <= self.observation_end_date_)
-        ]
-        # 評価期間のデータフレームの作成
-        df_eval = interaction_log[
-            (self.evaluation_start_date_ <= interaction_log.datetime)
-            & (interaction_log.datetime <= self.evaluation_end_date_)
-        ]
+        self._fit_impl(obs_log, eval_log, obs_end, recency_limit, frequency_limit)
+        return self
 
-        self.record_num_obs = len(df_obs)
-        self.record_num_eval = len(df_eval)
+    def _to_internal(self, df):
+        """Convert a user-facing DataFrame to internal column names and types."""
+        result = df[[self.user_col, self.item_col, self.datetime_col]].copy()
+        result.columns = [self._USER_COL, self._ITEM_COL, self._DATETIME_COL]
+        if not is_string_dtype(result[self._USER_COL]):
+            result[self._USER_COL] = result[self._USER_COL].astype(str)
+        if not is_string_dtype(result[self._ITEM_COL]):
+            result[self._ITEM_COL] = result[self._ITEM_COL].astype(str)
+        if not is_datetime64_any_dtype(result[self._DATETIME_COL]):
+            result[self._DATETIME_COL] = pd.to_datetime(result[self._DATETIME_COL])
+        return result
 
-        # 評価期間に cv がある user と item のペアを作成
-        UIcv = {(row.user, row.item) for row in df_eval.itertuples()}
+    def _fit_impl(self, obs_log, eval_log, ref_date, recency_limit, frequency_limit):
+        """Core fitting logic. obs_log and eval_log must use internal column names."""
+        self.record_num_obs = len(obs_log)
+        self.record_num_eval = len(eval_log)
 
-        df_ui2frc = self._build_ui_rf_df(df_obs, self.observation_end_date_)
+        UIcv = {(row.user, row.item) for row in eval_log.itertuples()}
+
+        df_ui2frc = self._build_ui_rf_df(obs_log, ref_date)
         df_ui2frc["cv"] = (
             pd.MultiIndex.from_frame(df_ui2frc[[self._USER_COL, self._ITEM_COL]])
             .isin(UIcv)
             .astype(int)
         )
-        self.record_num_target_org = len(df_ui2frc)  # レコード数の計測(フィルタリング前)
-        self.total_cv_org = df_ui2frc.cv.sum()  # cv数の計測(フィルタリング前)
+        self.record_num_target_org = len(df_ui2frc)
+        self.total_cv_org = df_ui2frc.cv.sum()
 
-        # 最新度の最大値の決定
         if recency_limit is not None:
             self.recency_limit = recency_limit
         else:
@@ -311,7 +403,7 @@ class RecencyFrequencyScorer:
             total_cv = df_recency2cv.cv.sum()
             if total_cv == 0:
                 raise ValueError(
-                    "No revisits observed in evaluation_period. "
+                    "No revisits observed in evaluation period. "
                     "Cannot determine recency_limit automatically."
                 )
             cv_sum = 0
@@ -322,7 +414,6 @@ class RecencyFrequencyScorer:
                     break
             self.recency_limit = recency_limit
 
-        # 頻度の最大値の決定
         if frequency_limit is not None:
             self.frequency_limit = frequency_limit
         else:
@@ -331,7 +422,7 @@ class RecencyFrequencyScorer:
             total_cv = df_frequency2cv.cv.sum()
             if total_cv == 0:
                 raise ValueError(
-                    "No revisits observed in evaluation_period. "
+                    "No revisits observed in evaluation period. "
                     "Cannot determine frequency_limit automatically."
                 )
             cv_sum = 0
@@ -342,31 +433,24 @@ class RecencyFrequencyScorer:
                     break
             self.frequency_limit = frequency_limit
 
-        # 最新度上限値と頻度上限値でフィルタリング
         df_ui2frc = df_ui2frc[
-            (df_ui2frc.recency <= self.recency_limit)  # 最新度上限値以下のレコードをフィルタリング
-            & (
-                df_ui2frc.frequency <= self.frequency_limit
-            )  # 頻度上限値以下のレコードをフィルタリング
+            (df_ui2frc.recency <= self.recency_limit)
+            & (df_ui2frc.frequency <= self.frequency_limit)
         ]
-        self.record_num_target = len(df_ui2frc)  # レコード数の計測
-        self.total_cv = df_ui2frc.cv.sum()  # cv数の計測
+        self.record_num_target = len(df_ui2frc)
+        self.total_cv = df_ui2frc.cv.sum()
 
-        # 最新度と頻度のリストを作成(上記の処理では抜けがある可能性を否定できない)
         self.R = list(range(1, self.recency_limit + 1))
         self.F = list(range(1, self.frequency_limit + 1))
 
-        # 最新度と頻度のペアに対して、閲覧数、CV数、経験的再閲覧確率を初期化
         self.RF2N = {(r, f): 0.0 for r in self.R for f in self.F}
         self.RF2CV = {(r, f): 0.0 for r in self.R for f in self.F}
 
-        # 最新度と頻度のペアに対して、閲覧数、CV数の集計
         for row in df_ui2frc.itertuples():
             self.RF2N[row.recency, row.frequency] += 1
             if row.cv == 1:
                 self.RF2CV[row.recency, row.frequency] += 1
 
-        # 経験的再閲覧確率の計算
         RowsRF = []
         for r in self.R:
             for f in self.F:
@@ -374,22 +458,16 @@ class RecencyFrequencyScorer:
                 self.RF2Prob[r, f] = prob
                 RowsRF.append((r, f, self.RF2N[r, f], self.RF2CV[r, f], prob))
 
-        # 経験的再閲覧確率辞書の作成
         self.empirical_probability_dict_ = {(r, f): prob for r, f, _, _, prob in RowsRF}
-
-        # 経験的再閲覧確率データフレーム(縦持ち)の作成
         self.empirical_probability_ = pd.DataFrame(
             RowsRF, columns=["recency", "frequency", "N", "cv", "probability"]
         )
-
-        # 経験的再閲覧確率データフレーム(横持ち)の作成
         self.empirical_probability_table_ = self.empirical_probability_.pivot_table(
             index="recency",
             columns="frequency",
             values="probability",
         )
 
-        # 最新度別の集約
         df_r = self.empirical_probability_.groupby("recency")[["N", "cv"]].sum().reset_index()
         df_r["probability"] = (df_r["cv"] / df_r["N"]).where(df_r["N"] > 0, 0.0)
         self.recency_probability_ = df_r
@@ -397,7 +475,6 @@ class RecencyFrequencyScorer:
         self.R2CV = dict(zip(df_r["recency"], df_r["cv"]))
         self.R2Prob = dict(zip(df_r["recency"], df_r["probability"]))
 
-        # 頻度別の集約
         df_f = self.empirical_probability_.groupby("frequency")[["N", "cv"]].sum().reset_index()
         df_f["probability"] = (df_f["cv"] / df_f["N"]).where(df_f["N"] > 0, 0.0)
         self.frequency_probability_ = df_f
@@ -405,7 +482,6 @@ class RecencyFrequencyScorer:
         self.F2CV = dict(zip(df_f["frequency"], df_f["cv"]))
         self.F2Prob = dict(zip(df_f["frequency"], df_f["probability"]))
 
-        # er: R2Prob を全 f にブロードキャスト
         rows_er = [(r, f, self.R2Prob[r]) for r in self.R for f in self.F]
         self.er_probability_dict_ = {(r, f): p for r, f, p in rows_er}
         self.er_probability_ = pd.DataFrame(
@@ -415,7 +491,6 @@ class RecencyFrequencyScorer:
             index="recency", columns="frequency", values="probability"
         )
 
-        # ef: F2Prob を全 r にブロードキャスト
         rows_ef = [(r, f, self.F2Prob[f]) for r in self.R for f in self.F]
         self.ef_probability_dict_ = {(r, f): p for r, f, p in rows_ef}
         self.ef_probability_ = pd.DataFrame(
@@ -425,10 +500,8 @@ class RecencyFrequencyScorer:
             index="recency", columns="frequency", values="probability"
         )
 
-        return self
-
     def show(self):
-        """Print a summary of fit() or fit_period() results to stdout."""
+        """Print a summary of fit(), fit_date(), or fit_period() results to stdout."""
         print("=== profiling ===")
 
         if self.record_num:
@@ -492,9 +565,9 @@ class RecencyFrequencyScorer:
 
         Parameters
         ----------
-        kind : {"emp", "mono", "mr", "mf", "mrc", "mfc", "mcc"}, default "emp"
-            Which probability to visualize. "emp" uses fit() or
-            fit_period() results; others use optimize() results.
+        kind : {"emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc"}, default "emp"
+            Which probability to visualize. "emp", "er", and "ef" use fit(),
+            fit_date(), or fit_period() results; others use optimize() results.
         title : str or None, default None
             Figure title. If None, no title is shown.
         figsize : tuple[float, float], default (6, 5)
@@ -526,7 +599,10 @@ class RecencyFrequencyScorer:
                 f" got {kind!r}."
             )
         if kind in ("emp", "er", "ef") and self.empirical_probability_table_ is None:
-            raise RuntimeError("fit() must be called before plot_probability_surface().")
+            raise RuntimeError(
+                "fit(), fit_date(), or fit_period() must be called"
+                " before plot_probability_surface()."
+            )
         if kind == "mono" and self.mono_probability_table_ is None:
             raise RuntimeError(
                 "optimize(kind='mono') must be called before plot_probability_surface(kind='mono')."
@@ -643,6 +719,7 @@ class RecencyFrequencyScorer:
         """
         import matplotlib.pyplot as plt
 
+        kind = self._normalize_kind(kind)
         if axis not in ("recency", "frequency"):
             raise ValueError(f"axis must be 'recency' or 'frequency', got {axis!r}.")
         valid_kinds = ("emp", "mr", "mf", "all")
@@ -653,7 +730,10 @@ class RecencyFrequencyScorer:
         if axis == "frequency" and kind == "mr":
             raise ValueError("kind='mr' is not valid when axis='frequency'. Use kind='mf'.")
         if self.recency_probability_ is None:
-            raise RuntimeError("fit() must be called before plot_marginal_probability().")
+            raise RuntimeError(
+                "fit(), fit_date(), or fit_period() must be called"
+                " before plot_marginal_probability()."
+            )
         opt_kind = "mr" if axis == "recency" else "mf"
         if kind in (opt_kind, "all"):
             opt_attr = f"{opt_kind}_probability_"
@@ -716,10 +796,13 @@ class RecencyFrequencyScorer:
 
         Parameters
         ----------
-        kind : {"emp", "mono", "mr", "mf", "mrc", "mfc", "mcc", "all"}, default "emp"
-            Which probability to export. "emp" uses fit() or
-            fit_period() results; others use optimize() results;
-            "all" merges all models into a single file.
+        kind : {"emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc", "all"}, default "emp"
+            Which probability to export. "emp", "er", and "ef" use fit(),
+            fit_date(), or fit_period() results; others use optimize() results;
+            "all" merges all nine models into a single file with columns
+            empirical_probability, er_probability, ef_probability,
+            mono_probability, mr_probability, mf_probability, mrc_probability,
+            mfc_probability, mcc_probability (requires all optimize() calls).
         path : str or None, default None
             Output file path for the CSV. If None, saves as
             "{kind}_probability.csv" in the current directory.
@@ -736,7 +819,9 @@ class RecencyFrequencyScorer:
                 f" or 'all', got {kind!r}."
             )
         if kind in ("emp", "er", "ef", "all") and self.empirical_probability_ is None:
-            raise RuntimeError("fit() must be called before export_probability_csv().")
+            raise RuntimeError(
+                "fit(), fit_date(), or fit_period() must be called before export_probability_csv()."
+            )
         if kind in ("mono", "all") and self.mono_probability_ is None:
             raise RuntimeError(
                 "optimize(kind='mono') must be called before export_probability_csv(kind='mono')."
@@ -836,9 +921,9 @@ class RecencyFrequencyScorer:
             Recency rank (1 = most recently interacted, higher = older).
         f : int
             Frequency (number of interactions in the observation period).
-        kind : {"emp", "mono", "mr", "mf", "mrc", "mfc", "mcc"}, default "emp"
-            Which probability to use. "emp" uses fit() or fit_period()
-            results; others use optimize() results.
+        kind : {"emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc"}, default "emp"
+            Which probability to use. "emp", "er", and "ef" use fit(),
+            fit_date(), or fit_period() results; others use optimize() results.
 
         Returns
         -------
@@ -847,7 +932,6 @@ class RecencyFrequencyScorer:
         """
 
         kind = self._normalize_kind(kind)
-        # 最新度 r と頻度 f のバリデーション
         if not isinstance(r, int) or r < 1:
             raise TypeError("r must be a positive integer.")
         if not isinstance(f, int) or f < 1:
@@ -858,7 +942,9 @@ class RecencyFrequencyScorer:
                 f" got {kind!r}."
             )
         if kind in ("emp", "er", "ef") and self.empirical_probability_dict_ is None:
-            raise RuntimeError("fit() must be called before predict().")
+            raise RuntimeError(
+                "fit(), fit_date(), or fit_period() must be called before predict()."
+            )
         if kind == "mono" and self.mono_probability_dict_ is None:
             raise RuntimeError("optimize(kind='mono') must be called before predict(kind='mono').")
         if kind == "mr" and self.mr_probability_dict_ is None:
@@ -897,7 +983,7 @@ class RecencyFrequencyScorer:
     def transform(
         self,
         df,
-        target_date,
+        ref_date=None,
         kind="emp",
         user_col=None,
         item_col=None,
@@ -905,35 +991,37 @@ class RecencyFrequencyScorer:
     ):
         """Add recency, frequency, and revisit probability columns to a DataFrame.
 
-        Computes recency rank (r) and frequency (f) for each user-item pair
-        relative to target_date, then appends the corresponding revisit
-        probability from fit() or optimize() results.
+        Computes recency rank and frequency for each user-item pair relative to
+        ref_date, then appends the corresponding revisit probability from fit()
+        or optimize() results.  The caller is responsible for pre-filtering df
+        to the desired observation window before calling this method.
 
         Parameters
         ----------
         df : pd.DataFrame
-            User-item interaction history to score.
-        target_date : str or datetime
-            Reference date for computing recency and frequency.
-            Rows after this date are excluded.
-        kind : {"emp", "mono", "mr", "mf", "mrc", "mfc", "mcc"}, default "emp"
-            Which probability to use. "emp" uses fit() or fit_period()
-            results; others use optimize() results.
+            User-item interaction history to score. Should already be filtered
+            to the observation period by the caller.
+        ref_date : str or datetime, optional
+            Reference date for computing recency. When None, defaults to the
+            latest datetime in df.
+        kind : {"emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc"}, default "emp"
+            Which probability to use. "emp", "er", and "ef" use fit(),
+            fit_date(), or fit_period() results; others use optimize() results.
         user_col : str, optional
             Column name for user IDs in df. Defaults to the value set in __init__.
         item_col : str, optional
             Column name for item IDs in df. Defaults to the value set in __init__.
         datetime_col : str, optional
-            Column name for interaction timestamps in df. Defaults to the value set in __init__.
+            Column name for interaction timestamps in df. Defaults to the value
+            set in __init__.
 
         Returns
         -------
         pd.DataFrame
-            One row per user-item pair observed in df (up to target_date).
-            User and item columns retain the names used (from __init__ or the
-            overrides). Additional columns: recency, frequency, probability,
-            order. Sorted by user ascending and probability descending; order
-            starts at 1.
+            One row per user-item pair observed in df.  User and item columns
+            retain the names used (from __init__ or the overrides). Additional
+            columns: recency, frequency, probability, order. Sorted by user
+            ascending and probability descending; order starts at 1.
         """
         kind = self._normalize_kind(kind)
         if kind not in ("emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc"):
@@ -942,7 +1030,9 @@ class RecencyFrequencyScorer:
                 f" got {kind!r}."
             )
         if self.empirical_probability_dict_ is None:
-            raise RuntimeError("fit() must be called before transform().")
+            raise RuntimeError(
+                "fit(), fit_date(), or fit_period() must be called before transform()."
+            )
         if kind == "mono" and self.mono_probability_dict_ is None:
             raise RuntimeError(
                 "optimize(kind='mono') must be called before transform(kind='mono')."
@@ -962,12 +1052,6 @@ class RecencyFrequencyScorer:
         item_col = item_col or self.item_col
         datetime_col = datetime_col or self.datetime_col
 
-        # 基準日を datetime 型に変換
-        try:
-            target_date = pd.to_datetime(target_date)
-        except (ValueError, TypeError) as e:
-            raise ValueError(f"target_date could not be parsed as a date: {target_date}") from e
-
         df_log = df[[user_col, item_col, datetime_col]].copy()
         df_log.columns = [self._USER_COL, self._ITEM_COL, self._DATETIME_COL]
 
@@ -978,16 +1062,20 @@ class RecencyFrequencyScorer:
         if not is_datetime64_any_dtype(df_log[self._DATETIME_COL]):
             df_log[self._DATETIME_COL] = pd.to_datetime(df_log[self._DATETIME_COL])
 
-        # 基準日(target_date)までのレコードに絞る
-        df_log = df_log[df_log[self._DATETIME_COL] <= target_date]
+        if ref_date is None:
+            ref_date = df_log[self._DATETIME_COL].max()
+        else:
+            try:
+                ref_date = pd.to_datetime(ref_date)
+            except (ValueError, TypeError) as e:
+                raise ValueError(f"ref_date could not be parsed as a date: {ref_date}") from e
 
-        # user と item ごとに最新度・頻度を集計し、再閲覧確率を付与（ベクトル演算）
         prob_dict = self._probability_dict(kind)
         prob_df = pd.DataFrame(
             [(r, f, p) for (r, f), p in prob_dict.items()],
             columns=["recency_adj", "frequency_adj", "probability"],
         )
-        df_rf = self._build_ui_rf_df(df_log, target_date)
+        df_rf = self._build_ui_rf_df(df_log, ref_date)
         df_rf["recency_adj"] = df_rf["recency"].clip(upper=self.recency_limit)
         df_rf["frequency_adj"] = df_rf["frequency"].clip(upper=self.frequency_limit)
         df_rf = df_rf.merge(prob_df, on=["recency_adj", "frequency_adj"], how="left")
@@ -997,28 +1085,89 @@ class RecencyFrequencyScorer:
         df_rf["order"] = df_rf.groupby(self._USER_COL).cumcount() + 1
         df_rf = df_rf.rename(columns={self._USER_COL: user_col, self._ITEM_COL: item_col})
 
-        # 入力 df の元の dtype に戻す
         df_rf[user_col] = df_rf[user_col].astype(df[user_col].dtype)
         df_rf[item_col] = df_rf[item_col].astype(df[item_col].dtype)
 
         return df_rf
 
-    def evaluate(self, df_rec, UIrevisit, order=1, user_col=None, item_col=None):
+    def transform_date(
+        self,
+        df,
+        target_date,
+        kind="emp",
+        user_col=None,
+        item_col=None,
+        datetime_col=None,
+    ):
+        """Add recency, frequency, and revisit probability columns to a DataFrame.
+
+        Filters df to rows up to target_date, then computes recency rank and
+        frequency for each user-item pair relative to target_date, and appends
+        the corresponding revisit probability.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            User-item interaction history to score.
+        target_date : str or datetime
+            Reference date for computing recency and frequency.
+            Rows after this date are excluded.
+        kind : {"emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc"}, default "emp"
+            Which probability to use. "emp", "er", and "ef" use fit(),
+            fit_date(), or fit_period() results; others use optimize() results.
+        user_col : str, optional
+            Column name for user IDs in df. Defaults to the value set in __init__.
+        item_col : str, optional
+            Column name for item IDs in df. Defaults to the value set in __init__.
+        datetime_col : str, optional
+            Column name for interaction timestamps in df. Defaults to the value
+            set in __init__.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per user-item pair observed in df (up to target_date).
+            User and item columns retain the names used (from __init__ or the
+            overrides). Additional columns: recency, frequency, probability,
+            order. Sorted by user ascending and probability descending; order
+            starts at 1.
+        """
+        datetime_col_name = datetime_col or self.datetime_col
+
+        try:
+            target_date = pd.to_datetime(target_date)
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"target_date could not be parsed as a date: {target_date}") from e
+
+        df_filtered = df[pd.to_datetime(df[datetime_col_name]) <= target_date]
+        return self.transform(
+            df_filtered,
+            ref_date=target_date,
+            kind=kind,
+            user_col=user_col,
+            item_col=item_col,
+            datetime_col=datetime_col,
+        )
+
+    def evaluate(self, df_rec, df_eval, order=1, user_col=None, item_col=None):
         """Evaluate recommendation quality at each order cutoff.
 
         Parameters
         ----------
         df_rec : pd.DataFrame
             Recommendation results from transform(). Must have an "order" column.
-        UIrevisit : set
-            Ground truth set of (user, item) pairs that were actually revisited.
+        df_eval : pd.DataFrame
+            Evaluation period event log. Used to derive the ground truth
+            set of (user, item) pairs that experienced the target event.
         order : int, default 1
             Maximum recommendation rank to evaluate. Results are computed for
             each rank from 1 to order, plus the maximum order in df_rec.
         user_col : str, optional
-            Column name for user in df_rec. Defaults to the value set in __init__.
+            Column name for user in df_rec and df_eval. Defaults to the value
+            set in __init__.
         item_col : str, optional
-            Column name for item in df_rec. Defaults to the value set in __init__.
+            Column name for item in df_rec and df_eval. Defaults to the value
+            set in __init__.
 
         Returns
         -------
@@ -1031,6 +1180,14 @@ class RecencyFrequencyScorer:
         user_col = user_col or self.user_col
         item_col = item_col or self.item_col
 
+        if not isinstance(df_eval, pd.DataFrame):
+            raise TypeError("df_eval must be a pandas DataFrame.")
+        missing = [c for c in [user_col, item_col] if c not in df_eval.columns]
+        if missing:
+            raise ValueError(f"Missing required columns in df_eval: {missing}")
+
+        UIrevisit = set(zip(df_eval[user_col].astype(str), df_eval[item_col].astype(str)))
+
         df_rec = df_rec.copy()
         try:
             df_rec[user_col] = df_rec[user_col].astype(str)
@@ -1040,12 +1197,6 @@ class RecencyFrequencyScorer:
             df_rec[item_col] = df_rec[item_col].astype(str)
         except Exception as e:
             raise ValueError(f"Failed to cast column {item_col!r} to str: {e}") from e
-        try:
-            UIrevisit = {(str(u), str(i)) for u, i in UIrevisit}
-        except (TypeError, ValueError) as e:
-            raise ValueError(
-                f"UIrevisit must be a set of (user, item) 2-tuples. Failed to convert: {e}"
-            ) from e
 
         order_max = df_rec.order.max()
 
@@ -1059,40 +1210,28 @@ class RecencyFrequencyScorer:
             n_recommended = len(UIrec)
             precision = n_hit / n_recommended if n_recommended > 0 else 0.0
             Rows.append((recommend_num, n_recommended, n_hit, precision))
-        df_eval = pd.DataFrame(Rows, columns=["order", "n_recommended", "n_hit", "precision"])
+        df_result = pd.DataFrame(Rows, columns=["order", "n_recommended", "n_hit", "precision"])
 
-        total_hit = df_eval.n_hit.max()
-        df_eval["recall"] = df_eval.n_hit / len(UIrevisit)
-        denom = df_eval.precision + df_eval.recall
-        df_eval["f1"] = (2 * df_eval.precision * df_eval.recall).where(
+        total_hit = df_result.n_hit.max()
+        df_result["recall"] = df_result.n_hit / len(UIrevisit)
+        denom = df_result.precision + df_result.recall
+        df_result["f1"] = (2 * df_result.precision * df_result.recall).where(
             denom > 0, 0.0
         ) / denom.where(denom > 0, 1.0)
-        df_eval["recall_norm"] = df_eval.n_hit / total_hit
-        denom_norm = df_eval.precision + df_eval.recall_norm
-        df_eval["f1_norm"] = (2 * df_eval.precision * df_eval.recall_norm).where(
+        df_result["recall_norm"] = df_result.n_hit / total_hit
+        denom_norm = df_result.precision + df_result.recall_norm
+        df_result["f1_norm"] = (2 * df_result.precision * df_result.recall_norm).where(
             denom_norm > 0, 0.0
         ) / denom_norm.where(denom_norm > 0, 1.0)
 
-        return df_eval
-
-    def _build_u2i2recencies(self, df, ref_date):
-        result = {}
-        for row in df.itertuples():
-            recency = (ref_date - row.datetime).days + 1
-            result.setdefault(row.user, {}).setdefault(row.item, []).append(recency)
-        return result
-
-    def _iter_u2i_rf(self, U2I2Recensys):
-        for user, I2Recencys in U2I2Recensys.items():
-            for item, Recencys in I2Recencys.items():
-                yield user, item, min(Recencys), len(Recencys)
+        return df_result
 
     def _build_ui_rf_df(self, df, ref_date):
-        """Vectorized alternative to _build_u2i2recencies() + _iter_u2i_rf().
+        """Compute recency and frequency for each (user, item) pair.
 
-        Computes recency (minimum days since last interaction, 1-indexed) and
-        frequency (interaction count) for each (user, item) pair using
-        pandas groupby instead of a Python loop.
+        Recency is the minimum days from any interaction to ref_date plus 1
+        (1-indexed; most recent interaction on ref_date has recency 1).
+        Frequency is the interaction count. Uses pandas groupby.
         """
         tmp = df[[self._USER_COL, self._ITEM_COL]].copy()
         tmp["recency"] = (ref_date - df[self._DATETIME_COL]).dt.days + 1
@@ -1143,7 +1282,7 @@ class RecencyFrequencyScorer:
         constraints (and optionally convexity/concavity constraints).
         Uses weighted least squares as objective.
 
-        Requires fit() or fit_period() to be called first. Depends on cvxpy.
+        Requires fit(), fit_date(), or fit_period() to be called first. Depends on cvxpy.
 
         Parameters
         ----------
@@ -1157,7 +1296,7 @@ class RecencyFrequencyScorer:
             "mcc" applies both recency convexity and frequency concavity (2D joint model).
         eps : float, default 0.0
             Minimum gap enforced between adjacent values in monotonicity
-            constraints.  When 0.0 (default), weak monotonicity is used.
+            constraints.  When 0.0 (default), broad monotonicity is used.
             When positive, strict monotonicity is enforced, preventing ties
             between adjacent recency or frequency levels.
 
@@ -1165,6 +1304,7 @@ class RecencyFrequencyScorer:
         -------
         self
         """
+        kind = self._normalize_kind(kind)
         if kind not in ("mono", "mr", "mf", "mrc", "mfc", "mcc"):
             raise ValueError(
                 f"kind must be 'mono', 'mr', 'mf', 'mrc', 'mfc', or 'mcc', got {kind!r}."
@@ -1176,7 +1316,9 @@ class RecencyFrequencyScorer:
             from rfscorer.optimizer import RFOptimizer
 
         if self.empirical_probability_dict_ is None:
-            raise RuntimeError("fit() must be called before optimize().")
+            raise RuntimeError(
+                "fit(), fit_date(), or fit_period() must be called before optimize()."
+            )
 
         optimizer = RFOptimizer()
         optimizer.set_data(self.R, self.F, self.RF2N, self.RF2Prob)
@@ -1222,24 +1364,25 @@ if __name__ == "__main__":
     # データの読み込み（オーム社『Pythonではじめる数理最適化』サポートデータより引用）
     url = "https://raw.githubusercontent.com/ohmsha/PyOptBook/main/7.recommendation/access_log.csv"
     df = pd.read_csv(url)
-    df_train = df[df.user_id.map(lambda x: hash(x) % 10 < 8)]  # hash関数で学習データ8割を抽出
-    df_test = df[df.user_id.map(lambda x: hash(x) % 10 >= 8)]  # hash関数でテストデータ2割を抽出
+    df_train = df[df.user_id.map(lambda x: hash(x) % 10 < 8)]
+    df_test = df[df.user_id.map(lambda x: hash(x) % 10 >= 8)]
 
-    # スコアリングインスタンスの作成
     scorer = RecencyFrequencyScorer(user_col="user_id", item_col="item_id", datetime_col="date")
 
-    # 経験的再閲覧確率の計算
     target_date = "2015-07-07"
-    scorer.fit(df_train, target_date)
-    scorer.plot_probability_surface("empirical").savefig("surface_emp_probability.png")
 
+    # 観測期間・評価期間に分割してから fit
+    df_train_dates = pd.to_datetime(df_train["date"])
+    df_train_obs = df_train[df_train_dates <= target_date]
+    df_train_eval = df_train[df_train_dates > target_date]
+    scorer.fit(df_train_obs, df_train_eval)
+
+    scorer.plot_probability_surface("empirical").savefig("surface_emp_probability.png")
     scorer.plot_marginal_probability("recency").savefig("marginal_recency_probability.png")
     scorer.plot_marginal_probability("frequency").savefig("marginal_frequency_probability.png")
-
     scorer.plot_probability_surface("er").savefig("surface_er_probability.png")
     scorer.plot_probability_surface("ef").savefig("surface_ef_probability.png")
 
-    # 最適化(mr)
     scorer.optimize(kind="mr")
     scorer.plot_probability_surface("mr").savefig("surface_mr_probability.png")
     scorer.plot_marginal_probability("recency", kind="mr").savefig(
@@ -1249,7 +1392,6 @@ if __name__ == "__main__":
         "marginal_all_recency_probability.png"
     )
 
-    # 最適化(mf)
     scorer.optimize(kind="mf")
     scorer.plot_probability_surface("mf").savefig("surface_mf_probability.png")
     scorer.plot_marginal_probability("frequency", kind="mf").savefig(
@@ -1259,71 +1401,22 @@ if __name__ == "__main__":
         "marginal_all_frequency_probability.png"
     )
 
-    # 最適化(mono)
     scorer.optimize(kind="mono")
     scorer.plot_probability_surface("mono").savefig("surface_mono_probability.png")
-
-    # 最適化(mrc)
     scorer.optimize(kind="mrc")
     scorer.plot_probability_surface("mrc").savefig("surface_mrc_probability.png")
-
-    # 最適化(mfc)
     scorer.optimize(kind="mfc")
     scorer.plot_probability_surface("mfc").savefig("surface_mfc_probability.png")
-
-    # 最適化(mcc)
     scorer.optimize(kind="mcc")
     scorer.plot_probability_surface("mcc").savefig("surface_mcc_probability.png")
-
-    # 全確率テーブルの出力
     scorer.export_probability_csv("all")
 
-    # テストの実施
-    df_test_obs = df_test[df_test.date <= target_date]  # テストの観測期間データ
-    df_test_eval = df_test[df_test.date > target_date]  # テストの評価期間データ(正解データ)
-    UIrevisit = set([(row.user_id, row.item_id) for row in df_test_eval.itertuples()])  # 正解データ
+    df_test_dates = pd.to_datetime(df_test["date"])
+    df_test_obs = df_test[df_test_dates <= target_date]
+    df_test_eval = df_test[df_test_dates > target_date]
 
-    print("--- emp ---")
-    df_rec_emp = scorer.transform(df_test_obs, target_date, kind="emp")
-    df_rec_emp.to_csv("df_recommend_emp.csv", index=False)
-    print(scorer.evaluate(df_rec_emp, UIrevisit, order=10))
-
-    print("--- er ---")
-    df_rec_er = scorer.transform(df_test_obs, target_date, kind="er")
-    df_rec_er.to_csv("df_recommend_er.csv", index=False)
-    print(scorer.evaluate(df_rec_er, UIrevisit, order=10))
-
-    print("--- ef ---")
-    df_rec_ef = scorer.transform(df_test_obs, target_date, kind="ef")
-    df_rec_ef.to_csv("df_recommend_ef.csv", index=False)
-    print(scorer.evaluate(df_rec_ef, UIrevisit, order=10))
-
-    print("--- mr ---")
-    df_rec_mr = scorer.transform(df_test_obs, target_date, kind="mr")
-    df_rec_mr.to_csv("df_recommend_mr.csv", index=False)
-    print(scorer.evaluate(df_rec_mr, UIrevisit, order=10))
-
-    print("--- mf ---")
-    df_rec_mf = scorer.transform(df_test_obs, target_date, kind="mf")
-    df_rec_mf.to_csv("df_recommend_mf.csv", index=False)
-    print(scorer.evaluate(df_rec_mf, UIrevisit, order=10))
-
-    print("--- mono ---")
-    df_rec_mono = scorer.transform(df_test_obs, target_date, kind="mono")
-    df_rec_mono.to_csv("df_recommend_mono.csv", index=False)
-    print(scorer.evaluate(df_rec_mono, UIrevisit, order=10))
-
-    print("--- mrc ---")
-    df_rec_mrc = scorer.transform(df_test_obs, target_date, kind="mrc")
-    df_rec_mrc.to_csv("df_recommend_mrc.csv", index=False)
-    print(scorer.evaluate(df_rec_mrc, UIrevisit, order=10))
-
-    print("--- mfc ---")
-    df_rec_mfc = scorer.transform(df_test_obs, target_date, kind="mfc")
-    df_rec_mfc.to_csv("df_recommend_mfc.csv", index=False)
-    print(scorer.evaluate(df_rec_mfc, UIrevisit, order=10))
-
-    print("--- mcc ---")
-    df_rec_mcc = scorer.transform(df_test_obs, target_date, kind="mcc")
-    df_rec_mcc.to_csv("df_recommend_mcc.csv", index=False)
-    print(scorer.evaluate(df_rec_mcc, UIrevisit, order=10))
+    for kind in ("emp", "er", "ef", "mr", "mf", "mono", "mrc", "mfc", "mcc"):
+        print(f"--- {kind} ---")
+        df_rec = scorer.transform(df_test_obs, kind=kind)
+        df_rec.to_csv(f"df_recommend_{kind}.csv", index=False)
+        print(scorer.evaluate(df_rec, df_test_eval, order=10))

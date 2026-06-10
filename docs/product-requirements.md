@@ -24,7 +24,7 @@ RF スコアリング手法を Python パッケージとして PyPI に公開し
 
 | 課題 | 説明 |
 |------|------|
-| 推薦スコアの算出 | ユーザー × 商品のインタラクション履歴から、各ユーザーが各商品を選択するスコアを推定したい（∝再閲覧確率） |
+| 推薦スコアの算出 | ユーザー × 商品の閲覧履歴から、各ユーザーが各商品を選択するスコアを推定したい（∝再閲覧確率） |
 | 解釈可能性の確保 | スコアの根拠を説明できる手法が求められる |
 | 実装コストの削減 | RF スコアリングを自前実装する手間をなくす |
 
@@ -34,8 +34,12 @@ RF スコアリング手法を Python パッケージとして PyPI に公開し
 
 - コンストラクタ
   - カラム名を `user_col`・`item_col`・`datetime_col` で指定する（デフォルト: `user`・`item`・`datetime`）
-- `fit()` に渡す引数
-  - `df`: ユーザー × 商品のインタラクション履歴 DataFrame。同一ユーザー × 商品の組み合わせが複数行存在することを想定（リピート閲覧）
+- `fit()` に渡す引数（推奨）
+  - `df_obs`: 観測期間の閲覧履歴 DataFrame。同一ユーザー × 商品の組み合わせが複数行存在することを想定（リピート閲覧）
+  - `df_eval`: 評価期間のイベント履歴 DataFrame（閲覧・購買・CV など推定対象のイベント）。`df_obs` と同じカラム構成
+  - `ref_date`: 最新度計算の基準日（省略時は `df_obs` の最大日付を使用）
+- 単一 DataFrame と基準日から期間を自動導出したい場合は `fit_date()` を使用する
+  - `df`: 閲覧履歴全体の DataFrame
   - `target_date`: 観測期間と評価期間の分割点となる基準日。観測期間は `target_date` まで（デフォルト: 28日遡る）、評価期間は `target_date` の翌日から（デフォルト: 7日分）
 - 期間を明示的に指定したい場合は `fit_period()` を使用する
   - `observation_period`: 観測期間の開始日・終了日の tuple
@@ -46,18 +50,19 @@ RF スコアリング手法を Python パッケージとして PyPI に公開し
 | 機能 | 説明 |
 |------|------|
 | 経験的再閲覧確率の推定（`emp`） | 観測期間における最新度 $r$・頻度 $f$ 別に、評価期間での再閲覧比率を直接推定する |
-| 周辺的経験的再閲覧確率の推定（`er` / `ef`） | `fit()` 時に自動計算。最新度方向（`er`）・頻度方向（`ef`）の周辺確率を RF グリッド全体にブロードキャストした確率面 |
+| 周辺的経験的再閲覧確率の推定（`er` / `ef`） | `fit()`・`fit_date()` または `fit_period()` 時に自動計算。最新度方向（`er`）・頻度方向（`ef`）の周辺確率を RF グリッド全体にブロードキャストした確率面 |
 | 1次元最適化再閲覧確率の推定（`mr` / `mf`） | 周辺確率を目標とした1次元の凸2次計画問題を解く。`mr` は Recency 単調性 + 凸性、`mf` は Frequency 単調性 + 凹性を制約として課す。結果を RF グリッド全体にブロードキャスト |
 | 2次元最適化再閲覧確率の推定（`mono` / `mrc` / `mfc` / `mcc`） | RF 制約と最小二乗誤差を目的関数にもつ凸2次計画問題を解いて推定する。制約の組み合わせにより `mono`（単調性のみ）・`mrc`（+ Recency 凸性）・`mfc`（+ Frequency 凹性）・`mcc`（+ 両凹凸性）の4モデルを提供する |
-| 狭義単調性（`eps` パラメータ） | `optimize(eps=ε)` に正の値を指定すると、隣接する最新度・頻度の確率値が必ず $\varepsilon$ 以上離れる狭義単調性制約を付与する。デフォルト（`eps=0.0`）は従来の弱単調性と等価 |
+| 狭義単調性（`eps` パラメータ） | `optimize(eps=ε)` に正の値を指定すると、隣接する最新度・頻度の確率値が必ず $\varepsilon$ 以上離れる狭義単調性制約を付与する。デフォルト（`eps=0.0`）は従来の広義単調性と等価 |
+| 推薦精度の評価（`evaluate`） | 推薦結果と評価期間のイベント履歴を比較し、各順位カットオフでの precision・recall・f1 を返す |
 
 ### 出力
 
 | 属性 | 説明 |
 |------|------|
-| `empirical_probability_` | 経験的再閲覧確率（`emp`）。`pd.DataFrame`（カラム: `recency`, `frequency`, `N`, `cv`, `probability`）。`fit()` 後にアクセス可能 |
-| `er_probability_` | 経験的 Recency 周辺確率（`er`）。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`fit()` 後にアクセス可能 |
-| `ef_probability_` | 経験的 Frequency 周辺確率（`ef`）。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`fit()` 後にアクセス可能 |
+| `empirical_probability_` | 経験的再閲覧確率（`emp`）。`pd.DataFrame`（カラム: `recency`, `frequency`, `N`, `cv`, `probability`）。`fit()`・`fit_date()` または `fit_period()` 後にアクセス可能 |
+| `er_probability_` | 周辺的経験的再閲覧確率（`er`）。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`fit()`・`fit_date()` または `fit_period()` 後にアクセス可能 |
+| `ef_probability_` | 周辺的経験的再閲覧確率（`ef`）。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`fit()`・`fit_date()` または `fit_period()` 後にアクセス可能 |
 | `mr_probability_` | mr モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mr')` 後にアクセス可能 |
 | `mf_probability_` | mf モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mf')` 後にアクセス可能 |
 | `mono_probability_` | mono モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mono')` 後にアクセス可能 |
@@ -90,18 +95,24 @@ from rfscorer import RecencyFrequencyScorer
 df = pd.read_csv("examples/access_log.csv")
 scorer = RecencyFrequencyScorer(user_col="user_id", item_col="item_id", datetime_col="date")
 
-scorer.fit(df, target_date="2015-07-06")
-df_emp = scorer.empirical_probability_  # 経験的確率（2次元）
-df_er  = scorer.er_probability_         # 経験的 Recency 周辺（fit 時に自動計算）
-df_ef  = scorer.ef_probability_         # 経験的 Frequency 周辺（fit 時に自動計算）
+# 観測ログと評価ログを分割して渡す（推奨）
+df_obs = df[df["date"] <= "2015-07-06"]
+df_eval = df[df["date"] > "2015-07-06"]
+scorer.fit(df_obs, df_eval)
+df_emp = scorer.empirical_probability_  # 経験的再閲覧確率（2次元）
+df_er  = scorer.er_probability_         # 周辺的経験的再閲覧確率・Recency 方向（fit 時に自動計算）
+df_ef  = scorer.ef_probability_         # 周辺的経験的再閲覧確率・Frequency 方向（fit 時に自動計算）
 
-scorer.optimize(kind="mr")             # 1次元: Recency 単調性 + 凸性（弱単調性）
+df_rec = scorer.transform(df_obs)      # 推薦スコアリング
+scorer.evaluate(df_rec, df_eval)       # 評価
+
+scorer.optimize(kind="mr")             # 1次元: Recency 単調性 + 凸性（広義単調性）
 df_mr = scorer.mr_probability_
 
-scorer.optimize(kind="mf")             # 1次元: Frequency 単調性 + 凹性（弱単調性）
+scorer.optimize(kind="mf")             # 1次元: Frequency 単調性 + 凹性（広義単調性）
 df_mf = scorer.mf_probability_
 
-scorer.optimize(kind="mono")           # 2次元: 単調性のみ（弱単調性）
+scorer.optimize(kind="mono")           # 2次元: 単調性のみ（広義単調性）
 df_mono = scorer.mono_probability_
 
 scorer.optimize(kind="mcc")            # 2次元: 単調性 + 両凹凸性
@@ -116,7 +127,7 @@ df_mono_strict = scorer.mono_probability_
 | 項目 | 要求 |
 |------|------|
 | 配布 | PyPI に公開し、`pip install rfscorer` でインストール可能 |
-| API 設計 | scikit-learn スタイル（`fit` / `optimize`）に準拠し、既存ワークフローに組み込みやすくする |
+| API 設計 | scikit-learn スタイル（`fit` / `transform` / `optimize`）に準拠し、既存ワークフローに組み込みやすくする |
 | 解釈可能性 | スコアの算出根拠を説明できること。ブラックボックス化しない |
 | ドキュメント | README および docstring で API・使用例を説明する |
 | ライセンス | MIT License |
