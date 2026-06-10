@@ -17,6 +17,7 @@
 | フォーマット | `uv run ruff format .` |
 | パッケージビルド | `uv build` |
 | PyPI 公開 | `uv publish` |
+| Jupyter カーネル登録（初回のみ） | `uv run python -m ipykernel install --user --name rfscorer --display-name "rfscorer (venv)"` |
 | JupyterLab 起動 | `uv run jupyter lab --no-browser --ServerApp.token='' --ServerApp.password=''` |
 
 ## コーディング規約
