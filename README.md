@@ -63,6 +63,10 @@ scorer.fit(df_train_obs, df_train_eval)
 
 The empirical surface reflects raw revisit rates and may be irregular due to sparse data.
 
+```python
+fig = scorer.plot_probability_surface(kind="emp")
+```
+
 ![empirical probability surface](https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/surface_emp_probability.png)
 
 Call `optimize()` to smooth the surface under RF monotonicity constraints using convex quadratic programming.
@@ -70,6 +74,7 @@ Call `optimize()` to smooth the surface under RF monotonicity constraints using 
 
 ```python
 scorer.optimize(kind="mono")
+fig = scorer.plot_probability_surface(kind="mono")
 ```
 
 ![mono probability surface](https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/surface_mono_probability.png)
@@ -78,6 +83,7 @@ scorer.optimize(kind="mono")
 
 ```python
 scorer.optimize(kind="mcc")
+fig = scorer.plot_probability_surface(kind="mcc")
 ```
 
 ![mcc probability surface](https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/surface_mcc_probability.png)
