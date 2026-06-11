@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-06-11
+
+### Changed
+
+- `optimize(kind='mr')` and `optimize(kind='mf')` no longer broadcast results to the full RF grid.
+  Results are now stored as true 1-D outputs:
+  - `mr_probability_`: DataFrame with columns `recency, probability`
+    (previously `recency, frequency, probability` after broadcast)
+  - `mf_probability_`: DataFrame with columns `frequency, probability`
+    (previously `recency, frequency, probability` after broadcast)
+  - `mr_probability_dict_`: keyed by recency rank `r` (int)
+    (previously keyed by `(r, f)` tuple)
+  - `mf_probability_dict_`: keyed by frequency `f` (int)
+    (previously keyed by `(r, f)` tuple)
+- `plot_probability_surface()` now raises `ValueError` when `kind='mr'` or `kind='mf'` is specified,
+  as 1-D models cannot be represented as a surface plot.
+
+### Removed
+
+- `mr_probability_table_` and `mf_probability_table_` attributes.
+  These were 2-D broadcast grids produced by the previous implementation and are no longer generated.
+
 ## [0.3.1] - 2026-06-10
 
 ### Fixed
