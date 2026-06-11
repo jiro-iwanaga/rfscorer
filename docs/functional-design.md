@@ -79,14 +79,13 @@ $$\sum_{r\in R, f\in F} N_{r,f} \cdot(p_{r,f} - x_{r,f})^2$$
 
 #### 1次元最適化モデル（`mr` / `mf`）
 
-周辺確率 $p_r$・$p_f$ を目標として1次元で最適化し、結果を RF グリッド全体にブロードキャストする。
+周辺確率 $p_r$・$p_f$ を目標として1次元で最適化する。結果は1次元 dict に格納され、2次元グリッドへのブロードキャストは行わない。
 
 - **`mr`**（Monotonic Recency）: $r$ 方向の単調性と凸性を同時に制約。
   - 変数: $x_r\ (r \in R)$
   - 単調性: $x_r \geq x_{r+1} + \varepsilon\ \ \ (r, r+1 \in R)$
   - 凸性: $x_r - 2x_{r+1} + x_{r+2} \geq 0$
   - 目的関数: $\sum_{r \in R} N_r \cdot (p_r - x_r)^2$
-  - ブロードキャスト: $x_{r,f} = x_r\ (f \in F)$
   - $\varepsilon$ の上限: $\max(p_r) / (\lvert R\rvert - 1)$
 
 - **`mf`**（Monotonic Frequency）: $f$ 方向の単調性と凹性を同時に制約。
@@ -94,7 +93,6 @@ $$\sum_{r\in R, f\in F} N_{r,f} \cdot(p_{r,f} - x_{r,f})^2$$
   - 単調性: $x_f + \varepsilon \leq x_{f+1}\ \ \ (f, f+1 \in F)$
   - 凹性: $x_f - 2x_{f+1} + x_{f+2} \leq 0$
   - 目的関数: $\sum_{f \in F} N_f \cdot (p_f - x_f)^2$
-  - ブロードキャスト: $x_{r,f} = x_f\ (r \in R)$
   - $\varepsilon$ の上限: $\max(p_f) / (\lvert F\rvert - 1)$
 
 
@@ -253,7 +251,7 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
-| `kind` | `str` | `"emp"` | `"emp"`・`"er"`・`"ef"`・`"mono"`・`"mr"`・`"mf"`・`"mrc"`・`"mfc"`・`"mcc"` のいずれか（長名エイリアスも使用可） |
+| `kind` | `str` | `"emp"` | `"emp"`・`"er"`・`"ef"`・`"mono"`・`"mrc"`・`"mfc"`・`"mcc"` のいずれか（長名エイリアスも使用可）。`"mr"`・`"mf"` は1次元モデルのため `ValueError` を送出する（`plot_marginal_probability()` を使用する） |
 | `title` | `str \| None` | `None` | 図のタイトル。`None` の場合は表示しない |
 | `figsize` | `tuple[float, float]` | `(6, 5)` | 図のサイズ（インチ）。論文用途では最終印刷サイズに合わせる |
 | `fontsize` | `int` | `12` | 軸ラベル・目盛りのフォントサイズ。論文用途では対象ジャーナルの本文サイズ（通常 8〜10 pt）に合わせる |
@@ -321,12 +319,10 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 | `ef_probability_` | `pd.DataFrame` | ef モデル周辺的経験的再閲覧確率・F2Prob を全 r にブロードキャスト（カラム: `recency`, `frequency`, `probability`） | `fit()`・`fit_date()` または `fit_period()` 後 |
 | `ef_probability_table_` | `pd.DataFrame` | ef モデル周辺的経験的再閲覧確率（横持ち） | `fit()`・`fit_date()` または `fit_period()` 後 |
 | `ef_probability_dict_` | `dict` | ef モデル周辺的経験的再閲覧確率（キー: `(r, f)`、値: `probability`） | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `mr_probability_` | `pd.DataFrame` | mr モデル1次元最適化再閲覧確率・全 f にブロードキャスト（カラム: `recency`, `frequency`, `probability`） | `optimize(kind="mr")` 後 |
-| `mr_probability_table_` | `pd.DataFrame` | mr モデル最適化再閲覧確率（横持ち） | `optimize(kind="mr")` 後 |
-| `mr_probability_dict_` | `dict` | mr モデル最適化再閲覧確率（キー: `(r, f)`、値: `probability`） | `optimize(kind="mr")` 後 |
-| `mf_probability_` | `pd.DataFrame` | mf モデル1次元最適化再閲覧確率・全 r にブロードキャスト（カラム: `recency`, `frequency`, `probability`） | `optimize(kind="mf")` 後 |
-| `mf_probability_table_` | `pd.DataFrame` | mf モデル最適化再閲覧確率（横持ち） | `optimize(kind="mf")` 後 |
-| `mf_probability_dict_` | `dict` | mf モデル最適化再閲覧確率（キー: `(r, f)`、値: `probability`） | `optimize(kind="mf")` 後 |
+| `mr_probability_` | `pd.DataFrame` | mr モデル1次元最適化再閲覧確率（カラム: `recency`, `probability`） | `optimize(kind="mr")` 後 |
+| `mr_probability_dict_` | `dict` | mr モデル最適化再閲覧確率（キー: `r`（int）、値: `probability`） | `optimize(kind="mr")` 後 |
+| `mf_probability_` | `pd.DataFrame` | mf モデル1次元最適化再閲覧確率（カラム: `frequency`, `probability`） | `optimize(kind="mf")` 後 |
+| `mf_probability_dict_` | `dict` | mf モデル最適化再閲覧確率（キー: `f`（int）、値: `probability`） | `optimize(kind="mf")` 後 |
 | `mono_probability_` | `pd.DataFrame` | mono モデル最適化再閲覧確率（カラム: `recency`, `frequency`, `probability`） | `optimize(kind="mono")` 後 |
 | `mono_probability_table_` | `pd.DataFrame` | mono モデル最適化再閲覧確率（横持ち） | `optimize(kind="mono")` 後 |
 | `mono_probability_dict_` | `dict` | mono モデル最適化再閲覧確率（キー: `(r, f)`、値: `probability`） | `optimize(kind="mono")` 後 |
@@ -381,9 +377,9 @@ RF2N / RF2CV / RF2Prob / R2N / R2CV / R2Prob / F2N / F2CV / F2Prob
         ├─  export_probability_csv(kind, path)  ─→ 確率テーブルを CSV に書き出す
         │
         ├─  optimize(kind='mr'|'mf')  ← RFOptimizer (optimizer.py) に委譲（1次元最適化）
-        │   周辺確率を目標とした1次元凸2次計画問題を求解し、結果を 2次元グリッドにブロードキャスト
+        │   周辺確率を目標とした1次元凸2次計画問題を求解し、結果を1次元 dict に格納（ブロードキャストなし）
         │       ▼
-        │   {mr|mf}_probability_ / _table_ / _dict_
+        │   {mr|mf}_probability_ / _dict_
         │
         └─  optimize(kind='mono'|'mrc'|'mfc'|'mcc')  ← RFOptimizer に委譲（2次元最適化）
             RF 制約付き凸2次計画問題を求解（kind に応じた追加制約を適用）

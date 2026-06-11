@@ -78,15 +78,13 @@ class RecencyFrequencyScorer:
         self.mono_probability_table_ = None
         self.mono_probability_dict_ = None
 
-        # mr
-        self.mr_probability_ = None
-        self.mr_probability_table_ = None
-        self.mr_probability_dict_ = None
+        # mr (1D: recency only)
+        self.mr_probability_ = None  # DataFrame(recency, probability)
+        self.mr_probability_dict_ = None  # dict[int, float]
 
-        # mf
-        self.mf_probability_ = None
-        self.mf_probability_table_ = None
-        self.mf_probability_dict_ = None
+        # mf (1D: frequency only)
+        self.mf_probability_ = None  # DataFrame(frequency, probability)
+        self.mf_probability_dict_ = None  # dict[int, float]
 
         # mrc
         self.mrc_probability_ = None
@@ -151,6 +149,24 @@ class RecencyFrequencyScorer:
         Returns
         -------
         self
+
+        Raises
+        ------
+        TypeError
+            If df_obs or df_eval is not a pandas DataFrame.
+        ValueError
+            If required columns (user, item, datetime) are missing from
+            df_obs or df_eval, if ref_date cannot be parsed as a date, or
+            if no revisits are observed in the evaluation period (cannot
+            determine recency_limit or frequency_limit automatically).
+
+        Notes
+        -----
+        After a successful call, the following attributes become available
+        for use with predict(), transform(), and plot_*() methods:
+        ``empirical_probability_``, ``empirical_probability_table_``,
+        ``empirical_probability_dict_``, ``recency_probability_``,
+        ``frequency_probability_``, ``recency_limit``, ``frequency_limit``.
         """
         if not isinstance(df_obs, pd.DataFrame):
             raise TypeError("df_obs must be a pandas DataFrame.")
@@ -204,10 +220,10 @@ class RecencyFrequencyScorer:
         """Estimate empirical revisit probabilities using target_date as split point.
 
         Derives observation and evaluation periods automatically from target_date:
-        observation spans from at most observation_days before target_date to
-        target_date; evaluation spans from the next day to at most evaluation_days
-        after target_date.  Pass None for either days argument to use the full
-        data range in that direction.
+        observation spans from at most observation_days before target_date up to
+        and including target_date; evaluation spans from the next day to at most
+        evaluation_days after target_date.  Pass None for either days argument to
+        use the full data range in that direction.
 
         Parameters
         ----------
@@ -215,6 +231,7 @@ class RecencyFrequencyScorer:
             Interaction log containing user, item, and datetime columns.
         target_date : str or datetime
             Reference date used as the observation end / evaluation start boundary.
+            target_date is inclusive in the observation period.
         observation_days : int or None, default 28
             Maximum number of days to look back from target_date for the
             observation period.  If None, uses all data up to target_date.
@@ -229,6 +246,22 @@ class RecencyFrequencyScorer:
         Returns
         -------
         self
+
+        Raises
+        ------
+        TypeError
+            If df is not a pandas DataFrame.
+        ValueError
+            If the datetime column is missing from df, if target_date or the
+            datetime column cannot be parsed as dates, or if no revisits are
+            observed in the evaluation period.
+
+        Notes
+        -----
+        After a successful call, the same attributes as fit() become available:
+        ``empirical_probability_``, ``empirical_probability_table_``,
+        ``empirical_probability_dict_``, ``recency_probability_``,
+        ``frequency_probability_``, ``recency_limit``, ``frequency_limit``.
         """
         if not isinstance(df, pd.DataFrame):
             raise TypeError("df must be a pandas DataFrame.")
@@ -299,9 +332,9 @@ class RecencyFrequencyScorer:
         df : pd.DataFrame
             Interaction log containing user, item, and datetime columns.
         observation_period : tuple[str | datetime, str | datetime]
-            Start and end dates of the observation period.
+            Start and end dates of the observation period, both inclusive.
         evaluation_period : tuple[str | datetime, str | datetime]
-            Start and end dates of the evaluation period.
+            Start and end dates of the evaluation period, both inclusive.
             Must start strictly after observation_period ends.
         recency_limit : int, optional
             Maximum recency rank to include. If None, automatically set to
@@ -313,6 +346,23 @@ class RecencyFrequencyScorer:
         Returns
         -------
         self
+
+        Raises
+        ------
+        TypeError
+            If df is not a pandas DataFrame.
+        ValueError
+            If required columns are missing from df, if observation_period or
+            evaluation_period cannot be parsed as dates, if a period is not
+            ordered as (start, end), if the periods overlap, or if no revisits
+            are observed in the evaluation period.
+
+        Notes
+        -----
+        After a successful call, the same attributes as fit() become available:
+        ``empirical_probability_``, ``empirical_probability_table_``,
+        ``empirical_probability_dict_``, ``recency_probability_``,
+        ``frequency_probability_``, ``recency_limit``, ``frequency_limit``.
         """
         if not isinstance(df, pd.DataFrame):
             raise TypeError("df must be a pandas DataFrame.")
@@ -565,9 +615,16 @@ class RecencyFrequencyScorer:
 
         Parameters
         ----------
-        kind : {"emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc"}, default "emp"
+        kind : {"emp", "er", "ef", "mono", "mrc", "mfc", "mcc"}, default "emp"
             Which probability to visualize. "emp", "er", and "ef" use fit(),
             fit_date(), or fit_period() results; others use optimize() results.
+            "er" shows the empirical recency marginal: for each cell (r, f) the
+            probability is the recency-only empirical average (aggregated over
+            all frequency levels), ignoring frequency.  "ef" shows the empirical
+            frequency marginal: probability is aggregated over all recency levels
+            for each frequency value, ignoring recency.
+            Note: "mr" and "mf" are 1D models and cannot be visualized as a
+            surface; use plot_marginal_probability() instead.
         title : str or None, default None
             Figure title. If None, no title is shown.
         figsize : tuple[float, float], default (6, 5)
@@ -588,15 +645,29 @@ class RecencyFrequencyScorer:
         Returns
         -------
         matplotlib.figure.Figure
+
+        Raises
+        ------
+        ValueError
+            If kind is "mr" or "mf" (1D models cannot be plotted as a surface),
+            or if kind is not one of the accepted values.
+        RuntimeError
+            If fit(), fit_date(), or fit_period() has not been called for
+            emp/er/ef kinds, or if optimize(kind=...) has not been called for
+            the requested optimization kind.
         """
         import matplotlib.pyplot as plt
         import numpy as np
 
         kind = self._normalize_kind(kind)
-        if kind not in ("emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc"):
+        if kind in ("mr", "mf"):
             raise ValueError(
-                f"kind must be 'emp', 'er', 'ef', 'mono', 'mr', 'mf', 'mrc', 'mfc', or 'mcc',"
-                f" got {kind!r}."
+                f"kind={kind!r} is a 1D marginal model and cannot be plotted as a surface."
+                " Use plot_marginal_probability() instead."
+            )
+        if kind not in ("emp", "er", "ef", "mono", "mrc", "mfc", "mcc"):
+            raise ValueError(
+                f"kind must be 'emp', 'er', 'ef', 'mono', 'mrc', 'mfc', or 'mcc', got {kind!r}."
             )
         if kind in ("emp", "er", "ef") and self.empirical_probability_table_ is None:
             raise RuntimeError(
@@ -606,14 +677,6 @@ class RecencyFrequencyScorer:
         if kind == "mono" and self.mono_probability_table_ is None:
             raise RuntimeError(
                 "optimize(kind='mono') must be called before plot_probability_surface(kind='mono')."
-            )
-        if kind == "mr" and self.mr_probability_table_ is None:
-            raise RuntimeError(
-                "optimize(kind='mr') must be called before plot_probability_surface(kind='mr')."
-            )
-        if kind == "mf" and self.mf_probability_table_ is None:
-            raise RuntimeError(
-                "optimize(kind='mf') must be called before plot_probability_surface(kind='mf')."
             )
         if kind == "mrc" and self.mrc_probability_table_ is None:
             raise RuntimeError(
@@ -636,10 +699,6 @@ class RecencyFrequencyScorer:
             table = self.ef_probability_table_
         elif kind == "mono":
             table = self.mono_probability_table_
-        elif kind == "mr":
-            table = self.mr_probability_table_
-        elif kind == "mf":
-            table = self.mf_probability_table_
         elif kind == "mrc":
             table = self.mrc_probability_table_
         elif kind == "mfc":
@@ -678,8 +737,11 @@ class RecencyFrequencyScorer:
     ):
         """Plot revisit probability aggregated along one RF dimension.
 
-        Visualizes R2Prob / mr (when axis='recency') or F2Prob / mf (when
-        axis='frequency') as a line chart with markers.
+        When axis='recency', plots the empirical recency-marginal probability
+        (aggregated over all frequency levels) and optionally the mr-optimized
+        probability against recency rank.  When axis='frequency', plots the
+        empirical frequency-marginal probability and optionally the mf-optimized
+        probability against frequency.  Both are shown as line charts with markers.
 
         In Jupyter Lab / Colab the returned figure renders inline automatically.
         To save to a file, call ``fig.savefig("output.png")`` on the returned figure.
@@ -716,6 +778,17 @@ class RecencyFrequencyScorer:
         Returns
         -------
         matplotlib.figure.Figure
+
+        Raises
+        ------
+        ValueError
+            If axis is not "recency" or "frequency", if kind is not one of the
+            accepted values, or if the axis/kind combination is invalid (e.g.,
+            kind="mf" with axis="recency").
+        RuntimeError
+            If fit(), fit_date(), or fit_period() has not been called, or if
+            optimize(kind='mr') / optimize(kind='mf') has not been called when
+            kind is "mr", "mf", or "all".
         """
         import matplotlib.pyplot as plt
 
@@ -751,12 +824,9 @@ class RecencyFrequencyScorer:
             df_emp = self.frequency_probability_
 
         if kind in (opt_kind, "all"):
-            df_opt_full = getattr(self, f"{opt_kind}_probability_")
-            fixed_col = "frequency" if axis == "recency" else "recency"
-            fixed_val = df_opt_full[fixed_col].iloc[0]
-            df_opt = df_opt_full[df_opt_full[fixed_col] == fixed_val][
-                [x_col, "probability"]
-            ].reset_index(drop=True)
+            df_opt = getattr(self, f"{opt_kind}_probability_")[[x_col, "probability"]].reset_index(
+                drop=True
+            )
 
         fig, ax = plt.subplots(figsize=figsize)
         if kind in ("emp", "all"):
@@ -799,10 +869,10 @@ class RecencyFrequencyScorer:
         kind : {"emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc", "all"}, default "emp"
             Which probability to export. "emp", "er", and "ef" use fit(),
             fit_date(), or fit_period() results; others use optimize() results;
-            "all" merges all nine models into a single file with columns
-            empirical_probability, er_probability, ef_probability,
-            mono_probability, mr_probability, mf_probability, mrc_probability,
-            mfc_probability, mcc_probability (requires all optimize() calls).
+            "all" merges all nine models into a single file. For 2D models the
+            merge key is (recency, frequency); for 1D models mr merges on
+            recency and mf merges on frequency, so their probability columns
+            are constant along the other axis.
         path : str or None, default None
             Output file path for the CSV. If None, saves as
             "{kind}_probability.csv" in the current directory.
@@ -811,6 +881,15 @@ class RecencyFrequencyScorer:
         Returns
         -------
         None
+
+        Raises
+        ------
+        ValueError
+            If kind is not one of the accepted values.
+        RuntimeError
+            If fit(), fit_date(), or fit_period() has not been called for
+            emp/er/ef kinds, or if the required optimize(kind=...) has not been
+            called for the requested optimization kind.
         """
         kind = self._normalize_kind(kind)
         if kind not in ("emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc", "all"):
@@ -873,11 +952,11 @@ class RecencyFrequencyScorer:
                 )
                 .merge(
                     self.mr_probability_.rename(columns={"probability": "mr_probability"}),
-                    on=["recency", "frequency"],
+                    on="recency",
                 )
                 .merge(
                     self.mf_probability_.rename(columns={"probability": "mf_probability"}),
-                    on=["recency", "frequency"],
+                    on="frequency",
                 )
                 .merge(
                     self.mrc_probability_.rename(columns={"probability": "mrc_probability"}),
@@ -924,11 +1003,27 @@ class RecencyFrequencyScorer:
         kind : {"emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc"}, default "emp"
             Which probability to use. "emp", "er", and "ef" use fit(),
             fit_date(), or fit_period() results; others use optimize() results.
+            For 1D models "mr" and "mf", only the relevant dimension is used:
+            "mr" uses r only, "mf" uses f only.
 
         Returns
         -------
         float
-            Revisit probability for the given (r, f).
+            Revisit probability for the given (r, f). If r exceeds
+            recency_limit, it is clamped to recency_limit before lookup.
+            If f exceeds frequency_limit, it is clamped to frequency_limit.
+            For 1D kind "mr", f is ignored; for "mf", r is ignored.
+
+        Raises
+        ------
+        TypeError
+            If r or f is not a positive integer.
+        ValueError
+            If kind is not one of the accepted values.
+        RuntimeError
+            If fit(), fit_date(), or fit_period() has not been called for
+            emp/er/ef kinds, or if optimize(kind=...) has not been called
+            for the requested optimization kind.
         """
 
         kind = self._normalize_kind(kind)
@@ -958,6 +1053,13 @@ class RecencyFrequencyScorer:
         if kind == "mcc" and self.mcc_probability_dict_ is None:
             raise RuntimeError("optimize(kind='mcc') must be called before predict(kind='mcc').")
 
+        if kind == "mr":
+            r_clipped = min(r, self.recency_limit)
+            return self.mr_probability_dict_.get(r_clipped, 0.0)
+        if kind == "mf":
+            f_clipped = min(f, self.frequency_limit)
+            return self.mf_probability_dict_.get(f_clipped, 0.0)
+
         r = min(r, self.recency_limit)
         f = min(f, self.frequency_limit)
         if kind == "emp":
@@ -968,10 +1070,6 @@ class RecencyFrequencyScorer:
             prob = self.ef_probability_dict_.get((r, f), 0.0)
         elif kind == "mono":
             prob = self.mono_probability_dict_.get((r, f), 0.0)
-        elif kind == "mr":
-            prob = self.mr_probability_dict_.get((r, f), 0.0)
-        elif kind == "mf":
-            prob = self.mf_probability_dict_.get((r, f), 0.0)
         elif kind == "mrc":
             prob = self.mrc_probability_dict_.get((r, f), 0.0)
         elif kind == "mfc":
@@ -993,20 +1091,25 @@ class RecencyFrequencyScorer:
 
         Computes recency rank and frequency for each user-item pair relative to
         ref_date, then appends the corresponding revisit probability from fit()
-        or optimize() results.  The caller is responsible for pre-filtering df
-        to the desired observation window before calling this method.
+        or optimize() results.  Does not filter df by date; pass a pre-filtered
+        DataFrame or use transform_date() to apply automatic date filtering.
+        Recency values above recency_limit and frequency values above
+        frequency_limit are clamped to their respective limits before lookup.
 
         Parameters
         ----------
         df : pd.DataFrame
-            User-item interaction history to score. Should already be filtered
-            to the observation period by the caller.
+            User-item interaction history to score. If this DataFrame is not
+            pre-filtered to the desired observation window, use transform_date()
+            instead, which filters automatically up to a given date.
         ref_date : str or datetime, optional
             Reference date for computing recency. When None, defaults to the
             latest datetime in df.
         kind : {"emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc"}, default "emp"
             Which probability to use. "emp", "er", and "ef" use fit(),
             fit_date(), or fit_period() results; others use optimize() results.
+            For 1D models "mr" and "mf", probability is looked up by recency
+            or frequency alone.
         user_col : str, optional
             Column name for user IDs in df. Defaults to the value set in __init__.
         item_col : str, optional
@@ -1022,6 +1125,15 @@ class RecencyFrequencyScorer:
             retain the names used (from __init__ or the overrides). Additional
             columns: recency, frequency, probability, order. Sorted by user
             ascending and probability descending; order starts at 1.
+
+        Raises
+        ------
+        ValueError
+            If kind is not one of the accepted values, or if ref_date cannot
+            be parsed as a date.
+        RuntimeError
+            If fit(), fit_date(), or fit_period() has not been called, or if
+            optimize(kind=...) has not been called for the requested kind.
         """
         kind = self._normalize_kind(kind)
         if kind not in ("emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc"):
@@ -1070,15 +1182,30 @@ class RecencyFrequencyScorer:
             except (ValueError, TypeError) as e:
                 raise ValueError(f"ref_date could not be parsed as a date: {ref_date}") from e
 
-        prob_dict = self._probability_dict(kind)
-        prob_df = pd.DataFrame(
-            [(r, f, p) for (r, f), p in prob_dict.items()],
-            columns=["recency_adj", "frequency_adj", "probability"],
-        )
         df_rf = self._build_ui_rf_df(df_log, ref_date)
         df_rf["recency_adj"] = df_rf["recency"].clip(upper=self.recency_limit)
         df_rf["frequency_adj"] = df_rf["frequency"].clip(upper=self.frequency_limit)
-        df_rf = df_rf.merge(prob_df, on=["recency_adj", "frequency_adj"], how="left")
+
+        if kind == "mr":
+            prob_df = pd.DataFrame(
+                list(self.mr_probability_dict_.items()),
+                columns=["recency_adj", "probability"],
+            )
+            df_rf = df_rf.merge(prob_df, on="recency_adj", how="left")
+        elif kind == "mf":
+            prob_df = pd.DataFrame(
+                list(self.mf_probability_dict_.items()),
+                columns=["frequency_adj", "probability"],
+            )
+            df_rf = df_rf.merge(prob_df, on="frequency_adj", how="left")
+        else:
+            prob_dict = self._probability_dict(kind)
+            prob_df = pd.DataFrame(
+                [(r, f, p) for (r, f), p in prob_dict.items()],
+                columns=["recency_adj", "frequency_adj", "probability"],
+            )
+            df_rf = df_rf.merge(prob_df, on=["recency_adj", "frequency_adj"], how="left")
+
         df_rf["probability"] = df_rf["probability"].fillna(0.0)
         df_rf = df_rf.drop(columns=["recency_adj", "frequency_adj"])
         df_rf = df_rf.sort_values([self._USER_COL, "probability"], ascending=[True, False])
@@ -1099,19 +1226,21 @@ class RecencyFrequencyScorer:
         item_col=None,
         datetime_col=None,
     ):
-        """Add recency, frequency, and revisit probability columns to a DataFrame.
+        """Score user-item pairs, filtering the interaction log up to target_date.
 
-        Filters df to rows up to target_date, then computes recency rank and
-        frequency for each user-item pair relative to target_date, and appends
-        the corresponding revisit probability.
+        Filters df to rows on or before target_date, then delegates to
+        transform() using target_date as the recency reference date.
+        Use this when df spans multiple dates and you want only the
+        observation window ending at target_date.
 
         Parameters
         ----------
         df : pd.DataFrame
             User-item interaction history to score.
         target_date : str or datetime
-            Reference date for computing recency and frequency.
-            Rows after this date are excluded.
+            Upper bound for interaction timestamps (inclusive). Rows after
+            this date are excluded. Also used as the reference date for
+            computing recency.
         kind : {"emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc"}, default "emp"
             Which probability to use. "emp", "er", and "ef" use fit(),
             fit_date(), or fit_period() results; others use optimize() results.
@@ -1131,6 +1260,12 @@ class RecencyFrequencyScorer:
             overrides). Additional columns: recency, frequency, probability,
             order. Sorted by user ascending and probability descending; order
             starts at 1.
+
+        Raises
+        ------
+        ValueError
+            If target_date cannot be parsed as a date. Also propagates
+            ValueError and RuntimeError from transform().
         """
         datetime_col_name = datetime_col or self.datetime_col
 
@@ -1176,6 +1311,14 @@ class RecencyFrequencyScorer:
             order, n_recommended, n_hit, precision, recall, f1,
             recall_norm (recall normalized by the maximum hits achievable
             within df_rec), f1_norm (f1 using recall_norm instead of recall).
+
+        Raises
+        ------
+        TypeError
+            If df_eval is not a pandas DataFrame.
+        ValueError
+            If user_col or item_col are missing from df_eval, or if the user
+            or item column in df_rec cannot be cast to str.
         """
         user_col = user_col or self.user_col
         item_col = item_col or self.item_col
@@ -1263,10 +1406,6 @@ class RecencyFrequencyScorer:
             return self.ef_probability_dict_
         if kind == "mono":
             return self.mono_probability_dict_
-        if kind == "mr":
-            return self.mr_probability_dict_
-        if kind == "mf":
-            return self.mf_probability_dict_
         if kind == "mrc":
             return self.mrc_probability_dict_
         if kind == "mfc":
@@ -1290,19 +1429,29 @@ class RecencyFrequencyScorer:
             Optimization model to use.
             "mono" applies monotonicity constraints only (2D joint model).
             "mr" fits a 1-D recency-only model with monotonicity and convexity.
+                 Result stored as dict[int, float] keyed by recency.
             "mf" fits a 1-D frequency-only model with monotonicity and concavity.
+                 Result stored as dict[int, float] keyed by frequency.
             "mrc" additionally applies convexity in recency (2D joint model).
             "mfc" additionally applies concavity in frequency (2D joint model).
             "mcc" applies both recency convexity and frequency concavity (2D joint model).
         eps : float, default 0.0
             Minimum gap enforced between adjacent values in monotonicity
-            constraints.  When 0.0 (default), broad monotonicity is used.
+            constraints.  When 0.0 (default), weak monotonicity is used
+            (non-strict inequalities allow ties between adjacent levels).
             When positive, strict monotonicity is enforced, preventing ties
             between adjacent recency or frequency levels.
 
         Returns
         -------
         self
+
+        Raises
+        ------
+        ValueError
+            If kind is not one of the accepted values.
+        RuntimeError
+            If fit(), fit_date(), or fit_period() has not been called first.
         """
         kind = self._normalize_kind(kind)
         if kind not in ("mono", "mr", "mf", "mrc", "mfc", "mcc"):
@@ -1323,39 +1472,57 @@ class RecencyFrequencyScorer:
         optimizer = RFOptimizer()
         optimizer.set_data(self.R, self.F, self.RF2N, self.RF2Prob)
         optimizer.set_marginal_data(self.R2N, self.R2Prob, self.F2N, self.F2Prob)
-        optimizer.build_model(kind=kind, eps=eps)
-        optimizer.solve()
-        optimizer.show_solve_info()
-        optimizer.postprocess()
 
-        rows = [(r, f, optimizer.RF2X[(r, f)]) for r in self.R for f in self.F]
-        df_opt = pd.DataFrame(rows, columns=["recency", "frequency", "probability"])
-        table = df_opt.pivot_table(index="recency", columns="frequency", values="probability")
+        if kind == "mr":
+            optimizer.build_marginal_model(axis="r", eps=eps)
+            optimizer.solve()
+            optimizer.show_solve_info()
+            optimizer.postprocess()
+            self.mr_probability_dict_ = optimizer.R2X
+            self.mr_probability_ = (
+                pd.DataFrame(list(optimizer.R2X.items()), columns=["recency", "probability"])
+                .sort_values("recency")
+                .reset_index(drop=True)
+            )
 
-        if kind == "mono":
-            self.mono_probability_dict_ = optimizer.RF2X
-            self.mono_probability_ = df_opt
-            self.mono_probability_table_ = table
-        elif kind == "mr":
-            self.mr_probability_dict_ = optimizer.RF2X
-            self.mr_probability_ = df_opt
-            self.mr_probability_table_ = table
         elif kind == "mf":
-            self.mf_probability_dict_ = optimizer.RF2X
-            self.mf_probability_ = df_opt
-            self.mf_probability_table_ = table
-        elif kind == "mrc":
-            self.mrc_probability_dict_ = optimizer.RF2X
-            self.mrc_probability_ = df_opt
-            self.mrc_probability_table_ = table
-        elif kind == "mfc":
-            self.mfc_probability_dict_ = optimizer.RF2X
-            self.mfc_probability_ = df_opt
-            self.mfc_probability_table_ = table
+            optimizer.build_marginal_model(axis="f", eps=eps)
+            optimizer.solve()
+            optimizer.show_solve_info()
+            optimizer.postprocess()
+            self.mf_probability_dict_ = optimizer.F2X
+            self.mf_probability_ = (
+                pd.DataFrame(list(optimizer.F2X.items()), columns=["frequency", "probability"])
+                .sort_values("frequency")
+                .reset_index(drop=True)
+            )
+
         else:
-            self.mcc_probability_dict_ = optimizer.RF2X
-            self.mcc_probability_ = df_opt
-            self.mcc_probability_table_ = table
+            optimizer.build_model(kind=kind, eps=eps)
+            optimizer.solve()
+            optimizer.show_solve_info()
+            optimizer.postprocess()
+
+            rows = [(r, f, optimizer.RF2X[(r, f)]) for r in self.R for f in self.F]
+            df_opt = pd.DataFrame(rows, columns=["recency", "frequency", "probability"])
+            table = df_opt.pivot_table(index="recency", columns="frequency", values="probability")
+
+            if kind == "mono":
+                self.mono_probability_dict_ = optimizer.RF2X
+                self.mono_probability_ = df_opt
+                self.mono_probability_table_ = table
+            elif kind == "mrc":
+                self.mrc_probability_dict_ = optimizer.RF2X
+                self.mrc_probability_ = df_opt
+                self.mrc_probability_table_ = table
+            elif kind == "mfc":
+                self.mfc_probability_dict_ = optimizer.RF2X
+                self.mfc_probability_ = df_opt
+                self.mfc_probability_table_ = table
+            else:
+                self.mcc_probability_dict_ = optimizer.RF2X
+                self.mcc_probability_ = df_opt
+                self.mcc_probability_table_ = table
 
         return self
 
@@ -1384,7 +1551,6 @@ if __name__ == "__main__":
     scorer.plot_probability_surface("ef").savefig("surface_ef_probability.png")
 
     scorer.optimize(kind="mr")
-    scorer.plot_probability_surface("mr").savefig("surface_mr_probability.png")
     scorer.plot_marginal_probability("recency", kind="mr").savefig(
         "marginal_mono_recency_probability.png"
     )
@@ -1393,7 +1559,6 @@ if __name__ == "__main__":
     )
 
     scorer.optimize(kind="mf")
-    scorer.plot_probability_surface("mf").savefig("surface_mf_probability.png")
     scorer.plot_marginal_probability("frequency", kind="mf").savefig(
         "marginal_mono_frequency_probability.png"
     )

@@ -11,7 +11,7 @@ class RFOptimizer:
     over a recency-frequency grid under RF constraints. Intended to be called
     from RecencyFrequencyScorer.optimize().
 
-    Typical call sequence::
+    Typical call sequence for 2D models::
 
         optimizer = RFOptimizer()
         optimizer.set_data(R, F, RF2N, RF2Prob)
@@ -20,6 +20,16 @@ class RFOptimizer:
         optimizer.show_solve_info()  # optional
         optimizer.postprocess()
         # optimizer.RF2X holds the optimized probabilities
+
+    Typical call sequence for 1D marginal models::
+
+        optimizer = RFOptimizer()
+        optimizer.set_data(R, F, RF2N, RF2Prob)
+        optimizer.set_marginal_data(R2N, R2Prob, F2N, F2Prob)
+        optimizer.build_marginal_model(axis="r")
+        optimizer.solve()
+        optimizer.postprocess()
+        # optimizer.R2X holds the optimized recency probabilities
     """
 
     def __init__(self):
@@ -35,6 +45,7 @@ class RFOptimizer:
 
         # 数理最適化モデルとソルバー
         self.kind = None
+        self.axis = None  # None=2D, "r"=recency marginal, "f"=frequency marginal
         self.eps = 0.0
         self.x = None
         self.constraints = None
@@ -48,9 +59,14 @@ class RFOptimizer:
         self.status = None
         self.objective_value = None
         self.RF2X = {}
+        self.R2X = {}
+        self.F2X = {}
 
     def set_data(self, R, F, RF2N, RF2Prob):
         """Load recency-frequency data before building the model.
+
+        Must be called before build_model() or build_marginal_model().
+        Calling this method resets any previously built model and solver state.
 
         Parameters
         ----------
@@ -90,8 +106,8 @@ class RFOptimizer:
         self.F2N = {}
         self.F2Prob = {}
 
-        # 初期化
         self.kind = None
+        self.axis = None
         self.eps = 0.0
         self.x = None
         self.constraints = None
@@ -103,11 +119,13 @@ class RFOptimizer:
         self.status = None
         self.objective_value = None
         self.RF2X = {}
+        self.R2X = {}
+        self.F2X = {}
 
     def set_marginal_data(self, R2N, R2Prob, F2N, F2Prob):
         """Load marginal recency and frequency data for 1-D optimization models.
 
-        Must be called after set_data() and before build_model() with kind='mr' or 'mf'.
+        Must be called after set_data() and before build_marginal_model().
 
         Parameters
         ----------
@@ -148,65 +166,176 @@ class RFOptimizer:
         self.F2Prob = dict(F2Prob)
 
     def build_model(self, kind="mono", eps=0.0):
-        """Build the optimization model.
+        """Build the 2D joint optimization model.
+
+        Fits against joint RF probabilities (RF2Prob). Must be called after
+        set_data(). Resets any previous solve and postprocess state.
 
         Parameters
         ----------
-        kind : {"mono", "mr", "mf", "mrc", "mfc", "mcc"}, default "mono"
+        kind : {"mono", "mrc", "mfc", "mcc"}, default "mono"
             "mono" applies monotonicity constraints only.
-            "mrc" additionally applies convexity in recency (diminishing
-            marginal penalty as recency grows).
-            "mfc" additionally applies concavity in frequency (diminishing
-            marginal returns as frequency grows).
+            "mrc" additionally applies convexity in recency: the rate of
+            probability decrease slows as recency grows
+            (second difference >= 0 along the recency axis).
+            "mfc" additionally applies concavity in frequency: diminishing
+            marginal returns as frequency grows
+            (second difference <= 0 along the frequency axis).
             "mcc" applies both recency convexity and frequency concavity.
         eps : float, default 0.0
             Minimum gap enforced between adjacent values in monotonicity
             constraints.  When 0.0 (default), weak monotonicity is used
-            (``x[r] >= x[r+1]``).  When positive, strict monotonicity is
-            enforced (``x[r] >= x[r+1] + eps``), preventing ties between
-            adjacent recency or frequency levels.
+            (``x[r,f] >= x[r+1,f]`` and ``x[r,f] <= x[r,f+1]``).  When
+            positive, strict monotonicity is enforced
+            (``x[r,f] >= x[r+1,f] + eps`` and ``x[r,f] + eps <= x[r,f+1]``),
+            preventing ties between adjacent recency or frequency levels.
+
+        Raises
+        ------
+        ValueError
+            If kind is not one of the accepted values, eps is negative, or
+            eps exceeds the maximum feasible gap given the data.
+        RuntimeError
+            If set_data() has not been called.
         """
-        if kind not in ("mono", "mr", "mf", "mrc", "mfc", "mcc"):
-            raise ValueError(
-                f"kind must be 'mono', 'mr', 'mf', 'mrc', 'mfc', or 'mcc', got {kind!r}"
-            )
+        if kind not in ("mono", "mrc", "mfc", "mcc"):
+            raise ValueError(f"kind must be 'mono', 'mrc', 'mfc', or 'mcc', got {kind!r}")
         if len(self.R) == 0 or len(self.F) == 0:
             raise RuntimeError("set_data() must be called before build_model()")
-        if kind in ("mr", "mf") and not self.R2N:
-            raise RuntimeError(
-                "set_marginal_data() must be called before build_model() with kind='mr' or 'mf'"
-            )
         if eps < 0:
             raise ValueError(f"eps must be non-negative, got {eps!r}")
 
         self.kind = kind
+        self.axis = None
         self.eps = eps
 
         nr = len(self.R)
         nf = len(self.F)
 
         if eps > 0:
-            if kind == "mr":
-                p_max = max(self.R2Prob.values())
-                eps_max = p_max / (nr - 1) if nr > 1 else math.inf
-            elif kind == "mf":
-                p_max = max(self.F2Prob.values())
-                eps_max = p_max / (nf - 1) if nf > 1 else math.inf
-            else:
-                p_max = max(self.RF2Prob.values())
-                candidates = []
-                if nr > 1:
-                    candidates.append(p_max / (nr - 1))
-                if nf > 1:
-                    candidates.append(p_max / (nf - 1))
-                eps_max = min(candidates) if candidates else math.inf
+            p_max = max(self.RF2Prob.values())
+            candidates = []
+            if nr > 1:
+                candidates.append(p_max / (nr - 1))
+            if nf > 1:
+                candidates.append(p_max / (nf - 1))
+            eps_max = min(candidates) if candidates else math.inf
             if eps > eps_max:
                 raise ValueError(f"eps={eps!r} exceeds the maximum feasible value {eps_max:.6g}")
 
         self.constraints = []
         self.objectives = []
 
-        if kind == "mr":
+        self.x = cp.Variable((nr, nf))
+        self.constraints.append(self.x >= 0)
+        self.constraints.append(self.x <= 1)
+        # Recency 単調性: r < r' => x[r,f] >= x[r',f] + eps
+        for r_idx in range(nr - 1):
+            for f_idx in range(nf):
+                self.constraints.append(self.x[r_idx, f_idx] >= self.x[r_idx + 1, f_idx] + eps)
+        # Frequency 単調性: f < f' => x[r,f] + eps <= x[r,f']
+        for r_idx in range(nr):
+            for f_idx in range(nf - 1):
+                self.constraints.append(self.x[r_idx, f_idx] + eps <= self.x[r_idx, f_idx + 1])
+        if kind in ("mrc", "mcc"):
+            # Recency 凸性（二階差分 >= 0）
+            for r_idx in range(nr - 2):
+                for f_idx in range(nf):
+                    self.constraints.append(
+                        self.x[r_idx, f_idx]
+                        - 2 * self.x[r_idx + 1, f_idx]
+                        + self.x[r_idx + 2, f_idx]
+                        >= 0
+                    )
+        if kind in ("mfc", "mcc"):
+            # Frequency 凹性（二階差分 <= 0）
+            for r_idx in range(nr):
+                for f_idx in range(nf - 2):
+                    self.constraints.append(
+                        self.x[r_idx, f_idx]
+                        - 2 * self.x[r_idx, f_idx + 1]
+                        + self.x[r_idx, f_idx + 2]
+                        <= 0
+                    )
+        for r_idx, r in enumerate(self.R):
+            for f_idx, f in enumerate(self.F):
+                N = self.RF2N[r, f]
+                p = self.RF2Prob[r, f]
+                self.objectives.append(N * (self.x[r_idx, f_idx] - p) ** 2)
+
+        self.problem = cp.Problem(cp.Minimize(cp.sum(self.objectives)), self.constraints)
+        self.num_variables = sum(v.size for v in self.problem.variables())
+        self.num_constraints = sum(c.size for c in self.constraints)
+
+        self.elapsed_time = None
+        self.status = None
+        self.objective_value = None
+        self.RF2X = {}
+        self.R2X = {}
+        self.F2X = {}
+
+    def build_marginal_model(self, axis="r", eps=0.0):
+        """Build the 1D marginal optimization model.
+
+        Fits against marginal probabilities (R2Prob when axis='r', F2Prob when
+        axis='f'), not the joint RF2Prob. Must be called after set_data() and
+        set_marginal_data(). Resets any previous solve and postprocess state.
+
+        Parameters
+        ----------
+        axis : {"r", "f"}, default "r"
+            "r" fits a recency-only model with monotonicity (``x[r] >= x[r+1]``)
+            and convexity (second difference >= 0): the rate of probability
+            decrease slows as recency grows.
+            "f" fits a frequency-only model with monotonicity
+            (``x[f] <= x[f+1]``) and concavity (second difference <= 0):
+            diminishing marginal returns as frequency grows.
+        eps : float, default 0.0
+            Minimum gap enforced between adjacent values in monotonicity
+            constraints.  When 0.0 (default), weak monotonicity is used
+            (``x[r] >= x[r+1]`` or ``x[f] <= x[f+1]``).  When positive,
+            strict monotonicity is enforced
+            (``x[r] >= x[r+1] + eps`` or ``x[f] + eps <= x[f+1]``),
+            preventing ties between adjacent levels.
+
+        Raises
+        ------
+        ValueError
+            If axis is not 'r' or 'f', eps is negative, or eps exceeds the
+            maximum feasible gap given the marginal data.
+        RuntimeError
+            If set_data() or set_marginal_data() has not been called.
+        """
+        if axis not in ("r", "f"):
+            raise ValueError(f"axis must be 'r' or 'f', got {axis!r}")
+        if len(self.R) == 0 or len(self.F) == 0:
+            raise RuntimeError("set_data() must be called before build_marginal_model()")
+        if not self.R2N:
+            raise RuntimeError("set_marginal_data() must be called before build_marginal_model()")
+        if eps < 0:
+            raise ValueError(f"eps must be non-negative, got {eps!r}")
+
+        self.kind = None
+        self.axis = axis
+        self.eps = eps
+
+        nr = len(self.R)
+        nf = len(self.F)
+
+        if eps > 0:
+            if axis == "r":
+                p_max = max(self.R2Prob.values())
+                eps_max = p_max / (nr - 1) if nr > 1 else math.inf
+            else:
+                p_max = max(self.F2Prob.values())
+                eps_max = p_max / (nf - 1) if nf > 1 else math.inf
+            if eps > eps_max:
+                raise ValueError(f"eps={eps!r} exceeds the maximum feasible value {eps_max:.6g}")
+
+        self.constraints = []
+        self.objectives = []
+
+        if axis == "r":
             self.x = cp.Variable(nr)
             self.constraints.append(self.x >= 0)
             self.constraints.append(self.x <= 1)
@@ -223,7 +352,7 @@ class RFOptimizer:
                 p = self.R2Prob[r]
                 self.objectives.append(N * (self.x[r_idx] - p) ** 2)
 
-        elif kind == "mf":
+        else:  # axis == "f"
             self.x = cp.Variable(nf)
             self.constraints.append(self.x >= 0)
             self.constraints.append(self.x <= 1)
@@ -240,64 +369,28 @@ class RFOptimizer:
                 p = self.F2Prob[f]
                 self.objectives.append(N * (self.x[f_idx] - p) ** 2)
 
-        else:
-            self.x = cp.Variable((nr, nf))
-            self.constraints.append(self.x >= 0)
-            self.constraints.append(self.x <= 1)
-            # Recency 単調性: r < r' => x[r,f] >= x[r',f] + eps
-            for r_idx in range(nr - 1):
-                for f_idx in range(nf):
-                    self.constraints.append(self.x[r_idx, f_idx] >= self.x[r_idx + 1, f_idx] + eps)
-            # Frequency 単調性: f < f' => x[r,f] + eps <= x[r,f']
-            for r_idx in range(nr):
-                for f_idx in range(nf - 1):
-                    self.constraints.append(self.x[r_idx, f_idx] + eps <= self.x[r_idx, f_idx + 1])
-            if kind in ("mrc", "mcc"):
-                # Recency 凸性（二階差分 >= 0）
-                for r_idx in range(nr - 2):
-                    for f_idx in range(nf):
-                        self.constraints.append(
-                            self.x[r_idx, f_idx]
-                            - 2 * self.x[r_idx + 1, f_idx]
-                            + self.x[r_idx + 2, f_idx]
-                            >= 0
-                        )
-            if kind in ("mfc", "mcc"):
-                # Frequency 凹性（二階差分 <= 0）
-                for r_idx in range(nr):
-                    for f_idx in range(nf - 2):
-                        self.constraints.append(
-                            self.x[r_idx, f_idx]
-                            - 2 * self.x[r_idx, f_idx + 1]
-                            + self.x[r_idx, f_idx + 2]
-                            <= 0
-                        )
-            for r_idx, r in enumerate(self.R):
-                for f_idx, f in enumerate(self.F):
-                    N = self.RF2N[r, f]
-                    p = self.RF2Prob[r, f]
-                    self.objectives.append(N * (self.x[r_idx, f_idx] - p) ** 2)
-
         self.problem = cp.Problem(cp.Minimize(cp.sum(self.objectives)), self.constraints)
-
         self.num_variables = sum(v.size for v in self.problem.variables())
         self.num_constraints = sum(c.size for c in self.constraints)
 
-        # 初期化
         self.elapsed_time = None
         self.status = None
         self.objective_value = None
         self.RF2X = {}
+        self.R2X = {}
+        self.F2X = {}
 
     def solve(self):
-        """Solve the optimization problem built by build_model().
+        """Solve the optimization problem built by build_model() or build_marginal_model().
 
         Sets status, objective_value, and elapsed_time.
-        Raises RuntimeError if build_model() has not been called.
+        Raises RuntimeError if neither build method has been called.
         Solver failures are not raised here; call postprocess() to detect them.
         """
         if self.problem is None:
-            raise RuntimeError("build_model() must be called before solve()")
+            raise RuntimeError(
+                "build_model() or build_marginal_model() must be called before solve()"
+            )
 
         start_time = time.time()
         self.problem.solve()
@@ -307,7 +400,12 @@ class RFOptimizer:
         self.objective_value = self.problem.value
 
     def postprocess(self):
-        """Extract optimized probabilities from the solver solution into RF2X.
+        """Extract optimized probabilities from the solver solution.
+
+        For 2D models (build_model): populates RF2X.
+        For 1D marginal models (build_marginal_model):
+          axis="r" populates R2X, axis="f" populates F2X.
+        No broadcast is performed.
 
         Must be called after solve(). Raises RuntimeError if the solver did
         not find a feasible solution.
@@ -316,21 +414,17 @@ class RFOptimizer:
             raise RuntimeError("solve() must be called before postprocess()")
         if self.x.value is None:
             raise RuntimeError(f"Cannot postprocess: solver status is {self.status!r}")
-        self.RF2X = {}
-        if self.kind == "mr":
-            for r_idx, r in enumerate(self.R):
-                val = float(self.x.value[r_idx])
-                for f in self.F:
-                    self.RF2X[r, f] = val
-        elif self.kind == "mf":
-            for f_idx, f in enumerate(self.F):
-                val = float(self.x.value[f_idx])
-                for r in self.R:
-                    self.RF2X[r, f] = val
+
+        if self.axis == "r":
+            self.R2X = {r: float(self.x.value[r_idx]) for r_idx, r in enumerate(self.R)}
+        elif self.axis == "f":
+            self.F2X = {f: float(self.x.value[f_idx]) for f_idx, f in enumerate(self.F)}
         else:
-            for r_idx, r in enumerate(self.R):
-                for f_idx, f in enumerate(self.F):
-                    self.RF2X[r, f] = float(self.x.value[r_idx, f_idx])
+            self.RF2X = {
+                (r, f): float(self.x.value[r_idx, f_idx])
+                for r_idx, r in enumerate(self.R)
+                for f_idx, f in enumerate(self.F)
+            }
 
     def _print_pivot(self, RF2Val, fmt="g"):
         row_w = max(9, max(len(str(r)) for r in self.R) + 1)
@@ -365,7 +459,10 @@ class RFOptimizer:
         obj_val = self.objective_value
         obj_str = f"{obj_val:.4f}" if (obj_val is not None and math.isfinite(obj_val)) else "N/A"
         print("=== show solve info ===")
-        print(f"kind: {self.kind}")
+        if self.axis is not None:
+            print(f"axis: {self.axis}")
+        else:
+            print(f"kind: {self.kind}")
         print(f"eps: {self.eps}")
         print(f"status: {self.status}")
         print(f"objective_value: {obj_str}")
@@ -374,11 +471,28 @@ class RFOptimizer:
         print(f"num_constraints: {self.num_constraints}")
 
     def show_result(self):
-        """Print the optimized probability table (RF2X) to stdout."""
-        if not self.RF2X:
-            raise RuntimeError("postprocess() must be called before show_result()")
-        print("=== show result ===")
-        self._print_pivot(self.RF2X, fmt=".4f")
+        """Print the optimized probability table to stdout."""
+        if self.axis == "r":
+            if not self.R2X:
+                raise RuntimeError("postprocess() must be called before show_result()")
+            print("=== show result (recency marginal) ===")
+            col_w = 10
+            print(f"{'recency':>{col_w}}{'probability':>{col_w}}")
+            for r in self.R:
+                print(f"{r:>{col_w}}{self.R2X[r]:>{col_w}.4f}")
+        elif self.axis == "f":
+            if not self.F2X:
+                raise RuntimeError("postprocess() must be called before show_result()")
+            print("=== show result (frequency marginal) ===")
+            col_w = 10
+            print(f"{'frequency':>{col_w}}{'probability':>{col_w}}")
+            for f in self.F:
+                print(f"{f:>{col_w}}{self.F2X[f]:>{col_w}.4f}")
+        else:
+            if not self.RF2X:
+                raise RuntimeError("postprocess() must be called before show_result()")
+            print("=== show result ===")
+            self._print_pivot(self.RF2X, fmt=".4f")
 
 
 if __name__ == "__main__":

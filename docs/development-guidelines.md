@@ -38,7 +38,7 @@
 
 - テストコードは `tests/` に配置する
 - `pytest` を使用する
-- `fit()`・`fit_date()`・`fit_period()`・`predict()`・`transform()`・`transform_date()`・`evaluate()`・`optimize()`・`export_probability_csv()` の正常系・異常系をカバーする
+- `fit()`・`fit_date()`・`fit_period()`・`predict()`・`transform()`・`transform_date()`・`evaluate()`・`optimize()`・`plot_probability_surface()`・`plot_marginal_probability()`・`export_probability_csv()` の正常系・異常系をカバーする
 
 ## ドキュメント管理
 
