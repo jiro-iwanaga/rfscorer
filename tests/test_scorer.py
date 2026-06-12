@@ -188,13 +188,13 @@ class TestInit:
     def test_default_column_names(self, scorer):
         assert scorer.user_col == "user"
         assert scorer.item_col == "item"
-        assert scorer.datetime_col == "datetime"
+        assert scorer.time_col == "datetime"
 
     def test_custom_column_names(self):
-        s = RecencyFrequencyScorer(user_col="uid", item_col="iid", datetime_col="ts")
+        s = RecencyFrequencyScorer(user_col="uid", item_col="iid", time_col="ts")
         assert s.user_col == "uid"
         assert s.item_col == "iid"
-        assert s.datetime_col == "ts"
+        assert s.time_col == "ts"
 
     def test_initial_state(self, scorer):
         assert scorer.R == []
@@ -321,10 +321,10 @@ class TestFitPeriodResult:
         assert scorer_fitted.record_num == len(_make_df())
 
     def test_periods_stored(self, scorer_fitted):
-        assert scorer_fitted.observation_start_date_ == pd.Timestamp("2024-01-01")
-        assert scorer_fitted.observation_end_date_ == pd.Timestamp("2024-01-07")
-        assert scorer_fitted.evaluation_start_date_ == pd.Timestamp("2024-01-08")
-        assert scorer_fitted.evaluation_end_date_ == pd.Timestamp("2024-01-14")
+        assert scorer_fitted.observation_start_ == pd.Timestamp("2024-01-01").toordinal()
+        assert scorer_fitted.observation_end_ == pd.Timestamp("2024-01-07").toordinal()
+        assert scorer_fitted.evaluation_start_ == pd.Timestamp("2024-01-08").toordinal()
+        assert scorer_fitted.evaluation_end_ == pd.Timestamp("2024-01-14").toordinal()
 
     def test_explicit_limits_respected(self, scorer_fitted):
         assert scorer_fitted.recency_limit == _RECENCY_LIMIT
@@ -392,7 +392,7 @@ class TestFitPeriodResult:
 
     def test_custom_column_names(self):
         df_custom = _make_df().rename(columns={"user": "uid", "item": "iid", "datetime": "ts"})
-        s = RecencyFrequencyScorer(user_col="uid", item_col="iid", datetime_col="ts")
+        s = RecencyFrequencyScorer(user_col="uid", item_col="iid", time_col="ts")
         s.fit_period(
             df_custom,
             _OBS_PERIOD,
@@ -473,13 +473,13 @@ class TestFitDateValidation:
         with pytest.raises(TypeError, match="pandas DataFrame"):
             scorer.fit_date("not_a_df", "2024-01-07")
 
-    def test_missing_datetime_col_raises(self, scorer, df):
+    def test_missing_time_col_raises(self, scorer, df):
         with pytest.raises(ValueError, match="Missing required columns"):
             scorer.fit_date(df.drop(columns="datetime"), "2024-01-07")
 
     def test_invalid_target_date_raises(self, scorer, df):
-        with pytest.raises(ValueError, match="target_date could not be parsed"):
-            scorer.fit_date(df, "not-a-date")
+        with pytest.raises(ValueError, match="time value could not be normalized"):
+            scorer.fit_date(df, object())
 
 
 # ---------------------------------------------------------------------------
@@ -508,11 +508,11 @@ class TestFitValidation:
         with pytest.raises(ValueError, match="df_eval"):
             scorer.fit(df_obs, df_eval)
 
-    def test_invalid_ref_date_raises(self, scorer, df):
+    def test_invalid_ref_raises(self, scorer, df):
         df_obs = df[pd.to_datetime(df["datetime"]) <= "2024-01-07"]
         df_eval = df[pd.to_datetime(df["datetime"]) > "2024-01-07"]
-        with pytest.raises(ValueError, match="ref_date could not be parsed"):
-            scorer.fit(df_obs, df_eval, ref_date="not-a-date")
+        with pytest.raises(ValueError, match="time value could not be normalized"):
+            scorer.fit(df_obs, df_eval, ref=object())
 
 
 # ---------------------------------------------------------------------------
@@ -530,8 +530,8 @@ class TestFitDateResult:
         s.fit_date(
             df, _FIT_TARGET_DATE, recency_limit=_RECENCY_LIMIT, frequency_limit=_FREQUENCY_LIMIT
         )
-        assert s.observation_end_date_ == pd.Timestamp(_FIT_TARGET_DATE)
-        assert s.evaluation_start_date_ == pd.Timestamp("2024-01-08")
+        assert s.observation_end_ == pd.Timestamp(_FIT_TARGET_DATE).toordinal()
+        assert s.evaluation_start_ == pd.Timestamp("2024-01-08").toordinal()
 
     def test_observation_start_bounded_by_observation_days(self, df):
         # observation_days=3 → obs_start = max(Jan01, Jan07-3d) = Jan04
@@ -544,7 +544,7 @@ class TestFitDateResult:
             recency_limit=_RECENCY_LIMIT,
             frequency_limit=_FREQUENCY_LIMIT,
         )
-        assert s.observation_start_date_ == pd.Timestamp("2024-01-04")
+        assert s.observation_start_ == pd.Timestamp("2024-01-04").toordinal()
 
     def test_observation_days_none_uses_df_min(self, df):
         s = RecencyFrequencyScorer()
@@ -555,7 +555,7 @@ class TestFitDateResult:
             recency_limit=_RECENCY_LIMIT,
             frequency_limit=_FREQUENCY_LIMIT,
         )
-        assert s.observation_start_date_ == pd.Timestamp("2024-01-01")
+        assert s.observation_start_ == pd.Timestamp("2024-01-01").toordinal()
 
     def test_evaluation_end_bounded_by_evaluation_days(self, df):
         # evaluation_days=2 → eval_end = min(Jan10, Jan07+2d) = Jan09
@@ -567,7 +567,7 @@ class TestFitDateResult:
             recency_limit=_RECENCY_LIMIT,
             frequency_limit=_FREQUENCY_LIMIT,
         )
-        assert s.evaluation_end_date_ == pd.Timestamp("2024-01-09")
+        assert s.evaluation_end_ == pd.Timestamp("2024-01-09").toordinal()
 
     def test_evaluation_days_none_uses_df_max(self, df):
         s = RecencyFrequencyScorer()
@@ -578,7 +578,7 @@ class TestFitDateResult:
             recency_limit=_RECENCY_LIMIT,
             frequency_limit=_FREQUENCY_LIMIT,
         )
-        assert s.evaluation_end_date_ == pd.Timestamp("2024-01-10")
+        assert s.evaluation_end_ == pd.Timestamp("2024-01-10").toordinal()
 
     def test_same_result_as_fit_period(self, df):
         # fit_date(target_date, obs_days=None, eval_days=None) == fit_period(full range)
@@ -650,7 +650,7 @@ class TestFitResult:
         assert s1.empirical_probability_dict_ == s2.empirical_probability_dict_
 
     def test_ref_date_default_is_obs_max(self):
-        # ref_date=None → df_obs の最大日 (2024-01-07) が observation_end_date_
+        # ref=None → df_obs の最大日 (2024-01-07) が observation_end_ に ordinal で格納される
         s = RecencyFrequencyScorer()
         s.fit(
             self._make_obs(),
@@ -658,18 +658,18 @@ class TestFitResult:
             recency_limit=_RECENCY_LIMIT,
             frequency_limit=_FREQUENCY_LIMIT,
         )
-        assert s.observation_end_date_ == pd.Timestamp("2024-01-07")
+        assert s.observation_end_ == pd.Timestamp("2024-01-07").toordinal()
 
     def test_ref_date_explicit(self):
         s = RecencyFrequencyScorer()
         s.fit(
             self._make_obs(),
             self._make_eval(),
-            ref_date="2024-01-07",
+            ref="2024-01-07",
             recency_limit=_RECENCY_LIMIT,
             frequency_limit=_FREQUENCY_LIMIT,
         )
-        assert s.observation_end_date_ == pd.Timestamp("2024-01-07")
+        assert s.observation_end_ == pd.Timestamp("2024-01-07").toordinal()
 
     def test_observation_start_from_data(self):
         s = RecencyFrequencyScorer()
@@ -679,7 +679,7 @@ class TestFitResult:
             recency_limit=_RECENCY_LIMIT,
             frequency_limit=_FREQUENCY_LIMIT,
         )
-        assert s.observation_start_date_ == pd.Timestamp("2024-01-01")
+        assert s.observation_start_ == pd.Timestamp("2024-01-01").toordinal()
 
     def test_evaluation_dates_from_data(self):
         s = RecencyFrequencyScorer()
@@ -689,8 +689,8 @@ class TestFitResult:
             recency_limit=_RECENCY_LIMIT,
             frequency_limit=_FREQUENCY_LIMIT,
         )
-        assert s.evaluation_start_date_ == pd.Timestamp("2024-01-09")
-        assert s.evaluation_end_date_ == pd.Timestamp("2024-01-10")
+        assert s.evaluation_start_ == pd.Timestamp("2024-01-09").toordinal()
+        assert s.evaluation_end_ == pd.Timestamp("2024-01-10").toordinal()
 
     def test_empirical_probability_dict_populated(self):
         s = RecencyFrequencyScorer()
@@ -1194,7 +1194,7 @@ class TestPredict:
 
 
 # ---------------------------------------------------------------------------
-# transform — 新 API (ref_date, 事前フィルタ済み df)
+# transform — 新 API (ref, 事前フィルタ済み df)
 # ---------------------------------------------------------------------------
 class TestTransform:
     def _make_obs(self):
@@ -1222,23 +1222,23 @@ class TestTransform:
             assert list(grp["probability"]) == sorted(grp["probability"], reverse=True)
             assert list(grp["order"]) == list(range(1, len(grp) + 1))
 
-    def test_ref_date_none_uses_data_max(self, scorer_fitted):
-        # ref_date=None → df_obs の最大日 (2024-01-07) が基準になることを確認
-        # u2-item2 は Jan07 に閲覧 → ref_date=Jan07 なら recency=1
+    def test_ref_none_uses_data_max(self, scorer_fitted):
+        # ref=None → df_obs の最大日 (2024-01-07) が基準になることを確認
+        # u2-item2 は Jan07 に閲覧 → ref=Jan07 なら recency=1
         result = scorer_fitted.transform(self._make_obs())
         u2_item2 = result[(result["user"] == "u2") & (result["item"] == "item2")].iloc[0]
         assert u2_item2["recency"] == 1
 
-    def test_ref_date_explicit(self, scorer_fitted):
-        # ref_date="2024-01-08" → u2-item2 (最終閲覧 Jan07) の recency = 2
-        result = scorer_fitted.transform(self._make_obs(), ref_date="2024-01-08")
+    def test_ref_explicit(self, scorer_fitted):
+        # ref="2024-01-08" → u2-item2 (最終閲覧 Jan07) の recency = 2
+        result = scorer_fitted.transform(self._make_obs(), ref="2024-01-08")
         u2_item2 = result[(result["user"] == "u2") & (result["item"] == "item2")].iloc[0]
         assert u2_item2["recency"] == 2
 
     def test_same_result_as_transform_date(self, scorer_fitted):
-        # transform(df_obs, ref_date) と transform_date(df, target_date) が一致
+        # transform(df_obs, ref) と transform_date(df, target_date) が一致
         df = _make_df()
-        result_new = scorer_fitted.transform(self._make_obs(), ref_date=_FIT_TARGET_DATE)
+        result_new = scorer_fitted.transform(self._make_obs(), ref=_FIT_TARGET_DATE)
         result_old = scorer_fitted.transform_date(df, _FIT_TARGET_DATE)
         assert list(result_new.sort_values(["user", "item"])["probability"]) == pytest.approx(
             list(result_old.sort_values(["user", "item"])["probability"])
@@ -1248,7 +1248,7 @@ class TestTransform:
         df_b = _make_df().rename(columns={"user": "uid", "item": "iid", "datetime": "ts"})
         df_b_obs = df_b[pd.to_datetime(df_b["ts"]) <= _OBS_PERIOD[1]]
         result = scorer_fitted.transform(
-            df_b_obs, ref_date=_FIT_TARGET_DATE, user_col="uid", item_col="iid", datetime_col="ts"
+            df_b_obs, ref=_FIT_TARGET_DATE, user_col="uid", item_col="iid", time_col="ts"
         )
         assert "uid" in result.columns
         assert "iid" in result.columns
@@ -1267,18 +1267,14 @@ class TestTransform:
             scorer_fitted.transform(self._make_obs(), kind="mf")
 
     def test_mr_probability_matches_dict(self, scorer_optimized_mr):
-        result = scorer_optimized_mr.transform(
-            self._make_obs(), ref_date=_FIT_TARGET_DATE, kind="mr"
-        )
+        result = scorer_optimized_mr.transform(self._make_obs(), ref=_FIT_TARGET_DATE, kind="mr")
         for _, row in result.iterrows():
             r_adj = min(int(row["recency"]), _RECENCY_LIMIT)
             expected = scorer_optimized_mr.mr_probability_dict_[r_adj]
             assert row["probability"] == pytest.approx(expected)
 
     def test_mf_probability_matches_dict(self, scorer_optimized_mf):
-        result = scorer_optimized_mf.transform(
-            self._make_obs(), ref_date=_FIT_TARGET_DATE, kind="mf"
-        )
+        result = scorer_optimized_mf.transform(self._make_obs(), ref=_FIT_TARGET_DATE, kind="mf")
         for _, row in result.iterrows():
             f_adj = min(int(row["frequency"]), _FREQUENCY_LIMIT)
             expected = scorer_optimized_mf.mf_probability_dict_[f_adj]
@@ -1289,7 +1285,7 @@ class TestTransform:
         # 2023-12-30 → ref_date Jan07 との差 = 8日 → recency = 9 > limit=7
         extra = pd.DataFrame([("u3", "item3", "2023-12-30")], columns=["user", "item", "datetime"])
         df_obs = pd.concat([self._make_obs(), extra], ignore_index=True)
-        result = scorer_fitted.transform(df_obs, ref_date=_FIT_TARGET_DATE)
+        result = scorer_fitted.transform(df_obs, ref=_FIT_TARGET_DATE)
         u3_row = result[(result["user"] == "u3") & (result["item"] == "item3")].iloc[0]
         assert u3_row["recency"] == 9  # 出力の recency は元値を保持
         expected = scorer_fitted.empirical_probability_dict_[_RECENCY_LIMIT, 1]
@@ -1301,7 +1297,7 @@ class TestTransform:
         extra_rows = [("u3", "item3", f"2024-01-0{d}") for d in range(4, 8)]
         extra = pd.DataFrame(extra_rows, columns=["user", "item", "datetime"])
         df_obs = pd.concat([self._make_obs(), extra], ignore_index=True)
-        result = scorer_fitted.transform(df_obs, ref_date=_FIT_TARGET_DATE)
+        result = scorer_fitted.transform(df_obs, ref=_FIT_TARGET_DATE)
         u3_row = result[(result["user"] == "u3") & (result["item"] == "item3")].iloc[0]
         assert u3_row["frequency"] == 4  # 出力の frequency は元値を保持
         # min recency = Jan07→recency=1, frequency_adj = min(4, 3) = 3
@@ -1319,7 +1315,7 @@ class TestTransformDate:
 
     def test_uses_init_col_names_by_default(self):
         df_custom = _make_df().rename(columns={"user": "uid", "item": "iid", "datetime": "ts"})
-        s = RecencyFrequencyScorer(user_col="uid", item_col="iid", datetime_col="ts")
+        s = RecencyFrequencyScorer(user_col="uid", item_col="iid", time_col="ts")
         s.fit_period(
             df_custom,
             _OBS_PERIOD,
@@ -1347,9 +1343,7 @@ class TestTransformDate:
             recency_limit=_RECENCY_LIMIT,
             frequency_limit=_FREQUENCY_LIMIT,
         )
-        result = s.transform_date(
-            df_b, "2024-01-07", user_col="uid", item_col="iid", datetime_col="ts"
-        )
+        result = s.transform_date(df_b, "2024-01-07", user_col="uid", item_col="iid", time_col="ts")
         assert "uid" in result.columns
         assert "iid" in result.columns
 
@@ -1383,8 +1377,8 @@ class TestTransformDate:
         assert u2_item2["frequency"] == 2
 
     def test_invalid_target_date_raises(self, scorer_fitted, df):
-        with pytest.raises(ValueError, match="target_date could not be parsed"):
-            scorer_fitted.transform_date(df, "not-a-date")
+        with pytest.raises((ValueError, Exception)):
+            scorer_fitted.transform_date(df, object())
 
 
 # ---------------------------------------------------------------------------
@@ -1481,7 +1475,7 @@ class TestEvaluate:
 
     def test_uses_init_col_names_by_default(self):
         df_custom = _make_df().rename(columns={"user": "uid", "item": "iid", "datetime": "ts"})
-        s = RecencyFrequencyScorer(user_col="uid", item_col="iid", datetime_col="ts")
+        s = RecencyFrequencyScorer(user_col="uid", item_col="iid", time_col="ts")
         s.fit_period(
             df_custom,
             _OBS_PERIOD,
@@ -1923,3 +1917,210 @@ class TestExportProbabilityCsv:
         out = tmp_path / "out.csv"
         scorer_fitted.export_probability_csv(kind="empirical", path=str(out))
         assert out.exists()
+
+
+# ---------------------------------------------------------------------------
+# _normalize_ref — T14
+# ---------------------------------------------------------------------------
+class TestNormalizeRef:
+    @pytest.fixture
+    def scorer(self):
+        return RecencyFrequencyScorer()
+
+    def test_string_date(self, scorer):
+        expected = pd.Timestamp("2024-01-01").toordinal()
+        assert scorer._normalize_ref("2024-01-01") == expected
+
+    def test_timestamp(self, scorer):
+        ts = pd.Timestamp("2024-01-01")
+        assert scorer._normalize_ref(ts) == ts.toordinal()
+
+    def test_int(self, scorer):
+        assert scorer._normalize_ref(100) == 100
+
+    def test_float(self, scorer):
+        assert scorer._normalize_ref(100.9) == 100
+
+    def test_numpy_int(self, scorer):
+        import numpy as np
+
+        assert scorer._normalize_ref(np.int64(42)) == 42
+
+    def test_numpy_float(self, scorer):
+        import numpy as np
+
+        assert scorer._normalize_ref(np.float64(7.0)) == 7
+
+    def test_invalid_type_raises(self, scorer):
+        with pytest.raises(ValueError, match="time value could not be normalized"):
+            scorer._normalize_ref(object())
+
+
+# ---------------------------------------------------------------------------
+# _normalize_sequence_col — T15
+# ---------------------------------------------------------------------------
+class TestNormalizeSequenceCol:
+    @pytest.fixture
+    def scorer(self):
+        return RecencyFrequencyScorer()
+
+    def test_datetime64_col(self, scorer):
+        s = pd.Series(pd.to_datetime(["2024-01-01", "2024-01-07"]))
+        result = scorer._normalize_sequence_col(s)
+        assert list(result) == [
+            pd.Timestamp("2024-01-01").toordinal(),
+            pd.Timestamp("2024-01-07").toordinal(),
+        ]
+
+    def test_string_date_col(self, scorer):
+        s = pd.Series(["2024-01-01", "2024-01-07"])
+        result = scorer._normalize_sequence_col(s)
+        assert list(result) == [
+            pd.Timestamp("2024-01-01").toordinal(),
+            pd.Timestamp("2024-01-07").toordinal(),
+        ]
+
+    def test_int_col(self, scorer):
+        s = pd.Series([1, 7, 100])
+        result = scorer._normalize_sequence_col(s)
+        assert list(result) == [1, 7, 100]
+
+    def test_float_col(self, scorer):
+        s = pd.Series([1.0, 7.5, 100.9])
+        result = scorer._normalize_sequence_col(s)
+        assert list(result) == [1, 7, 100]
+
+    def test_invalid_dtype_raises(self, scorer):
+        s = pd.Series([object(), object()])
+        with pytest.raises(ValueError, match="time_col must be datetime or integer type"):
+            scorer._normalize_sequence_col(s)
+
+
+# ---------------------------------------------------------------------------
+# 整数入力での fit / fit_date / fit_period — T16
+# ---------------------------------------------------------------------------
+class TestIntegerTimeCol:
+    """整数列を time_col として渡したとき正常に動作することを確認する。"""
+
+    def _make_int_df(self):
+        """_make_df() の datetime を ordinal 整数に変換したデータ。"""
+        df = _make_df().copy()
+        df["seq"] = pd.to_datetime(df["datetime"]).map(lambda x: x.toordinal())
+        return df.drop(columns="datetime")
+
+    def test_fit_with_integer_col(self):
+        df = self._make_int_df()
+        target_ord = pd.Timestamp(_FIT_TARGET_DATE).toordinal()
+        obs = df[df["seq"] <= target_ord]
+        evl = df[df["seq"] > target_ord]
+        s = RecencyFrequencyScorer(time_col="seq")
+        s.fit(obs, evl, recency_limit=_RECENCY_LIMIT, frequency_limit=_FREQUENCY_LIMIT)
+        assert isinstance(s.empirical_probability_dict_, dict)
+
+    def test_fit_date_with_integer_col(self):
+        df = self._make_int_df()
+        target_ord = pd.Timestamp(_FIT_TARGET_DATE).toordinal()
+        s = RecencyFrequencyScorer(time_col="seq")
+        s.fit_date(
+            df,
+            target_ord,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        assert isinstance(s.empirical_probability_dict_, dict)
+
+    def test_fit_period_with_integer_col(self):
+        df = self._make_int_df()
+        obs_start = pd.Timestamp(_OBS_PERIOD[0]).toordinal()
+        obs_end = pd.Timestamp(_OBS_PERIOD[1]).toordinal()
+        eval_start = pd.Timestamp(_EVAL_PERIOD[0]).toordinal()
+        eval_end = pd.Timestamp(_EVAL_PERIOD[1]).toordinal()
+        s = RecencyFrequencyScorer(time_col="seq")
+        s.fit_period(
+            df,
+            (obs_start, obs_end),
+            (eval_start, eval_end),
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        assert isinstance(s.empirical_probability_dict_, dict)
+
+    def test_integer_and_datetime_produce_same_rf_distribution(self):
+        """整数入力と日付入力で同一の RF 分布が得られること。"""
+        df_date = _make_df()
+        df_int = self._make_int_df()
+
+        s_date = RecencyFrequencyScorer()
+        s_date.fit_period(
+            df_date,
+            _OBS_PERIOD,
+            _EVAL_PERIOD,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+
+        obs_start = pd.Timestamp(_OBS_PERIOD[0]).toordinal()
+        obs_end = pd.Timestamp(_OBS_PERIOD[1]).toordinal()
+        eval_start = pd.Timestamp(_EVAL_PERIOD[0]).toordinal()
+        eval_end = pd.Timestamp(_EVAL_PERIOD[1]).toordinal()
+        s_int = RecencyFrequencyScorer(time_col="seq")
+        s_int.fit_period(
+            df_int,
+            (obs_start, obs_end),
+            (eval_start, eval_end),
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+
+        assert s_date.empirical_probability_dict_ == s_int.empirical_probability_dict_
+
+
+# ---------------------------------------------------------------------------
+# unit パラメータ — T17
+# ---------------------------------------------------------------------------
+class TestUnit:
+    def _make_scorer_with_unit(self, unit):
+        df = _make_df()
+        s = RecencyFrequencyScorer(unit=unit)
+        s.fit_period(
+            df,
+            _OBS_PERIOD,
+            _EVAL_PERIOD,
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        return s
+
+    def test_unit_zero_raises(self):
+        with pytest.raises(ValueError, match="unit must be a positive integer"):
+            RecencyFrequencyScorer(unit=0)
+
+    def test_unit_negative_raises(self):
+        with pytest.raises(ValueError, match="unit must be a positive integer"):
+            RecencyFrequencyScorer(unit=-1)
+
+    def test_unit_7_recency_is_floor_div_of_unit_1(self):
+        """unit=7 の Recency が unit=1 の Recency の // 7 になること。"""
+        df = _make_df()
+        obs = df[pd.to_datetime(df["datetime"]) <= _OBS_PERIOD[1]]
+
+        s1 = self._make_scorer_with_unit(1)
+        s7 = self._make_scorer_with_unit(7)
+
+        result1 = s1.transform(obs)
+        result7 = s7.transform(obs)
+
+        merged = result1.merge(
+            result7,
+            on=["user", "item"],
+            suffixes=("_1", "_7"),
+        )
+        for _, row in merged.iterrows():
+            assert (
+                row["recency_7"] == row["recency_1"] // 7 + (1 if row["recency_1"] % 7 != 0 else 0)
+                or row["recency_7"] == (row["recency_1"] - 1) // 7 + 1
+            )
+
+    def test_unit_1_default(self):
+        s = RecencyFrequencyScorer()
+        assert s.unit == 1

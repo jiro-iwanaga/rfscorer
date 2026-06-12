@@ -103,18 +103,19 @@ $$\sum_{r\in R, f\in F} N_{r,f} \cdot(p_{r,f} - x_{r,f})^2$$
 #### コンストラクタ
 
 ```python
-RecencyFrequencyScorer(user_col="user", item_col="item", datetime_col="datetime")
+RecencyFrequencyScorer(user_col="user", item_col="item", time_col="datetime", unit=1)
 ```
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
 | `user_col` | `str` | `"user"` | ユーザー識別子のカラム名 |
 | `item_col` | `str` | `"item"` | 商品識別子のカラム名 |
-| `datetime_col` | `str` | `"datetime"` | 閲覧日付のカラム名 |
+| `time_col` | `str` | `"datetime"` | 時点カラムのカラム名（`datetime64`・文字列・整数いずれも可） |
+| `unit` | `int` | `1` | 最新度の粒度（正の整数）。`unit=7` で週単位、`unit=30` で月単位（近似） |
 
 #### メソッド
 
-##### `fit(df_obs, df_eval, ref_date=None, recency_limit=None, frequency_limit=None)`
+##### `fit(df_obs, df_eval, ref=None, recency_limit=None, frequency_limit=None)`
 
 観測ログ DataFrame と評価ログ DataFrame を直接受け取り、$(r, f)$ 別の経験的再閲覧確率を推定する。scikit-learn スタイルの主要 fit メソッド。
 
@@ -122,7 +123,7 @@ RecencyFrequencyScorer(user_col="user", item_col="item", datetime_col="datetime"
 |-----------|-----|-----------|------|
 | `df_obs` | `pd.DataFrame` | — | 観測期間の閲覧履歴 |
 | `df_eval` | `pd.DataFrame` | — | 評価期間のイベント履歴（閲覧・購買・CV など推定対象のイベント） |
-| `ref_date` | `str \| datetime \| None` | `None` | 最新度計算の基準日。`None` の場合は `df_obs[datetime_col].max()` を使用 |
+| `ref` | `str \| datetime \| int \| None` | `None` | 最新度計算の基準値（日付または整数）。`None` の場合は `df_obs[time_col].max()` を使用 |
 | `recency_limit` | `int \| None` | `None` | 最大最新度。`None` の場合、累積再閲覧数の分布から `RECENCY_LIMIT_RATE` に基づいて自動決定 |
 | `frequency_limit` | `int \| None` | `None` | 最大頻度。`None` の場合、累積再閲覧数の分布から `FREQUENCY_LIMIT_RATE` に基づいて自動決定 |
 
@@ -130,17 +131,17 @@ RecencyFrequencyScorer(user_col="user", item_col="item", datetime_col="datetime"
 
 ##### `fit_date(df, target_date, observation_days=28, evaluation_days=7, recency_limit=None, frequency_limit=None)`
 
-`target_date` を起点として観測・評価ウィンドウを自動決定し、$(r, f)$ 別の経験的再閲覧確率を推定する。単一 DataFrame と基準日から観測・評価ログを内部で自動分割して `fit()` に委譲する。
+`target_date` を起点として観測・評価ウィンドウを自動決定し、$(r, f)$ 別の経験的再閲覧確率を推定する。単一 DataFrame と基準値から観測・評価ログを内部で自動分割して `fit()` に委譲する。
 
-- 観測期間: `max(df の先頭日付, target_date - observation_days 日)` 〜 `target_date`
-- 評価期間: `target_date + 1 日` 〜 `min(df の末尾日付, target_date + evaluation_days 日)`
+- 観測期間: `max(df の先頭値, target_int - observation_days 単位)` 〜 `target_int`
+- 評価期間: `target_int + 1単位` 〜 `min(df の末尾値, target_int + evaluation_days 単位)`
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
 | `df` | `pd.DataFrame` | — | 閲覧履歴 |
-| `target_date` | `str \| datetime` | — | 観測期間終了日 兼 評価期間分割点 |
-| `observation_days` | `int \| None` | `28` | `target_date` から遡る最大日数。`None` の場合はデータ先頭まで |
-| `evaluation_days` | `int \| None` | `7` | `target_date` から進む最大日数。`None` の場合はデータ末尾まで |
+| `target_date` | `str \| datetime \| int` | — | 観測期間終了値 兼 評価期間分割点（日付または整数） |
+| `observation_days` | `int \| None` | `28` | `target_date` から遡る最大単位数。`None` の場合はデータ先頭まで |
+| `evaluation_days` | `int \| None` | `7` | `target_date` から進む最大単位数。`None` の場合はデータ末尾まで |
 | `recency_limit` | `int \| None` | `None` | 最大最新度。`None` の場合、累積再閲覧数の分布から `RECENCY_LIMIT_RATE` に基づいて自動決定 |
 | `frequency_limit` | `int \| None` | `None` | 最大頻度。`None` の場合、累積再閲覧数の分布から `FREQUENCY_LIMIT_RATE` に基づいて自動決定 |
 
@@ -153,8 +154,8 @@ RecencyFrequencyScorer(user_col="user", item_col="item", datetime_col="datetime"
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
 | `df` | `pd.DataFrame` | — | 閲覧履歴 |
-| `observation_period` | `tuple[str \| datetime, str \| datetime]` | — | 観測期間の開始日・終了日 |
-| `evaluation_period` | `tuple[str \| datetime, str \| datetime]` | — | 評価期間の開始日・終了日。観測期間の終了日より後から始まる必要がある |
+| `observation_period` | `tuple[str \| datetime \| int, str \| datetime \| int]` | — | 観測期間の開始値・終了値（日付・整数いずれも可） |
+| `evaluation_period` | `tuple[str \| datetime \| int, str \| datetime \| int]` | — | 評価期間の開始値・終了値（日付・整数いずれも可）。観測期間の終了値より後から始まる必要がある |
 | `recency_limit` | `int \| None` | `None` | 最大最新度。`None` の場合、累積再閲覧数の分布から `RECENCY_LIMIT_RATE` に基づいて自動決定 |
 | `frequency_limit` | `int \| None` | `None` | 最大頻度。`None` の場合、累積再閲覧数の分布から `FREQUENCY_LIMIT_RATE` に基づいて自動決定 |
 
@@ -172,33 +173,33 @@ RecencyFrequencyScorer(user_col="user", item_col="item", datetime_col="datetime"
 
 戻り値: `float`
 
-##### `transform(df, ref_date=None, kind="emp", user_col=None, item_col=None, datetime_col=None)`
+##### `transform(df, ref=None, kind="emp", user_col=None, item_col=None, time_col=None)`
 
 入力 DataFrame の各 user×item ペアに最新度・頻度・再閲覧確率・順位を付与して返す。scikit-learn スタイルの主要 transform メソッド。
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
 | `df` | `pd.DataFrame` | — | スコアリング対象の閲覧履歴（観測期間でフィルタ済みを想定） |
-| `ref_date` | `str \| datetime \| None` | `None` | 最新度・頻度の計算基準日。`None` の場合は `df[datetime_col].max()` を使用 |
+| `ref` | `str \| datetime \| int \| None` | `None` | 最新度・頻度の計算基準値（日付または整数）。`None` の場合は `df[time_col].max()` を使用 |
 | `kind` | `str` | `"emp"` | `"emp"`・`"er"`・`"ef"`・`"mono"`・`"mr"`・`"mf"`・`"mrc"`・`"mfc"`・`"mcc"` のいずれか（長名エイリアスも使用可） |
 | `user_col` | `str \| None` | `None` | ユーザーカラム名。省略時は `__init__` で設定した値を使用 |
 | `item_col` | `str \| None` | `None` | 商品カラム名。省略時は `__init__` で設定した値を使用 |
-| `datetime_col` | `str \| None` | `None` | 日付カラム名。省略時は `__init__` で設定した値を使用 |
+| `time_col` | `str \| None` | `None` | 時点カラム名。省略時は `__init__` で設定した値を使用 |
 
 戻り値: `pd.DataFrame`。ユーザー・商品カラム名は `__init__`（または引数の上書き）で設定した名前になる。その他のカラム: `recency`, `frequency`, `probability`, `order`
 
-##### `transform_date(df, target_date, kind="emp", user_col=None, item_col=None, datetime_col=None)`
+##### `transform_date(df, target_date, kind="emp", user_col=None, item_col=None, time_col=None)`
 
 入力 DataFrame の各 user×item ペアに最新度・頻度・再閲覧確率・順位を付与して返す。`target_date` を明示的に指定する `transform()` のラッパー。
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
 | `df` | `pd.DataFrame` | — | スコアリング対象の閲覧履歴 |
-| `target_date` | `str \| datetime` | — | 最新度・頻度の計算基準日 |
+| `target_date` | `str \| datetime \| int` | — | 最新度・頻度の計算基準値（日付または整数） |
 | `kind` | `str` | `"emp"` | `"emp"`・`"er"`・`"ef"`・`"mono"`・`"mr"`・`"mf"`・`"mrc"`・`"mfc"`・`"mcc"` のいずれか（長名エイリアスも使用可） |
 | `user_col` | `str \| None` | `None` | ユーザーカラム名。省略時は `__init__` で設定した値を使用 |
 | `item_col` | `str \| None` | `None` | 商品カラム名。省略時は `__init__` で設定した値を使用 |
-| `datetime_col` | `str \| None` | `None` | 日付カラム名。省略時は `__init__` で設定した値を使用 |
+| `time_col` | `str \| None` | `None` | 時点カラム名。省略時は `__init__` で設定した値を使用 |
 
 戻り値: `pd.DataFrame`。ユーザー・商品カラム名は `__init__`（または引数の上書き）で設定した名前になる。その他のカラム: `recency`, `frequency`, `probability`, `order`
 
@@ -354,7 +355,7 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
         または fit_date(df, target_date)
         または fit_period(df, observation_period, evaluation_period)
                    │
-user / item / datetime に正規化
+user / item / time_col に正規化（datetime64・文字列は ordinal 整数に変換）
 観測期間・評価期間でフィルタ
 r（最新度）・f（頻度）を算出
 (r, f) 別に n_{r,f}・N_{r,f} を集計
@@ -367,7 +368,7 @@ RF2N / RF2CV / RF2Prob / R2N / R2CV / R2Prob / F2N / F2CV / F2Prob
         │
         ├─  predict(r, f, kind)  ─→ 特定 (r, f) の再閲覧確率を返す
         │
-        ├─  transform(df, ref_date, kind)  ─→ user×item に r・f・確率・順位を付与
+        ├─  transform(df, ref, kind)  ─→ user×item に r・f・確率・順位を付与
         │   または transform_date(df, target_date, kind)
         │
         ├─  plot_probability_surface(kind)  ─→ 3次元ワイヤーフレームで可視化
@@ -399,7 +400,7 @@ from rfscorer import RecencyFrequencyScorer
 df = pd.read_csv("examples/access_log.csv")
 # access_log.csv のカラム: user_id, item_id, date
 
-scorer = RecencyFrequencyScorer(user_col="user_id", item_col="item_id", datetime_col="date")
+scorer = RecencyFrequencyScorer(user_col="user_id", item_col="item_id", time_col="date")
 
 # 観測ログと評価ログを分割して渡す（推奨）
 df_obs = df[df["date"] <= "2015-07-06"]

@@ -9,15 +9,15 @@
 | 閲覧履歴 | interaction history | ユーザーが商品を閲覧した記録。`fit()`・`fit_date()` または `fit_period()` に DataFrame として渡す。カラム名はコンストラクタ引数で指定し、内部で `user`・`item`・`datetime` に正規化される |
 | ユーザー | user | 閲覧履歴の主体。`user` カラムで識別する |
 | 商品 | item | 閲覧対象。`item` カラムで識別する |
-| 観測期間 | observation period / `observation_period` | 最新度・頻度を算出するために使用する期間。`fit()` では `df_obs` として直接渡す。`fit_date()` では `target_date` から自動導出される。`fit_period()` に開始日・終了日の tuple で明示指定することもできる |
-| 評価期間 | evaluation period / `evaluation_period` | 対象イベント（閲覧・購買・CV など）の発生を観測するために使用する期間。観測期間の直後に設定する。`fit()` では `df_eval` として直接渡す。`fit_date()` では `target_date` の翌日から自動導出される。`fit_period()` に開始日・終了日の tuple で明示指定することもできる |
+| 観測期間 | observation period / `observation_period` | 最新度・頻度を算出するために使用する期間。`fit()` では `df_obs` として直接渡す。`fit_date()` では `target_date` から自動導出される。`fit_period()` に開始値・終了値の tuple で明示指定することもできる（日付・整数いずれも可） |
+| 評価期間 | evaluation period / `evaluation_period` | 対象イベント（閲覧・購買・CV など）の発生を観測するために使用する期間。観測期間の直後に設定する。`fit()` では `df_eval` として直接渡す。`fit_date()` では `target_date` の翌時点から自動導出される。`fit_period()` に開始値・終了値の tuple で明示指定することもできる（日付・整数いずれも可） |
 
 ## アルゴリズム
 
 | 用語 | 英語 / 記号 | 定義 |
 |------|------------|------|
 | RF | Recency-Frequency | 最新度と頻度の2つの行動シグナルを指す。Random Forest ではない |
-| 最新度 | recency / $r$ | 観測期間における、ユーザーが最後に閲覧した日付の新しさをランクで表した値。1 が最も直近。$r \in R$（$R$ は観測されたすべての最新度の集合） |
+| 最新度 | recency / $r$ | 観測期間における、ユーザーが最後に閲覧した時点の新しさを整数で表した値。1 が最も直近。$r \in R$（$R$ は観測されたすべての最新度の集合） |
 | 頻度 | frequency / $f$ | 観測期間における、ユーザーによる商品の閲覧回数。$f \in F$（$F$ は観測されたすべての頻度の集合） |
 | 再閲覧確率 | revisit probability | 観測期間で最新度 $r$・頻度 $f$ であった商品が、評価期間に再閲覧される確率 |
 | 経験的再閲覧確率 | empirical revisit probability / $p_{r,f}$ | $p_{r,f} = n_{r,f} / N_{r,f}$。観測データから直接算出した再閲覧確率 |
@@ -37,12 +37,13 @@
 
 | 用語 | 定義 |
 |------|------|
-| `RecencyFrequencyScorer` | RF スコアリングの主クラス。コンストラクタでカラム名を受け取る |
-| `fit(df_obs, df_eval, ref_date=None, recency_limit=None, frequency_limit=None)` | 観測ログ `df_obs` と評価ログ `df_eval` を直接受け取り、経験的再閲覧確率を推定するメソッド。scikit-learn スタイルの主要 fit メソッド。`ref_date` は最新度計算の基準日（`None` の場合は `df_obs` の最大日付を使用） |
-| `fit_date(df, target_date, observation_days=28, evaluation_days=7, recency_limit=None, frequency_limit=None)` | 閲覧履歴 DataFrame と基準日 `target_date` を受け取り、観測・評価ウィンドウを自動導出して経験的再閲覧確率を推定するメソッド。`observation_days`・`evaluation_days` でウィンドウ幅を調整できる（`None` でデータ全範囲）。内部で `_fit_impl()` を直接呼び出す |
+| `RecencyFrequencyScorer` | RF スコアリングの主クラス。コンストラクタでカラム名・`unit` を受け取る |
+| `unit` | 最新度の粒度を指定する正の整数（デフォルト `1`）。最新度は `(ref - 値) // unit + 1` で算出される。`unit=1` で日単位、`unit=7` で週単位、`unit=30` で月単位（近似）になる |
+| `fit(df_obs, df_eval, ref=None, recency_limit=None, frequency_limit=None)` | 観測ログ `df_obs` と評価ログ `df_eval` を直接受け取り、経験的再閲覧確率を推定するメソッド。scikit-learn スタイルの主要 fit メソッド。`ref` は最新度計算の基準値（日付または整数。`None` の場合は `df_obs` の最大値を使用） |
+| `fit_date(df, target_date, observation_days=28, evaluation_days=7, recency_limit=None, frequency_limit=None)` | 閲覧履歴 DataFrame と基準値 `target_date` を受け取り、観測・評価ウィンドウを自動導出して経験的再閲覧確率を推定するメソッド。`target_date` は日付・整数いずれも可。`observation_days`・`evaluation_days` でウィンドウ幅を調整できる（`None` でデータ全範囲）。内部で `_fit_impl()` を直接呼び出す |
 | `fit_period(df, observation_period, evaluation_period, recency_limit=None, frequency_limit=None)` | 観測期間・評価期間を tuple で明示指定して経験的再閲覧確率を推定するメソッド。`fit_date()` より細かい期間制御が必要な場合に使用する |
 | `predict(r, f, kind='emp')` | 指定した最新度 `r`・頻度 `f` の再閲覧確率を返すメソッド。`r` は1が最も直近（数値が大きいほど古い）、`f` は観測期間の閲覧回数。`fit()`・`fit_date()` または `fit_period()` 後に利用可能 |
-| `transform(df, ref_date=None, kind='emp', ...)` | 入力 DataFrame の各 user×item ペアに最新度・頻度・再閲覧確率・順位を付与して返すメソッド。`ref_date` は最新度計算の基準日（`None` の場合は `df` の最大日付を使用）。`user_col`・`item_col`・`datetime_col` は省略すると `__init__` の設定値を使用する。`fit()`・`fit_date()` または `fit_period()` 後に利用可能 |
+| `transform(df, ref=None, kind='emp', ...)` | 入力 DataFrame の各 user×item ペアに最新度・頻度・再閲覧確率・順位を付与して返すメソッド。`ref` は最新度計算の基準値（`None` の場合は `df` の最大値を使用）。`user_col`・`item_col`・`time_col` は省略すると `__init__` の設定値を使用する。`fit()`・`fit_date()` または `fit_period()` 後に利用可能 |
 | `transform_date(df, target_date, kind='emp', ...)` | `target_date` を明示指定する `transform()` のラッパー。`fit()`・`fit_date()` または `fit_period()` 後に利用可能 |
 | `evaluate(df_rec, df_eval, order=1, ...)` | 推薦結果と評価期間のイベント履歴 `df_eval` を比較し precision・recall・f1 等の評価指標を返すメソッド。`user_col`・`item_col` は省略すると `__init__` の設定値を使用する |
 | `plot_probability_surface(kind='emp', title=None, figsize=(6, 5), fontsize=12, recency_label='recency', frequency_label='frequency', probability_label='probability')` | 再閲覧確率を3次元ワイヤーフレームで可視化し `matplotlib.figure.Figure` を返すメソッド。軸ラベル・タイトル・図サイズ・フォントサイズを指定可能。日本語ラベルには `rfscorer[ja]` が必要。`fit()`・`fit_date()` または `fit_period()` 後（`kind='mono'/'mrc'/'mfc'/'mcc'` の場合は `optimize()` 後）に利用可能。`kind='mr'` または `'mf'` は1次元周辺モデルのため `ValueError` を送出する（サーフェス描画には `plot_marginal_probability()` を使用する） |
@@ -51,7 +52,7 @@
 | `show()` | `fit()`・`fit_date()` または `fit_period()` 後の集計情報（レコード数・cv 数・期間・上限値）を標準出力に表示するデバッグ用メソッド |
 | `R` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる最新度のリスト |
 | `F` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる頻度のリスト |
-| `recency_limit` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる最新度の上限値。これを超える最新度は `recency_limit` にクランプされてスコアリングされる。`None` の場合は累積閲覧数の 95% をカバーする最新度ランクに自動設定される |
+| `recency_limit` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる最新度の上限値。これを超える最新度は `recency_limit` にクランプされてスコアリングされる。`None` の場合は累積閲覧数の 95% をカバーする最新度に自動設定される |
 | `frequency_limit` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる頻度の上限値。これを超える頻度は `frequency_limit` にクランプされてスコアリングされる。`None` の場合は累積閲覧数の 95% をカバーする頻度に自動設定される |
 | `empirical_probability_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる経験的再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `N`, `cv`, `probability`） |
 | `empirical_probability_table_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる経験的再閲覧確率（横持ち）。`pd.DataFrame`（インデックス: `recency`、カラム: `frequency`） |

@@ -33,21 +33,23 @@ RF スコアリング手法を Python パッケージとして PyPI に公開し
 ### 入力
 
 - コンストラクタ
-  - カラム名を `user_col`・`item_col`・`datetime_col` で指定する（デフォルト: `user`・`item`・`datetime`）
+  - カラム名を `user_col`・`item_col`・`time_col` で指定する（デフォルト: `user`・`item`・`datetime`）
+  - `time_col` には日付型（`datetime64`・文字列）・整数型いずれも指定可能
+  - `unit`: 最新度の粒度を指定する正の整数（デフォルト: `1`）。`unit=7` で週単位、`unit=30` で月単位（近似）
 - `fit()` に渡す引数（推奨）
   - `df_obs`: 観測期間の閲覧履歴 DataFrame。同一ユーザー × 商品の組み合わせが複数行存在することを想定（リピート閲覧）
   - `df_eval`: 評価期間のイベント履歴 DataFrame（閲覧・購買・CV など推定対象のイベント）。`df_obs` と同じカラム構成
-  - `ref_date`: 最新度計算の基準日（省略時は `df_obs` の最大日付を使用）
+  - `ref`: 最新度計算の基準値（日付または整数。省略時は `df_obs` の最大値を使用）
   - `recency_limit`: 最新度の上限値（省略時は累積 cv の 95% をカバーする値を自動設定）
   - `frequency_limit`: 頻度の上限値（省略時は累積 cv の 95% をカバーする値を自動設定）
-- 単一 DataFrame と基準日から期間を自動導出したい場合は `fit_date()` を使用する
+- 単一 DataFrame と基準値から期間を自動導出したい場合は `fit_date()` を使用する
   - `df`: 閲覧履歴全体の DataFrame
-  - `target_date`: 観測期間と評価期間の分割点となる基準日。観測期間は `target_date` まで（デフォルト: 28日遡る）、評価期間は `target_date` の翌日から（デフォルト: 7日分）
+  - `target_date`: 観測期間と評価期間の分割点となる基準値（日付または整数）。観測期間は `target_date` まで（デフォルト: 28単位遡る）、評価期間は `target_date` の翌時点から（デフォルト: 7単位分）
   - `recency_limit`: 最新度の上限値（省略時は自動設定）
   - `frequency_limit`: 頻度の上限値（省略時は自動設定）
 - 期間を明示的に指定したい場合は `fit_period()` を使用する
-  - `observation_period`: 観測期間の開始日・終了日の tuple
-  - `evaluation_period`: 評価期間の開始日・終了日の tuple
+  - `observation_period`: 観測期間の開始値・終了値の tuple（日付・整数いずれも可）
+  - `evaluation_period`: 評価期間の開始値・終了値の tuple（日付・整数いずれも可）
   - `recency_limit`: 最新度の上限値（省略時は自動設定）
   - `frequency_limit`: 頻度の上限値（省略時は自動設定）
 
@@ -104,7 +106,7 @@ import pandas as pd
 from rfscorer import RecencyFrequencyScorer
 
 df = pd.read_csv("examples/access_log.csv")
-scorer = RecencyFrequencyScorer(user_col="user_id", item_col="item_id", datetime_col="date")
+scorer = RecencyFrequencyScorer(user_col="user_id", item_col="item_id", time_col="date")
 
 # 観測ログと評価ログを分割して渡す（推奨）
 df_obs = df[df["date"] <= "2015-07-06"]

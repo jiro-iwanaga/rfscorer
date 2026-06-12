@@ -1,5 +1,11 @@
+import numpy as np
 import pandas as pd
-from pandas.api.types import is_datetime64_any_dtype, is_string_dtype
+from pandas.api.types import (
+    is_datetime64_any_dtype,
+    is_float_dtype,
+    is_integer_dtype,
+    is_string_dtype,
+)
 
 
 class RecencyFrequencyScorer:
@@ -11,11 +17,12 @@ class RecencyFrequencyScorer:
 
     _USER_COL = "user"
     _ITEM_COL = "item"
-    _DATETIME_COL = "datetime"
+    _SEQUENCE_COL = "datetime"
+    _ORDINAL_ORIGIN = pd.Timestamp("0001-01-01")
     _FREQUENCY_LIMIT_RATE = 0.95  # 最新度上限値自動計算の際に利用する割合
     _RECENCY_LIMIT_RATE = 0.95  # 頻度上限値自動計算の際に利用する割合
 
-    def __init__(self, user_col="user", item_col="item", datetime_col="datetime"):
+    def __init__(self, user_col="user", item_col="item", time_col="datetime", unit=1):
         """Initialize the scorer with column name mappings.
 
         Parameters
@@ -24,17 +31,28 @@ class RecencyFrequencyScorer:
             Column name for user IDs in the interaction log.
         item_col : str, default "item"
             Column name for item IDs in the interaction log.
-        datetime_col : str, default "datetime"
-            Column name for interaction timestamps in the interaction log.
+        time_col : str, default "datetime"
+            Column name for the time axis in the interaction log. Accepts
+            datetime (datetime64, str) or integer columns. Datetime values are
+            converted to ordinal integers internally; integer values are used
+            as-is.
+        unit : int, default 1
+            Number of days (or integer steps) per recency bin. Recency is
+            computed as ``(ref - value) // unit + 1``. Must be a positive
+            integer. Use ``unit=7`` for weekly, ``unit=30`` for approximate
+            monthly granularity.
         """
+        if unit <= 0:
+            raise ValueError(f"unit must be a positive integer, got {unit}.")
         self.user_col = user_col
         self.item_col = item_col
-        self.datetime_col = datetime_col
+        self.time_col = time_col
+        self.unit = unit
 
-        self.observation_start_date_ = None
-        self.observation_end_date_ = None
-        self.evaluation_start_date_ = None
-        self.evaluation_end_date_ = None
+        self.observation_start_ = None
+        self.observation_end_ = None
+        self.evaluation_start_ = None
+        self.evaluation_end_ = None
         self.recency_limit = (
             None  # 最新度の上限値(デフォルトでは _RECENCY_LIMIT_RATE を用いて自動計算)
         )
@@ -114,7 +132,7 @@ class RecencyFrequencyScorer:
         self,
         df_obs,
         df_eval,
-        ref_date=None,
+        ref=None,
         recency_limit=None,
         frequency_limit=None,
     ):
@@ -122,8 +140,8 @@ class RecencyFrequencyScorer:
 
         Accepts observation and evaluation DataFrames that have already been
         filtered to the respective periods by the caller.  This is the primary
-        fitting method; for convenience wrappers that perform date-based
-        splitting automatically, see fit_date() and fit_period().
+        fitting method; for convenience wrappers that perform automatic
+        splitting, see fit_date() and fit_period().
 
         Parameters
         ----------
@@ -133,12 +151,11 @@ class RecencyFrequencyScorer:
         df_eval : pd.DataFrame
             Evaluation period event log (revisits, purchases, conversions,
             etc.). Must already be filtered to the evaluation period by the caller.
-        ref_date : str or datetime, optional
-            Reference date for recency computation. Recency of each
-            user-item pair is the minimum number of days from any of its
-            interactions to ref_date, plus 1 (so the most recent interaction
-            on ref_date itself has recency 1). When None, defaults to the
-            latest datetime in df_obs.
+        ref : str, datetime, or int, optional
+            Reference value for recency computation. Recency of each
+            user-item pair is ``(ref - value) // unit + 1``, where the
+            minimum across interactions is taken. When None, defaults to the
+            maximum value in df_obs time_col.
         recency_limit : int, optional
             Maximum recency rank to include. If None, automatically set to
             the recency rank covering 95% of cumulative revisits.
@@ -155,10 +172,10 @@ class RecencyFrequencyScorer:
         TypeError
             If df_obs or df_eval is not a pandas DataFrame.
         ValueError
-            If required columns (user, item, datetime) are missing from
-            df_obs or df_eval, if ref_date cannot be parsed as a date, or
-            if no revisits are observed in the evaluation period (cannot
-            determine recency_limit or frequency_limit automatically).
+            If required columns (user, item, time_col) are missing from
+            df_obs or df_eval, if ref cannot be normalized, or if no revisits
+            are observed in the evaluation period (cannot determine
+            recency_limit or frequency_limit automatically).
 
         Notes
         -----
@@ -173,7 +190,7 @@ class RecencyFrequencyScorer:
         if not isinstance(df_eval, pd.DataFrame):
             raise TypeError("df_eval must be a pandas DataFrame.")
 
-        required_columns = [self.user_col, self.item_col, self.datetime_col]
+        required_columns = [self.user_col, self.item_col, self.time_col]
         missing_obs = [c for c in required_columns if c not in df_obs.columns]
         if missing_obs:
             raise ValueError(f"Missing required columns in df_obs: {missing_obs}")
@@ -186,26 +203,23 @@ class RecencyFrequencyScorer:
 
         self.record_num = len(obs_log) + len(eval_log)
 
-        if ref_date is None:
-            ref_date = obs_log[self._DATETIME_COL].max()
+        if ref is None:
+            ref_int = int(obs_log[self._SEQUENCE_COL].max())
         else:
-            try:
-                ref_date = pd.to_datetime(ref_date)
-            except (ValueError, TypeError) as e:
-                raise ValueError(f"ref_date could not be parsed as a date: {ref_date}") from e
+            ref_int = self._normalize_ref(ref)
 
-        self.observation_start_date_ = (
-            obs_log[self._DATETIME_COL].min() if len(obs_log) > 0 else None
+        self.observation_start_ = (
+            int(obs_log[self._SEQUENCE_COL].min()) if len(obs_log) > 0 else None
         )
-        self.observation_end_date_ = ref_date
-        self.evaluation_start_date_ = (
-            eval_log[self._DATETIME_COL].min() if len(eval_log) > 0 else None
+        self.observation_end_ = ref_int
+        self.evaluation_start_ = (
+            int(eval_log[self._SEQUENCE_COL].min()) if len(eval_log) > 0 else None
         )
-        self.evaluation_end_date_ = (
-            eval_log[self._DATETIME_COL].max() if len(eval_log) > 0 else None
+        self.evaluation_end_ = (
+            int(eval_log[self._SEQUENCE_COL].max()) if len(eval_log) > 0 else None
         )
 
-        self._fit_impl(obs_log, eval_log, ref_date, recency_limit, frequency_limit)
+        self._fit_impl(obs_log, eval_log, ref_int, recency_limit, frequency_limit)
         return self
 
     def fit_date(
@@ -228,15 +242,16 @@ class RecencyFrequencyScorer:
         Parameters
         ----------
         df : pd.DataFrame
-            Interaction log containing user, item, and datetime columns.
-        target_date : str or datetime
-            Reference date used as the observation end / evaluation start boundary.
+            Interaction log containing user, item, and time_col columns.
+        target_date : str, datetime, or int
+            Reference value used as the observation end / evaluation start
+            boundary. Accepts the same types as time_col (datetime or integer).
             target_date is inclusive in the observation period.
         observation_days : int or None, default 28
-            Maximum number of days to look back from target_date for the
+            Maximum number of units to look back from target_date for the
             observation period.  If None, uses all data up to target_date.
         evaluation_days : int or None, default 7
-            Maximum number of days to look forward from target_date for the
+            Maximum number of units to look forward from target_date for the
             evaluation period.  If None, uses all data after target_date.
         recency_limit : int, optional
             Maximum recency rank to include.  If None, determined automatically.
@@ -252,9 +267,8 @@ class RecencyFrequencyScorer:
         TypeError
             If df is not a pandas DataFrame.
         ValueError
-            If the datetime column is missing from df, if target_date or the
-            datetime column cannot be parsed as dates, or if no revisits are
-            observed in the evaluation period.
+            If time_col is missing from df, if target_date cannot be
+            normalized, or if no revisits are observed in the evaluation period.
 
         Notes
         -----
@@ -265,50 +279,37 @@ class RecencyFrequencyScorer:
         """
         if not isinstance(df, pd.DataFrame):
             raise TypeError("df must be a pandas DataFrame.")
-        if self.datetime_col not in df.columns:
-            raise ValueError(f"Missing required columns: [{self.datetime_col!r}]")
-
-        try:
-            target_date = pd.to_datetime(target_date)
-        except (ValueError, TypeError) as e:
-            raise ValueError(f"target_date could not be parsed as a date: {target_date}") from e
-
-        try:
-            dates = pd.to_datetime(df[self.datetime_col])
-        except (ValueError, TypeError) as e:
-            raise ValueError(f"Column {self.datetime_col!r} could not be parsed as dates.") from e
-        df_min = dates.min()
-        df_max = dates.max()
-
-        if observation_days is None:
-            obs_start = df_min
-        else:
-            obs_start = max(df_min, target_date - pd.Timedelta(days=observation_days))
-
-        obs_end = target_date
-        eval_start = target_date + pd.Timedelta(days=1)
-
-        if evaluation_days is None:
-            eval_end = df_max
-        else:
-            eval_end = min(df_max, target_date + pd.Timedelta(days=evaluation_days))
+        if self.time_col not in df.columns:
+            raise ValueError(f"Missing required columns: [{self.time_col!r}]")
 
         interaction_log = self._to_internal(df)
         self.record_num = len(interaction_log)
 
+        target_int = self._normalize_ref(target_date)
+        df_min = int(interaction_log[self._SEQUENCE_COL].min())
+        df_max = int(interaction_log[self._SEQUENCE_COL].max())
+
+        if observation_days is None:
+            obs_start = df_min
+        else:
+            obs_start = max(df_min, target_int - observation_days)
+        obs_end = target_int
+        eval_start = target_int + 1
+        eval_end = df_max if evaluation_days is None else min(df_max, target_int + evaluation_days)
+
         obs_log = interaction_log[
-            (obs_start <= interaction_log[self._DATETIME_COL])
-            & (interaction_log[self._DATETIME_COL] <= obs_end)
+            (obs_start <= interaction_log[self._SEQUENCE_COL])
+            & (interaction_log[self._SEQUENCE_COL] <= obs_end)
         ]
         eval_log = interaction_log[
-            (eval_start <= interaction_log[self._DATETIME_COL])
-            & (interaction_log[self._DATETIME_COL] <= eval_end)
+            (eval_start <= interaction_log[self._SEQUENCE_COL])
+            & (interaction_log[self._SEQUENCE_COL] <= eval_end)
         ]
 
-        self.observation_start_date_ = obs_start
-        self.observation_end_date_ = obs_end
-        self.evaluation_start_date_ = eval_start
-        self.evaluation_end_date_ = eval_end
+        self.observation_start_ = obs_start
+        self.observation_end_ = obs_end
+        self.evaluation_start_ = eval_start
+        self.evaluation_end_ = eval_end
 
         self._fit_impl(obs_log, eval_log, obs_end, recency_limit, frequency_limit)
         return self
@@ -330,12 +331,14 @@ class RecencyFrequencyScorer:
         Parameters
         ----------
         df : pd.DataFrame
-            Interaction log containing user, item, and datetime columns.
-        observation_period : tuple[str | datetime, str | datetime]
-            Start and end dates of the observation period, both inclusive.
-        evaluation_period : tuple[str | datetime, str | datetime]
-            Start and end dates of the evaluation period, both inclusive.
+            Interaction log containing user, item, and time_col columns.
+        observation_period : tuple[str | datetime | int, str | datetime | int]
+            Start and end values of the observation period, both inclusive.
+            Accepts the same types as time_col (datetime or integer).
+        evaluation_period : tuple[str | datetime | int, str | datetime | int]
+            Start and end values of the evaluation period, both inclusive.
             Must start strictly after observation_period ends.
+            Accepts the same types as time_col (datetime or integer).
         recency_limit : int, optional
             Maximum recency rank to include. If None, automatically set to
             the recency rank covering 95% of cumulative revisits.
@@ -353,9 +356,9 @@ class RecencyFrequencyScorer:
             If df is not a pandas DataFrame.
         ValueError
             If required columns are missing from df, if observation_period or
-            evaluation_period cannot be parsed as dates, if a period is not
-            ordered as (start, end), if the periods overlap, or if no revisits
-            are observed in the evaluation period.
+            evaluation_period cannot be normalized, if a period is not ordered
+            as (start, end), if the periods overlap, or if no revisits are
+            observed in the evaluation period.
 
         Notes
         -----
@@ -367,7 +370,7 @@ class RecencyFrequencyScorer:
         if not isinstance(df, pd.DataFrame):
             raise TypeError("df must be a pandas DataFrame.")
 
-        required_columns = [self.user_col, self.item_col, self.datetime_col]
+        required_columns = [self.user_col, self.item_col, self.time_col]
         missing_columns = [col for col in required_columns if col not in df.columns]
         if missing_columns:
             raise ValueError(f"Missing required columns: {missing_columns}")
@@ -375,19 +378,19 @@ class RecencyFrequencyScorer:
         if len(observation_period) != 2:
             raise ValueError("observation_period must be a tuple of (start, end).")
         try:
-            obs_start, obs_end = pd.to_datetime(observation_period)
-        except (ValueError, TypeError) as e:
+            obs_start, obs_end = (self._normalize_ref(v) for v in observation_period)
+        except ValueError as e:
             raise ValueError(
-                f"observation_period could not be parsed as dates: {observation_period}"
+                f"observation_period could not be normalized: {observation_period}"
             ) from e
 
         if len(evaluation_period) != 2:
             raise ValueError("evaluation_period must be a tuple of (start, end).")
         try:
-            eval_start, eval_end = pd.to_datetime(evaluation_period)
-        except (ValueError, TypeError) as e:
+            eval_start, eval_end = (self._normalize_ref(v) for v in evaluation_period)
+        except ValueError as e:
             raise ValueError(
-                f"evaluation_period could not be parsed as dates: {evaluation_period}"
+                f"evaluation_period could not be normalized: {evaluation_period}"
             ) from e
 
         if obs_start > obs_end:
@@ -401,42 +404,66 @@ class RecencyFrequencyScorer:
         self.record_num = len(interaction_log)
 
         obs_log = interaction_log[
-            (obs_start <= interaction_log[self._DATETIME_COL])
-            & (interaction_log[self._DATETIME_COL] <= obs_end)
+            (obs_start <= interaction_log[self._SEQUENCE_COL])
+            & (interaction_log[self._SEQUENCE_COL] <= obs_end)
         ]
         eval_log = interaction_log[
-            (eval_start <= interaction_log[self._DATETIME_COL])
-            & (interaction_log[self._DATETIME_COL] <= eval_end)
+            (eval_start <= interaction_log[self._SEQUENCE_COL])
+            & (interaction_log[self._SEQUENCE_COL] <= eval_end)
         ]
 
-        self.observation_start_date_ = obs_start
-        self.observation_end_date_ = obs_end
-        self.evaluation_start_date_ = eval_start
-        self.evaluation_end_date_ = eval_end
+        self.observation_start_ = obs_start
+        self.observation_end_ = obs_end
+        self.evaluation_start_ = eval_start
+        self.evaluation_end_ = eval_end
 
         self._fit_impl(obs_log, eval_log, obs_end, recency_limit, frequency_limit)
         return self
 
+    def _normalize_ref(self, value) -> int:
+        """Normalize a single time reference value (date or integer) to int."""
+        if isinstance(value, (pd.Timestamp, pd.DatetimeTZDtype)):
+            return value.toordinal()
+        elif isinstance(value, str):
+            return pd.to_datetime(value).toordinal()
+        elif isinstance(value, (int, float, np.integer, np.floating)):
+            return int(value)
+        else:
+            try:
+                return int(pd.to_datetime(value).toordinal())
+            except Exception:
+                raise ValueError(f"time value could not be normalized: {value!r}")
+
+    def _normalize_sequence_col(self, series: pd.Series) -> pd.Series:
+        """Normalize a time column (datetime or integer) to an integer Series."""
+        if is_datetime64_any_dtype(series):
+            return (series - self._ORDINAL_ORIGIN).dt.days + 1
+        elif is_string_dtype(series):
+            return (pd.to_datetime(series) - self._ORDINAL_ORIGIN).dt.days + 1
+        elif is_integer_dtype(series) or is_float_dtype(series):
+            return series.astype(int)
+        else:
+            raise ValueError(f"time_col must be datetime or integer type, got {series.dtype}")
+
     def _to_internal(self, df):
         """Convert a user-facing DataFrame to internal column names and types."""
-        result = df[[self.user_col, self.item_col, self.datetime_col]].copy()
-        result.columns = [self._USER_COL, self._ITEM_COL, self._DATETIME_COL]
+        result = df[[self.user_col, self.item_col, self.time_col]].copy()
+        result.columns = [self._USER_COL, self._ITEM_COL, self._SEQUENCE_COL]
         if not is_string_dtype(result[self._USER_COL]):
             result[self._USER_COL] = result[self._USER_COL].astype(str)
         if not is_string_dtype(result[self._ITEM_COL]):
             result[self._ITEM_COL] = result[self._ITEM_COL].astype(str)
-        if not is_datetime64_any_dtype(result[self._DATETIME_COL]):
-            result[self._DATETIME_COL] = pd.to_datetime(result[self._DATETIME_COL])
+        result[self._SEQUENCE_COL] = self._normalize_sequence_col(result[self._SEQUENCE_COL])
         return result
 
-    def _fit_impl(self, obs_log, eval_log, ref_date, recency_limit, frequency_limit):
+    def _fit_impl(self, obs_log, eval_log, ref_int, recency_limit, frequency_limit):
         """Core fitting logic. obs_log and eval_log must use internal column names."""
         self.record_num_obs = len(obs_log)
         self.record_num_eval = len(eval_log)
 
         UIcv = {(row.user, row.item) for row in eval_log.itertuples()}
 
-        df_ui2frc = self._build_ui_rf_df(obs_log, ref_date)
+        df_ui2frc = self._build_ui_rf_df(obs_log, ref_int)
         df_ui2frc["cv"] = (
             pd.MultiIndex.from_frame(df_ui2frc[[self._USER_COL, self._ITEM_COL]])
             .isin(UIcv)
@@ -562,18 +589,10 @@ class RecencyFrequencyScorer:
         if self.record_num_eval:
             print("record_num_eval:", self.record_num_eval)
 
-        if self.observation_start_date_ and self.observation_end_date_:
-            print(
-                "observation: {} -> {}".format(
-                    self.observation_start_date_, self.observation_end_date_
-                )
-            )
-        if self.evaluation_start_date_ and self.evaluation_end_date_:
-            print(
-                "evaluation: {} -> {}".format(
-                    self.evaluation_start_date_, self.evaluation_end_date_
-                )
-            )
+        if self.observation_start_ and self.observation_end_:
+            print("observation: {} -> {}".format(self.observation_start_, self.observation_end_))
+        if self.evaluation_start_ and self.evaluation_end_:
+            print("evaluation: {} -> {}".format(self.evaluation_start_, self.evaluation_end_))
 
         if self.recency_limit:
             print("recency_limit:", self.recency_limit)
@@ -1081,18 +1100,18 @@ class RecencyFrequencyScorer:
     def transform(
         self,
         df,
-        ref_date=None,
+        ref=None,
         kind="emp",
         user_col=None,
         item_col=None,
-        datetime_col=None,
+        time_col=None,
     ):
         """Add recency, frequency, and revisit probability columns to a DataFrame.
 
         Computes recency rank and frequency for each user-item pair relative to
-        ref_date, then appends the corresponding revisit probability from fit()
-        or optimize() results.  Does not filter df by date; pass a pre-filtered
-        DataFrame or use transform_date() to apply automatic date filtering.
+        ref, then appends the corresponding revisit probability from fit() or
+        optimize() results.  Does not filter df; pass a pre-filtered DataFrame
+        or use transform_date() to apply automatic filtering.
         Recency values above recency_limit and frequency values above
         frequency_limit are clamped to their respective limits before lookup.
 
@@ -1101,10 +1120,10 @@ class RecencyFrequencyScorer:
         df : pd.DataFrame
             User-item interaction history to score. If this DataFrame is not
             pre-filtered to the desired observation window, use transform_date()
-            instead, which filters automatically up to a given date.
-        ref_date : str or datetime, optional
-            Reference date for computing recency. When None, defaults to the
-            latest datetime in df.
+            instead, which filters automatically up to a given value.
+        ref : str, datetime, or int, optional
+            Reference value for computing recency. When None, defaults to the
+            maximum value in df time_col.
         kind : {"emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc"}, default "emp"
             Which probability to use. "emp", "er", and "ef" use fit(),
             fit_date(), or fit_period() results; others use optimize() results.
@@ -1114,9 +1133,9 @@ class RecencyFrequencyScorer:
             Column name for user IDs in df. Defaults to the value set in __init__.
         item_col : str, optional
             Column name for item IDs in df. Defaults to the value set in __init__.
-        datetime_col : str, optional
-            Column name for interaction timestamps in df. Defaults to the value
-            set in __init__.
+        time_col : str, optional
+            Column name for the time axis in df. Defaults to the value set in
+            __init__.
 
         Returns
         -------
@@ -1129,8 +1148,8 @@ class RecencyFrequencyScorer:
         Raises
         ------
         ValueError
-            If kind is not one of the accepted values, or if ref_date cannot
-            be parsed as a date.
+            If kind is not one of the accepted values, or if ref cannot be
+            normalized.
         RuntimeError
             If fit(), fit_date(), or fit_period() has not been called, or if
             optimize(kind=...) has not been called for the requested kind.
@@ -1162,27 +1181,23 @@ class RecencyFrequencyScorer:
 
         user_col = user_col or self.user_col
         item_col = item_col or self.item_col
-        datetime_col = datetime_col or self.datetime_col
+        time_col = time_col or self.time_col
 
-        df_log = df[[user_col, item_col, datetime_col]].copy()
-        df_log.columns = [self._USER_COL, self._ITEM_COL, self._DATETIME_COL]
+        df_log = df[[user_col, item_col, time_col]].copy()
+        df_log.columns = [self._USER_COL, self._ITEM_COL, self._SEQUENCE_COL]
 
         if not is_string_dtype(df_log[self._USER_COL]):
             df_log[self._USER_COL] = df_log[self._USER_COL].astype(str)
         if not is_string_dtype(df_log[self._ITEM_COL]):
             df_log[self._ITEM_COL] = df_log[self._ITEM_COL].astype(str)
-        if not is_datetime64_any_dtype(df_log[self._DATETIME_COL]):
-            df_log[self._DATETIME_COL] = pd.to_datetime(df_log[self._DATETIME_COL])
+        df_log[self._SEQUENCE_COL] = self._normalize_sequence_col(df_log[self._SEQUENCE_COL])
 
-        if ref_date is None:
-            ref_date = df_log[self._DATETIME_COL].max()
+        if ref is None:
+            ref_int = int(df_log[self._SEQUENCE_COL].max())
         else:
-            try:
-                ref_date = pd.to_datetime(ref_date)
-            except (ValueError, TypeError) as e:
-                raise ValueError(f"ref_date could not be parsed as a date: {ref_date}") from e
+            ref_int = self._normalize_ref(ref)
 
-        df_rf = self._build_ui_rf_df(df_log, ref_date)
+        df_rf = self._build_ui_rf_df(df_log, ref_int)
         df_rf["recency_adj"] = df_rf["recency"].clip(upper=self.recency_limit)
         df_rf["frequency_adj"] = df_rf["frequency"].clip(upper=self.frequency_limit)
 
@@ -1224,23 +1239,23 @@ class RecencyFrequencyScorer:
         kind="emp",
         user_col=None,
         item_col=None,
-        datetime_col=None,
+        time_col=None,
     ):
         """Score user-item pairs, filtering the interaction log up to target_date.
 
         Filters df to rows on or before target_date, then delegates to
-        transform() using target_date as the recency reference date.
-        Use this when df spans multiple dates and you want only the
+        transform() using target_date as the recency reference value.
+        Use this when df spans multiple values and you want only the
         observation window ending at target_date.
 
         Parameters
         ----------
         df : pd.DataFrame
             User-item interaction history to score.
-        target_date : str or datetime
-            Upper bound for interaction timestamps (inclusive). Rows after
-            this date are excluded. Also used as the reference date for
-            computing recency.
+        target_date : str, datetime, or int
+            Upper bound for the time axis (inclusive). Rows after this value
+            are excluded. Also used as the reference value for computing
+            recency. Accepts the same types as time_col.
         kind : {"emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc"}, default "emp"
             Which probability to use. "emp", "er", and "ef" use fit(),
             fit_date(), or fit_period() results; others use optimize() results.
@@ -1248,9 +1263,9 @@ class RecencyFrequencyScorer:
             Column name for user IDs in df. Defaults to the value set in __init__.
         item_col : str, optional
             Column name for item IDs in df. Defaults to the value set in __init__.
-        datetime_col : str, optional
-            Column name for interaction timestamps in df. Defaults to the value
-            set in __init__.
+        time_col : str, optional
+            Column name for the time axis in df. Defaults to the value set in
+            __init__.
 
         Returns
         -------
@@ -1264,24 +1279,20 @@ class RecencyFrequencyScorer:
         Raises
         ------
         ValueError
-            If target_date cannot be parsed as a date. Also propagates
-            ValueError and RuntimeError from transform().
+            If target_date cannot be normalized. Also propagates ValueError
+            and RuntimeError from transform().
         """
-        datetime_col_name = datetime_col or self.datetime_col
-
-        try:
-            target_date = pd.to_datetime(target_date)
-        except (ValueError, TypeError) as e:
-            raise ValueError(f"target_date could not be parsed as a date: {target_date}") from e
-
-        df_filtered = df[pd.to_datetime(df[datetime_col_name]) <= target_date]
+        time_col_name = time_col or self.time_col
+        target_int = self._normalize_ref(target_date)
+        normalized_col = self._normalize_sequence_col(df[time_col_name])
+        df_filtered = df[normalized_col <= target_int]
         return self.transform(
             df_filtered,
-            ref_date=target_date,
+            ref=target_int,
             kind=kind,
             user_col=user_col,
             item_col=item_col,
-            datetime_col=datetime_col,
+            time_col=time_col,
         )
 
     def evaluate(self, df_rec, df_eval, order=1, user_col=None, item_col=None):
@@ -1369,15 +1380,15 @@ class RecencyFrequencyScorer:
 
         return df_result
 
-    def _build_ui_rf_df(self, df, ref_date):
+    def _build_ui_rf_df(self, df, ref_int):
         """Compute recency and frequency for each (user, item) pair.
 
-        Recency is the minimum days from any interaction to ref_date plus 1
-        (1-indexed; most recent interaction on ref_date has recency 1).
-        Frequency is the interaction count. Uses pandas groupby.
+        Recency is ``(ref_int - value) // unit + 1`` (1-indexed; most recent
+        interaction at ref_int has recency 1). Frequency is the interaction
+        count. Uses pandas groupby.
         """
         tmp = df[[self._USER_COL, self._ITEM_COL]].copy()
-        tmp["recency"] = (ref_date - df[self._DATETIME_COL]).dt.days + 1
+        tmp["recency"] = (ref_int - df[self._SEQUENCE_COL]) // self.unit + 1
         return (
             tmp.groupby([self._USER_COL, self._ITEM_COL], sort=False)
             .agg(recency=("recency", "min"), frequency=("recency", "count"))
