@@ -6,18 +6,18 @@
 
 `rfscorer` is a Python package for Recency-Frequency based recommendation scoring.
 
-It estimates **revisit probabilities** — the preference score for each user-item pair, forming a matrix analogous to a rating matrix — from interaction histories, using two simple but powerful behavioral signals: **recency**, which captures how recently a user interacted with an item, and **frequency**, which captures how often the user has interacted with it.
+It estimates **product-choice probabilities** — the preference score for each user-item pair, forming a matrix analogous to a rating matrix — from interaction histories, using two simple but powerful behavioral signals: **recency**, which captures how recently a user interacted with an item, and **frequency**, which captures how often the user has interacted with it. The target event whose probability is estimated (revisits, purchases, conversions, etc.) is configurable through the evaluation log.
 
-The package is designed for product recommendation and revisit modeling, especially in settings where interpretable scoring based on interaction history is preferred over black-box recommendation models.
+The package is designed for product recommendation and repeat-engagement modeling, especially in settings where interpretable scoring based on interaction history is preferred over black-box recommendation models.
 
 > Note: In this package, **RF** stands for **Recency-Frequency**, not Random Forest.
 
 ## Features
 
 - **scikit-learn-style API** — familiar `fit()` / `transform()` interface makes it easy to integrate into existing data science workflows
-- **Minimal data requirements** — works with any interaction log that has three columns: `user`, `item`, and `datetime`; no ratings or explicit feedback needed
+- **Minimal data requirements** — works with any interaction log that has three columns: `user`, `item`, and a time column (`datetime` by default, configurable via `time_col`; accepts datetime or integer); no ratings or explicit feedback needed
 - **Explainable scoring** — probabilities are derived through mathematical optimization under RF monotonicity constraints, making every score fully traceable and auditable; 3D surface visualization further supports intuitive understanding
-- **Probabilistic output** — revisit probabilities serve as preference scores, enabling expected value calculations and probabilistic ranking of recommendations
+- **Probabilistic output** — product-choice probabilities serve as preference scores, enabling expected value calculations and probabilistic ranking of recommendations
 - **Extensible** — the user–item probability matrix produced by `transform()` can be directly used as input to collaborative filtering or other downstream recommendation models
 
 ## Installation
@@ -33,8 +33,14 @@ import pandas as pd
 from rfscorer import RecencyFrequencyScorer
 ```
 
-Prepare an interaction log with three columns: `user`, `item`, and `datetime`.
-The same user-item pair may appear multiple times, representing repeat visits.
+Prepare an interaction log with three columns: `user`, `item`, and a time column (default column name: `datetime`).
+
+```python
+df_train = ...  # replace with your own training interaction log (columns: user, item, datetime)
+df_test  = ...  # replace with your own test interaction log     (columns: user, item, datetime)
+```
+
+Each DataFrame has the following structure. The same user-item pair may appear multiple times, representing repeat visits.
 
 | user  | item  | datetime   |
 |-------|-------|------------|
@@ -53,15 +59,15 @@ df_train_obs  = df_train[df_train.datetime <= target_date]
 df_train_eval = df_train[df_train.datetime >  target_date]
 ```
 
-Call `fit()` to estimate empirical revisit probabilities.
-Recency and frequency are computed from the observation window; the evaluation window provides ground-truth revisit labels.
+Call `fit()` to estimate empirical product-choice probabilities.
+Recency and frequency are computed from the observation window; the evaluation window provides ground-truth event labels (revisits, purchases, conversions, etc.).
 
 ```python
 scorer = RecencyFrequencyScorer()
 scorer.fit(df_train_obs, df_train_eval)
 ```
 
-The empirical surface reflects raw revisit rates and may be irregular due to sparse data.
+The empirical surface reflects raw event rates and may be irregular due to sparse data.
 
 ```python
 fig = scorer.plot_probability_surface(kind="emp")

@@ -18,7 +18,13 @@
 | パッケージビルド | `uv build` |
 | PyPI 公開 | `uv publish` |
 | Jupyter カーネル登録（初回のみ） | `uv run python -m ipykernel install --user --name rfscorer --display-name "rfscorer (venv)"` |
-| JupyterLab 起動 | `uv run jupyter lab --no-browser --ServerApp.token='' --ServerApp.password=''` |
+| JupyterLab 起動 | `uv run jupyter lab --IdentityProvider.token='' --PasswordIdentityProvider.hashed_password=''` |
+
+> **JupyterLab 起動について**
+> - 起動時にデフォルトブラウザで `http://localhost:8888/lab` が自動的に開く
+> - 起動ログ・URL は stderr に出力される
+> - 停止は端末で `Ctrl+C`
+> - ヘッドレス環境（リモート SSH・devcontainer など）では `--no-browser` を追記する
 
 ## コーディング規約
 
@@ -29,8 +35,8 @@
 
 ## API 設計方針
 
-- scikit-learn スタイル（`fit` / `transform` / `optimize`）に準拠する。`fit_date`・`fit_period` は期間指定の補助メソッドとして提供する
-- 推定後の属性名は末尾に `_` をつける（例: `empirical_probability_`）
+- scikit-learn スタイル（`fit` / `transform` / `optimize`）に準拠する。期間指定によるデータ準備は `rfscorer.split_by_date()` ユーティリティで分離する
+- 推定後の属性名は末尾に `_` をつける（例: `emp_probability_`）
 - `from rfscorer import RecencyFrequencyScorer` でインポートできるようにする
 - 解釈可能性を重視し、スコアの算出根拠を説明できる設計にする
 
@@ -38,7 +44,8 @@
 
 - テストコードは `tests/` に配置する
 - `pytest` を使用する
-- `fit()`・`fit_date()`・`fit_period()`・`predict()`・`transform()`・`transform_date()`・`evaluate()`・`optimize()`・`plot_probability_surface()`・`plot_marginal_probability()`・`export_probability_csv()` の正常系・異常系をカバーする
+- `fit()`・`predict()`・`transform()`・`evaluate()`・`optimize()`・`plot_probability_surface()`・`plot_marginal_probability()`・`export_probability_csv()` の正常系・異常系をカバーする
+- `split_by_date()` ユーティリティの正常系・異常系をカバーする
 
 ## ドキュメント管理
 

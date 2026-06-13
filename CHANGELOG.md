@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-13
+
+### Added
+
+- `split_by_date(df, target_date, observation_days=28, evaluation_days=7, time_col="datetime")`:
+  new top-level utility function (`from rfscorer import split_by_date`) that splits a single
+  interaction log into an observation/evaluation pair at `target_date`.
+  Returns `(df_obs, df_eval)`. Accepts the same datetime or integer `time_col` as the scorer.
+- `unit` parameter to `RecencyFrequencyScorer.__init__()`: controls recency bin granularity.
+  `unit=7` gives weekly recency, `unit=30` approximate monthly.  Default `unit=1` preserves
+  the previous day-level behavior.
+- Integer `time_col` support: `time_col` columns of integer dtype are now accepted in addition
+  to datetime / string columns across `fit()`, `transform()`, and `split_by_date()`.
+- `plot_marginal_probability(kind="er")` and `kind="ef"`: new 1-D marginal plot support for the
+  empirical recency and frequency models.
+
+### Changed
+
+- `er_probability_` and `ef_probability_` are now true 1-D outputs, mirroring the earlier
+  `mr` / `mf` refactor. Breaking changes:
+  - `er_probability_`: columns reduced to `(recency, probability)`
+    (previously `recency, frequency, probability` after 2-D broadcast)
+  - `ef_probability_`: columns reduced to `(frequency, probability)`
+    (previously `recency, frequency, probability` after 2-D broadcast)
+  - `er_probability_dict_`: keys changed from `(r, f)` tuple to `int r`
+  - `ef_probability_dict_`: keys changed from `(r, f)` tuple to `int f`
+  - `predict(kind="er")`: `f` argument is now ignored; `r` is clamped to `recency_limit`
+  - `predict(kind="ef")`: `r` argument is now ignored; `f` is clamped to `frequency_limit`
+  - `plot_probability_surface(kind="er"|"ef")`: now raises `ValueError`
+    (use `plot_marginal_probability()` instead)
+- `empirical_probability_*` attributes renamed to `emp_probability_*` for consistency with all
+  other short-form kind prefixes. Breaking changes:
+  - `empirical_probability_`       → `emp_probability_`
+  - `empirical_probability_table_` → `emp_probability_table_`
+  - `empirical_probability_dict_`  → `emp_probability_dict_`
+  - CSV column `"empirical_probability"` (from `export_probability_csv(kind="all")`) → `"emp_probability"`
+  - The kind aliases `"empirical"`, `"empirical_recency"`, `"empirical_frequency"` are preserved.
+
+### Removed
+
+- Python 3.10 support. Minimum supported version is now Python 3.11.
+- `er_probability_table_` and `ef_probability_table_` attributes.
+  These were 2-D broadcast grids produced by the previous implementation and are no longer generated.
+
 ## [0.3.2] - 2026-06-11
 
 ### Changed
