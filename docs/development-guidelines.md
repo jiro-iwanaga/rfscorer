@@ -18,7 +18,13 @@
 | パッケージビルド | `uv build` |
 | PyPI 公開 | `uv publish` |
 | Jupyter カーネル登録（初回のみ） | `uv run python -m ipykernel install --user --name rfscorer --display-name "rfscorer (venv)"` |
-| JupyterLab 起動 | `uv run jupyter lab --no-browser --ServerApp.token='' --ServerApp.password=''` |
+| JupyterLab 起動 | `uv run jupyter lab --IdentityProvider.token='' --PasswordIdentityProvider.hashed_password=''` |
+
+> **JupyterLab 起動について**
+> - 起動時にデフォルトブラウザで `http://localhost:8888/lab` が自動的に開く
+> - 起動ログ・URL は stderr に出力される
+> - 停止は端末で `Ctrl+C`
+> - ヘッドレス環境（リモート SSH・devcontainer など）では `--no-browser` を追記する
 
 ## コーディング規約
 
