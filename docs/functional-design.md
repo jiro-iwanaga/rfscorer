@@ -363,7 +363,7 @@ RF2N / RF2CV / RF2Prob / R2N / R2CV / R2Prob / F2N / F2CV / F2Prob
 
 ```python
 import pandas as pd
-from rfscorer import RecencyFrequencyScorer
+from rfscorer import RecencyFrequencyScorer, split_by_date
 
 # サンプルデータ: ohmsha/PyOptBook (MIT License) — カラム: user_id, item_id, date
 url = "https://raw.githubusercontent.com/ohmsha/PyOptBook/main/7.recommendation/access_log.csv"
@@ -371,13 +371,13 @@ df = pd.read_csv(url)
 
 scorer = RecencyFrequencyScorer(user_col="user_id", item_col="item_id", time_col="date")
 
-# 観測ログと評価ログを分割して渡す（推奨）
-df_obs = df[df["date"] <= "2015-07-06"]
-df_eval = df[df["date"] > "2015-07-06"]
+# split_by_date() で観測ログと評価ログを自動分割（推奨）
+target_date = "2015-07-06"
+df_obs, df_eval = split_by_date(df, target_date=target_date)
 scorer.fit(df_obs, df_eval)
 scorer.emp_probability_
 
-df_rec = scorer.transform(df_obs)
+df_rec = scorer.transform(df_obs, ref=target_date)
 prob = scorer.predict(r=1, f=3)
 scorer.evaluate(df_rec, df_eval)
 
@@ -394,11 +394,9 @@ scorer.optimize(kind="mrc")
 scorer.optimize(kind="mfc")
 scorer.export_probability_csv(kind="all", path="output/probabilities.csv")
 
-# 基準日から期間を自動導出する場合
-from rfscorer import split_by_date
-df_obs, df_eval = split_by_date(df, target_date="2015-07-06")
+# split_by_date() で期間をカスタマイズする場合
+df_obs, df_eval = split_by_date(df, target_date="2015-07-06", observation_days=4, evaluation_days=2)
 scorer.fit(df_obs, df_eval)
-df_rec = scorer.transform(df_obs, ref="2015-07-06")
 
 # 期間を明示的に指定する場合（標準 pandas フィルタ）
 mask_obs = (df["date"] >= "2015-07-02") & (df["date"] <= "2015-07-06")

@@ -2,11 +2,13 @@
 
 ## モジュール構成
 
-| モジュール | クラス | 役割 |
+| モジュール | クラス・関数 | 役割 |
 |-----------|--------|------|
 | `scorer.py` | `RecencyFrequencyScorer` | 公開 API。fit・predict・transform・optimize・evaluate・plot・export の各メソッドを提供する |
 | `optimizer.py` | `RecencyFrequencyOptimizer` | 内部モジュール。`optimize()` から委譲された凸2次計画問題を cvxpy で求解する |
-| `__init__.py` | — | `RecencyFrequencyScorer` のみを公開する |
+| `utils.py` | `split_by_date()` | 公開ユーティリティ。観測ログと評価ログを target_date で自動分割する |
+| `_time_utils.py` | `normalize_ref()`, `normalize_sequence_col()` | 内部用。時間軸の正規化・変換（プライベート） |
+| `__init__.py` | — | `RecencyFrequencyScorer` と `split_by_date` を公開 API としてエクスポートする |
 
 ## 遅延インポート方針
 

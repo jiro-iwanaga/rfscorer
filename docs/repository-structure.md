@@ -24,10 +24,13 @@ rfscorer/
 │   └── rfscorer/
 │       ├── __init__.py               # 公開 API のエクスポート
 │       ├── scorer.py                 # RecencyFrequencyScorer
-│       └── optimizer.py              # RecencyFrequencyOptimizer
+│       ├── optimizer.py              # RecencyFrequencyOptimizer
+│       ├── utils.py                  # 公開ユーティリティ（split_by_date）
+│       └── _time_utils.py            # 時間軸の正規化（内部用）
 ├── tests/
 │   ├── test_scorer.py
-│   └── test_optimizer.py
+│   ├── test_optimizer.py
+│   └── test_utils.py
 ├── examples/
 │   └── basic_usage.ipynb
 ├── img/                              # README 向け画像
@@ -67,9 +70,11 @@ rfscorer/
 
 | パス | 説明 |
 |------|------|
-| `__init__.py` | `RecencyFrequencyScorer` を公開 API としてエクスポートする |
+| `__init__.py` | `RecencyFrequencyScorer` と `split_by_date` を公開 API としてエクスポートする |
 | `scorer.py` | `RecencyFrequencyScorer` クラスを実装する |
 | `optimizer.py` | `RecencyFrequencyOptimizer` クラスを実装する。RF 単調性制約付き凸2次計画問題のモデル構築・求解を担う |
+| `utils.py` | `split_by_date()` など、データ準備用の公開ユーティリティを提供する |
+| `_time_utils.py` | 時間軸の正規化・変換など、内部用のヘルパー関数（プライベート） |
 
 ### `tests/`
 
@@ -77,6 +82,7 @@ rfscorer/
 |------|------|
 | `test_scorer.py` | `RecencyFrequencyScorer` のユニットテスト |
 | `test_optimizer.py` | `RecencyFrequencyOptimizer` のユニットテスト |
+| `test_utils.py` | `split_by_date()` など、ユーティリティのユニットテスト |
 
 ### `examples/`
 
@@ -84,7 +90,6 @@ rfscorer/
 |------|------|
 | `basic_usage.ipynb` | 基本的な使用例を示す Jupyter ノートブック |
 
-サンプルデータ（`access_log*.csv`）は ohmsha/PyOptBook より MIT ライセンスで利用しているが、gitignore 対象のため git 管理外。
 
 ### `img/`
 
