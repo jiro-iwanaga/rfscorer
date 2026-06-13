@@ -32,6 +32,11 @@ class RFOptimizer:
         # optimizer.R2X holds the optimized recency probabilities
     """
 
+    # Permissively licensed (MIT / Apache-2.0 / BSD) cvxpy solvers that support
+    # this QP formulation. CLARABEL/SCS/OSQP are bundled with cvxpy; the others
+    # require their own package (e.g. `daqp`, `piqp`, `proxqp`).
+    _ALLOWED_SOLVERS = ("CLARABEL", "SCS", "OSQP", "DAQP", "PIQP", "PROXQP")
+
     def __init__(self):
         # 集合と定数
         self.R = []
@@ -93,9 +98,10 @@ class RFOptimizer:
             raise ValueError(f"RF2N is missing {len(missing_N)} key(s): {missing_N[:3]}{suffix}")
         missing_Prob = [(r, f) for r in R for f in F if (r, f) not in RF2Prob]
         if missing_Prob:
-            n = len(missing_Prob)
-            suffix = "..." if n > 3 else ""
-            raise ValueError(f"RF2Prob is missing {n} key(s): {missing_Prob[:3]}{suffix}")
+            suffix = "..." if len(missing_Prob) > 3 else ""
+            raise ValueError(
+                f"RF2Prob is missing {len(missing_Prob)} key(s): {missing_Prob[:3]}{suffix}"
+            )
 
         self.R = list(R)
         self.F = list(F)
@@ -164,6 +170,22 @@ class RFOptimizer:
         self.R2Prob = dict(R2Prob)
         self.F2N = dict(F2N)
         self.F2Prob = dict(F2Prob)
+
+        self.kind = None
+        self.axis = None
+        self.eps = 0.0
+        self.x = None
+        self.constraints = None
+        self.objectives = None
+        self.problem = None
+        self.num_variables = None
+        self.num_constraints = None
+        self.elapsed_time = None
+        self.status = None
+        self.objective_value = None
+        self.RF2X = {}
+        self.R2X = {}
+        self.F2X = {}
 
     def build_model(self, kind="mono", eps=0.0):
         """Build the 2D joint optimization model.
@@ -380,20 +402,45 @@ class RFOptimizer:
         self.R2X = {}
         self.F2X = {}
 
-    def solve(self):
+    def solve(self, solver="CLARABEL"):
         """Solve the optimization problem built by build_model() or build_marginal_model().
 
         Sets status, objective_value, and elapsed_time.
-        Raises RuntimeError if neither build method has been called.
         Solver failures are not raised here; call postprocess() to detect them.
+
+        Parameters
+        ----------
+        solver : {"CLARABEL", "SCS", "OSQP", "DAQP", "PIQP", "PROXQP"}, default "CLARABEL"
+            Convex solver to use. Restricted to permissively licensed
+            (MIT / Apache-2.0 / BSD) open-source solvers that support the
+            QP formulation used here.
+            - "CLARABEL" (Apache-2.0): modern general convex solver, the
+              default solver in cvxpy 1.5+. Bundled with cvxpy.
+            - "SCS" (MIT): general convex solver, bundled with cvxpy.
+            - "OSQP" (Apache-2.0): classic QP solver, bundled with cvxpy.
+            - "DAQP" (MIT): dense QP-specialized solver. Requires the
+              `daqp` package.
+            - "PIQP" (BSD-2-Clause): proximal interior point QP solver.
+              Requires the `piqp` package.
+            - "PROXQP" (BSD-2-Clause): proximal QP solver from Inria.
+              Requires the `proxsuite` package.
+
+        Raises
+        ------
+        ValueError
+            If solver is not one of the allowed permissively licensed solvers.
+        RuntimeError
+            If neither build_model() nor build_marginal_model() has been called.
         """
+        if solver not in self._ALLOWED_SOLVERS:
+            raise ValueError(f"solver must be one of {self._ALLOWED_SOLVERS}, got {solver!r}")
         if self.problem is None:
             raise RuntimeError(
                 "build_model() or build_marginal_model() must be called before solve()"
             )
 
         start_time = time.time()
-        self.problem.solve()
+        self.problem.solve(solver=solver)
         self.elapsed_time = time.time() - start_time
 
         self.status = self.problem.status

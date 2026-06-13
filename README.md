@@ -15,7 +15,7 @@ The package is designed for product recommendation and revisit modeling, especia
 ## Features
 
 - **scikit-learn-style API** — familiar `fit()` / `transform()` interface makes it easy to integrate into existing data science workflows
-- **Minimal data requirements** — works with any interaction log that has three columns: `user`, `item`, and `datetime`; no ratings or explicit feedback needed
+- **Minimal data requirements** — works with any interaction log that has three columns: `user`, `item`, and a time column (`datetime` by default, configurable via `time_col`; accepts datetime or integer); no ratings or explicit feedback needed
 - **Explainable scoring** — probabilities are derived through mathematical optimization under RF monotonicity constraints, making every score fully traceable and auditable; 3D surface visualization further supports intuitive understanding
 - **Probabilistic output** — revisit probabilities serve as preference scores, enabling expected value calculations and probabilistic ranking of recommendations
 - **Extensible** — the user–item probability matrix produced by `transform()` can be directly used as input to collaborative filtering or other downstream recommendation models
@@ -33,7 +33,7 @@ import pandas as pd
 from rfscorer import RecencyFrequencyScorer
 ```
 
-Prepare an interaction log with three columns: `user`, `item`, and `datetime`.
+Prepare an interaction log with three columns: `user`, `item`, and a time column (default column name: `datetime`).
 The same user-item pair may appear multiple times, representing repeat visits.
 
 | user  | item  | datetime   |

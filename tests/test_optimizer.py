@@ -280,6 +280,18 @@ class TestSetMarginalData:
         with pytest.raises(ValueError, match="R2N is missing 3"):
             opt_with_data.set_marginal_data({}, _R2Prob, _F2N, _F2Prob)
 
+    def test_resets_model_state(self, opt_with_marginal_data):
+        opt_with_marginal_data.build_marginal_model(axis="r")
+        opt_with_marginal_data.solve()
+        opt_with_marginal_data.postprocess()
+        opt_with_marginal_data.set_marginal_data(_R2N, _R2Prob, _F2N, _F2Prob)
+        assert opt_with_marginal_data.axis is None
+        assert opt_with_marginal_data.problem is None
+        assert opt_with_marginal_data.status is None
+        assert opt_with_marginal_data.R2X == {}
+        assert opt_with_marginal_data.F2X == {}
+        assert opt_with_marginal_data.RF2X == {}
+
 
 # ---------------------------------------------------------------------------
 # build_model
@@ -473,6 +485,21 @@ class TestSolve:
 
     def test_objective_value_nonnegative(self, opt_after_solve):
         assert opt_after_solve.objective_value >= 0
+
+    def test_invalid_solver_raises(self, opt_with_data):
+        opt_with_data.build_model()
+        with pytest.raises(ValueError, match="solver"):
+            opt_with_data.solve(solver="invalid")
+
+    def test_solver_validation_before_build_check(self, opt_with_data):
+        # problem 未構築でも solver 検証が先に走る
+        with pytest.raises(ValueError, match="solver"):
+            opt_with_data.solve(solver="invalid")
+
+    def test_solve_with_scs(self, opt_with_data):
+        opt_with_data.build_model()
+        opt_with_data.solve(solver="SCS")
+        assert opt_with_data.status == "optimal"
 
 
 # ---------------------------------------------------------------------------

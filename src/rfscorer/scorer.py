@@ -1,3 +1,5 @@
+import datetime
+
 import numpy as np
 import pandas as pd
 from pandas.api.types import (
@@ -422,7 +424,7 @@ class RecencyFrequencyScorer:
 
     def _normalize_ref(self, value) -> int:
         """Normalize a single time reference value (date or integer) to int."""
-        if isinstance(value, (pd.Timestamp, pd.DatetimeTZDtype)):
+        if isinstance(value, (pd.Timestamp, datetime.datetime)):
             return value.toordinal()
         elif isinstance(value, str):
             return pd.to_datetime(value).toordinal()
@@ -676,7 +678,6 @@ class RecencyFrequencyScorer:
             the requested optimization kind.
         """
         import matplotlib.pyplot as plt
-        import numpy as np
 
         kind = self._normalize_kind(kind)
         if kind in ("mr", "mf"):

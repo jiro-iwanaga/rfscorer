@@ -14,7 +14,6 @@
 
 | ライブラリ | インポートのタイミング |
 |-----------|----------------------|
-| `numpy` | `plot_probability_surface()` 呼び出し時 |
 | `matplotlib` | `plot_probability_surface()` / `plot_marginal_probability()` 呼び出し時 |
 | `cvxpy`（`optimizer.py` 経由） | `optimize()` 呼び出し時 |
 
@@ -26,7 +25,7 @@
 |-----------|------|
 | `pandas` | データ操作・集計・出力形式 |
 | `cvxpy` | 凸2次計画問題のソルバー |
-| `numpy` | `plot_probability_surface()` 内のグリッド生成（遅延インポート） |
+| `numpy` | 型判定（`_normalize_ref()`）・`plot_probability_surface()` 内のグリッド生成 |
 | `matplotlib` | `plot_probability_surface()` / `plot_marginal_probability()` 内の描画・`Figure` 返却（遅延インポート） |
 
 オプション依存 (`pip install rfscorer[ja]`):

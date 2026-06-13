@@ -9,7 +9,7 @@ from rfscorer import RecencyFrequencyScorer
 # 観測期間: 2024-01-01 〜 2024-01-07 (obs_end = Jan07)
 # 評価期間: 2024-01-08 〜 2024-01-14
 #
-# obs_end 基準の Recency = (obs_end - datetime).days + 1
+# obs_end 基準の Recency (unit=1) = (ordinal(obs_end) - ordinal(datetime)) + 1
 #
 # u1-item1: Jan01(7), Jan03(5), Jan05(3) → recency=min=3, freq=3, cv=1
 # u1-item2: Jan02(6)                     → recency=6, freq=1, cv=0
@@ -1951,6 +1951,13 @@ class TestNormalizeRef:
 
         assert scorer._normalize_ref(np.float64(7.0)) == 7
 
+    def test_python_datetime(self, scorer):
+        import datetime
+
+        dt = datetime.datetime(2024, 1, 1)
+        expected = pd.Timestamp("2024-01-01").toordinal()
+        assert scorer._normalize_ref(dt) == expected
+
     def test_invalid_type_raises(self, scorer):
         with pytest.raises(ValueError, match="time value could not be normalized"):
             scorer._normalize_ref(object())
@@ -2116,11 +2123,33 @@ class TestUnit:
             suffixes=("_1", "_7"),
         )
         for _, row in merged.iterrows():
-            assert (
-                row["recency_7"] == row["recency_1"] // 7 + (1 if row["recency_1"] % 7 != 0 else 0)
-                or row["recency_7"] == (row["recency_1"] - 1) // 7 + 1
-            )
+            assert row["recency_7"] == (row["recency_1"] - 1) // 7 + 1
 
     def test_unit_1_default(self):
         s = RecencyFrequencyScorer()
         assert s.unit == 1
+
+
+# ---------------------------------------------------------------------------
+# show
+# ---------------------------------------------------------------------------
+class TestShow:
+    def test_show_does_not_raise(self, scorer_fitted, capsys):
+        scorer_fitted.show()
+
+    def test_show_outputs_profiling(self, scorer_fitted, capsys):
+        scorer_fitted.show()
+        out = capsys.readouterr().out
+        assert "profiling" in out
+
+    def test_show_outputs_period_info(self, scorer_fitted, capsys):
+        scorer_fitted.show()
+        out = capsys.readouterr().out
+        assert "observation" in out
+        assert "evaluation" in out
+
+    def test_show_outputs_limits(self, scorer_fitted, capsys):
+        scorer_fitted.show()
+        out = capsys.readouterr().out
+        assert "recency_limit" in out
+        assert "frequency_limit" in out

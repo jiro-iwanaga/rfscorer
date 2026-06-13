@@ -64,10 +64,8 @@
 | `ef_probability_table_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる周辺的経験的再閲覧確率（横持ち） |
 | `ef_probability_dict_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる周辺的経験的再閲覧確率。`dict`（キー: `(r, f)`） |
 | `mr_probability_` | `optimize(kind='mr')` 後に参照できる1次元最適化再閲覧確率（最新度のみ。ブロードキャストなし）。`pd.DataFrame`（カラム: `recency`, `probability`） |
-| `mr_probability_table_` | `optimize(kind='mr')` 後も `None`（1次元周辺モデルのため横持ちテーブルは生成されない） |
 | `mr_probability_dict_` | `optimize(kind='mr')` 後に参照できる1次元最適化再閲覧確率。`dict`（キー: `r`（int）） |
 | `mf_probability_` | `optimize(kind='mf')` 後に参照できる1次元最適化再閲覧確率（頻度のみ。ブロードキャストなし）。`pd.DataFrame`（カラム: `frequency`, `probability`） |
-| `mf_probability_table_` | `optimize(kind='mf')` 後も `None`（1次元周辺モデルのため横持ちテーブルは生成されない） |
 | `mf_probability_dict_` | `optimize(kind='mf')` 後に参照できる1次元最適化再閲覧確率。`dict`（キー: `f`（int）） |
 | `mono_probability_` | `optimize(kind='mono')` 後に参照できる最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`） |
 | `mono_probability_table_` | `optimize(kind='mono')` 後に参照できる最適化再閲覧確率（横持ち）。`pd.DataFrame`（インデックス: `recency`、カラム: `frequency`） |

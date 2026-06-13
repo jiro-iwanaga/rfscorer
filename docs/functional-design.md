@@ -131,7 +131,7 @@ RecencyFrequencyScorer(user_col="user", item_col="item", time_col="datetime", un
 
 ##### `fit_date(df, target_date, observation_days=28, evaluation_days=7, recency_limit=None, frequency_limit=None)`
 
-`target_date` を起点として観測・評価ウィンドウを自動決定し、$(r, f)$ 別の経験的再閲覧確率を推定する。単一 DataFrame と基準値から観測・評価ログを内部で自動分割して `fit()` に委譲する。
+`target_date` を起点として観測・評価ウィンドウを自動決定し、$(r, f)$ 別の経験的再閲覧確率を推定する。単一 DataFrame と基準値から観測・評価ログを内部で自動分割して `_fit_impl()` を直接呼び出す。
 
 - 観測期間: `max(df の先頭値, target_int - observation_days 単位)` 〜 `target_int`
 - 評価期間: `target_int + 1単位` 〜 `min(df の末尾値, target_int + evaluation_days 単位)`
