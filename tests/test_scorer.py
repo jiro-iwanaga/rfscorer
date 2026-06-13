@@ -279,6 +279,19 @@ class TestFitValidation:
         with pytest.raises(ValueError, match="time value could not be normalized"):
             scorer.fit(df_obs, df_eval, ref=object())
 
+    def test_no_cv_events_raises(self, scorer):
+        # df_eval の user-item ペアが df_obs と完全に不一致 → total_cv=0 で自動上限計算不能
+        df_obs = pd.DataFrame(
+            [("u1", "item1", "2024-01-01")],
+            columns=["user", "item", "datetime"],
+        )
+        df_eval = pd.DataFrame(
+            [("u99", "item99", "2024-01-09")],
+            columns=["user", "item", "datetime"],
+        )
+        with pytest.raises(ValueError, match="No events observed in evaluation period"):
+            scorer.fit(df_obs, df_eval)
+
 
 # ---------------------------------------------------------------------------
 # fit — 正常系 (新 API: df_obs, df_eval)
@@ -370,6 +383,16 @@ class TestFitResult:
             frequency_limit=_FREQUENCY_LIMIT,
         )
         assert s.emp_probability_dict_ is not None
+
+    def test_auto_recency_limit(self):
+        s = RecencyFrequencyScorer()
+        s.fit(self._make_obs(), self._make_eval())
+        assert s.recency_limit == _AUTO_RECENCY_LIMIT
+
+    def test_auto_frequency_limit(self):
+        s = RecencyFrequencyScorer()
+        s.fit(self._make_obs(), self._make_eval())
+        assert s.frequency_limit == _AUTO_FREQUENCY_LIMIT
 
 
 # ---------------------------------------------------------------------------
@@ -542,14 +565,14 @@ class TestOptimize:
             scorer.optimize(kind="mono", eps=-1e-6)
 
     def test_optimize_eps_too_large_mono_raises(self, scorer, df):
-        # eps_max(2D) = max(RF2Prob) / min(nr-1, nf-1) = 1.0 / min(6, 2) = 0.5
+        # eps_max(2D) = min(p_max/(nr-1), p_max/(nf-1)) = min(1.0/6, 1.0/2) = 1.0/6 ≈ 0.167
         scorer.fit(
             *_split_by_period(df, _OBS_PERIOD, _EVAL_PERIOD),
             recency_limit=_RECENCY_LIMIT,
             frequency_limit=_FREQUENCY_LIMIT,
         )
         with pytest.raises(ValueError, match="eps"):
-            scorer.optimize(kind="mono", eps=0.5 + 1e-9)
+            scorer.optimize(kind="mono", eps=1.0 / 6 + 1e-9)
 
     def test_optimize_eps_too_large_mr_raises(self, scorer, df):
         # eps_max(mr) = max(R2Prob) / (nr - 1) = 1.0 / 6 ≈ 0.1667
@@ -579,7 +602,7 @@ class TestOptimize:
             frequency_limit=_FREQUENCY_LIMIT,
         )
         with pytest.raises(ValueError, match="eps"):
-            scorer.optimize(kind="mrc", eps=0.5 + 1e-9)
+            scorer.optimize(kind="mrc", eps=1.0 / 6 + 1e-9)
 
     def test_optimize_with_eps_mono_produces_results(self, scorer, df):
         scorer.fit(

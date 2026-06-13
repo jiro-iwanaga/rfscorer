@@ -53,8 +53,8 @@ class RecencyFrequencyOptimizer:
         self.axis = None  # None=2D, "r"=recency marginal, "f"=frequency marginal
         self.eps = 0.0
         self.x = None
-        self.constraints = None
-        self.objectives = None
+        self.constraints = []
+        self.objectives = []
         self.problem = None
         self.num_variables = None
         self.num_constraints = None
@@ -116,8 +116,8 @@ class RecencyFrequencyOptimizer:
         self.axis = None
         self.eps = 0.0
         self.x = None
-        self.constraints = None
-        self.objectives = None
+        self.constraints = []
+        self.objectives = []
         self.problem = None
         self.num_variables = None
         self.num_constraints = None
@@ -132,6 +132,7 @@ class RecencyFrequencyOptimizer:
         """Load marginal recency and frequency data for 1-D optimization models.
 
         Must be called after set_data() and before build_marginal_model().
+        Calling this method resets any previously built model and solver state.
 
         Parameters
         ----------
@@ -175,8 +176,8 @@ class RecencyFrequencyOptimizer:
         self.axis = None
         self.eps = 0.0
         self.x = None
-        self.constraints = None
-        self.objectives = None
+        self.constraints = []
+        self.objectives = []
         self.problem = None
         self.num_variables = None
         self.num_constraints = None
@@ -557,7 +558,7 @@ if __name__ == "__main__":
     optimizer.set_data(R, F, RF2N, RF2Prob)
     optimizer.show_input()
 
-    # モデルの構築と探索
+    # モデルの構築と求解
     optimizer.build_model(kind="mcc")
     optimizer.solve()
     optimizer.show_solve_info()

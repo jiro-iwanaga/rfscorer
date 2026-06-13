@@ -23,14 +23,17 @@ def split_by_date(
         target_date; the evaluation window starts at the next time step.
         Accepts the same types as time_col (datetime or integer).
     observation_days : int or None, default 28
-        Maximum number of time units to look back from target_date for the
-        observation window. When None, uses df from its earliest row.
-        Note: this is in the same time units as time_col (days for datetime,
-        integer steps for integer time_col), independent of any recency
-        binning unit on the scorer.
+        Number of time units in the observation window ending at target_date
+        (inclusive). For example, ``observation_days=7`` covers
+        ``[target_date - 6, target_date]`` (7 units). When None, uses df from
+        its earliest row. Note: this is in the same time units as time_col
+        (days for datetime, integer steps for integer time_col), independent
+        of any recency binning unit on the scorer.
     evaluation_days : int or None, default 7
-        Maximum number of time units to look forward from target_date for
-        the evaluation window. When None, uses df up to its latest row.
+        Number of time units in the evaluation window starting one step after
+        target_date. For example, ``evaluation_days=7`` covers
+        ``[target_date + 1, target_date + 7]`` (7 units). When None, uses df
+        up to its latest row.
     time_col : str, default "datetime"
         Column name of the time axis in df.
 
@@ -70,7 +73,7 @@ def split_by_date(
     if observation_days is None:
         obs_start = df_min
     else:
-        obs_start = max(df_min, target_int - observation_days)
+        obs_start = max(df_min, target_int - observation_days + 1)
     obs_end = target_int
     eval_start = target_int + 1
     eval_end = df_max if evaluation_days is None else min(df_max, target_int + evaluation_days)

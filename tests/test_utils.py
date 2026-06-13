@@ -110,8 +110,12 @@ class TestSplitByDate:
         df_obs, df_eval = split_by_date(
             df, target_ord, observation_days=28, evaluation_days=7, time_col="seq"
         )
-        assert len(df_obs) == 4
-        assert len(df_eval) == 2
+        obs_dates = ["2024-01-01", "2024-01-03", "2024-01-05", "2024-01-07"]
+        eval_dates = ["2024-01-09", "2024-01-12"]
+        obs_expected = {pd.Timestamp(d).toordinal() for d in obs_dates}
+        eval_expected = {pd.Timestamp(d).toordinal() for d in eval_dates}
+        assert set(df_obs["seq"]) == obs_expected
+        assert set(df_eval["seq"]) == eval_expected
 
     def test_observation_days_none_uses_df_start(self):
         df = _make_df()
@@ -128,8 +132,8 @@ class TestSplitByDate:
     def test_observation_days_caps_at_df_start(self):
         df = _make_df()
         df_obs, _ = split_by_date(df, "2024-01-07", observation_days=2, evaluation_days=7)
-        # target - 2 = Jan05、観測期間: Jan05 - Jan07
-        assert set(df_obs["datetime"]) == {"2024-01-05", "2024-01-07"}
+        # target - 2 + 1 = Jan06、観測期間: Jan06 - Jan07 (2日間)
+        assert set(df_obs["datetime"]) == {"2024-01-07"}
 
     def test_evaluation_days_caps_at_df_end(self):
         df = _make_df()

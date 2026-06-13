@@ -15,8 +15,8 @@ class RecencyFrequencyScorer:
     _USER_COL = "user"
     _ITEM_COL = "item"
     _SEQUENCE_COL = "datetime"
-    _FREQUENCY_LIMIT_RATE = 0.95  # 最新度上限値自動計算の際に利用する割合
-    _RECENCY_LIMIT_RATE = 0.95  # 頻度上限値自動計算の際に利用する割合
+    _FREQUENCY_LIMIT_RATE = 0.95  # 頻度上限値自動計算の際に利用する割合
+    _RECENCY_LIMIT_RATE = 0.95  # 最新度上限値自動計算の際に利用する割合
 
     def __init__(self, user_col="user", item_col="item", time_col="datetime", unit=1):
         """Initialize the scorer with column name mappings.
@@ -71,9 +71,7 @@ class RecencyFrequencyScorer:
         # empirical
         self.emp_probability_ = None  # 経験的商品選択確率データフレーム(縦持ち)
         self.emp_probability_table_ = None  # 経験的商品選択確率データフレーム(横持ち)
-        self.emp_probability_dict_ = (
-            None  # 経験的商品選択確率データフレーム(辞書:キーは最新度と頻度のペア)
-        )
+        self.emp_probability_dict_ = None  # 経験的商品選択確率（辞書：キーは最新度と頻度のペア）
         self.recency_probability_ = None  # 最新度別経験的商品選択確率データフレーム
         self.frequency_probability_ = None  # 頻度別経験的商品選択確率データフレーム
 
