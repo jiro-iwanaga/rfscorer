@@ -34,7 +34,7 @@ $$p_{r,f} := \frac{n_{r,f}}{N_{r,f}}\ \ \  (r\in R, f\in F)$$
 
 ### 1次元経験的商品選択確率の推定（`er` / `ef`）
 
-$p_{r,f}$ を一方の次元で集約した1次元確率を、`fit()`・`fit_date()` または `fit_period()` 呼び出し時に自動計算する。結果は1次元 dict / DataFrame として保持され、2次元グリッドへのブロードキャストは行わない。
+$p_{r,f}$ を一方の次元で集約した1次元確率を、`fit()` 呼び出し時に自動計算する。結果は1次元 dict / DataFrame として保持され、2次元グリッドへのブロードキャストは行わない。
 
 - **`er`**（Empirical Recency）: 最新度 $r$ の1次元確率。
 $$x_r = p_r\ \ \ (r\in R)$$
@@ -128,38 +128,6 @@ RecencyFrequencyScorer(user_col="user", item_col="item", time_col="datetime", un
 
 戻り値: `self`
 
-##### `fit_date(df, target_date, observation_days=28, evaluation_days=7, recency_limit=None, frequency_limit=None)`
-
-`target_date` を起点として観測・評価ウィンドウを自動決定し、$(r, f)$ 別の経験的商品選択確率を推定する。単一 DataFrame と基準値から観測・評価ログを内部で自動分割して `_fit_impl()` を直接呼び出す。
-
-- 観測期間: `max(df の先頭値, target_int - observation_days 単位)` 〜 `target_int`
-- 評価期間: `target_int + 1単位` 〜 `min(df の末尾値, target_int + evaluation_days 単位)`
-
-| パラメータ | 型 | デフォルト | 説明 |
-|-----------|-----|-----------|------|
-| `df` | `pd.DataFrame` | — | 閲覧履歴 |
-| `target_date` | `str \| datetime \| int` | — | 観測期間終了値 兼 評価期間分割点（日付または整数） |
-| `observation_days` | `int \| None` | `28` | `target_date` から遡る最大単位数。`None` の場合はデータ先頭まで |
-| `evaluation_days` | `int \| None` | `7` | `target_date` から進む最大単位数。`None` の場合はデータ末尾まで |
-| `recency_limit` | `int \| None` | `None` | 最大最新度。`None` の場合、累積対象イベント数の分布から `RECENCY_LIMIT_RATE` に基づいて自動決定 |
-| `frequency_limit` | `int \| None` | `None` | 最大頻度。`None` の場合、累積対象イベント数の分布から `FREQUENCY_LIMIT_RATE` に基づいて自動決定 |
-
-戻り値: `self`
-
-##### `fit_period(df, observation_period, evaluation_period, recency_limit=None, frequency_limit=None)`
-
-観測期間・評価期間を明示的に指定して、$(r, f)$ 別の経験的商品選択確率を推定する。期間を細かく制御したい場合に使用する。
-
-| パラメータ | 型 | デフォルト | 説明 |
-|-----------|-----|-----------|------|
-| `df` | `pd.DataFrame` | — | 閲覧履歴 |
-| `observation_period` | `tuple[str \| datetime \| int, str \| datetime \| int]` | — | 観測期間の開始値・終了値（日付・整数いずれも可） |
-| `evaluation_period` | `tuple[str \| datetime \| int, str \| datetime \| int]` | — | 評価期間の開始値・終了値（日付・整数いずれも可）。観測期間の終了値より後から始まる必要がある |
-| `recency_limit` | `int \| None` | `None` | 最大最新度。`None` の場合、累積対象イベント数の分布から `RECENCY_LIMIT_RATE` に基づいて自動決定 |
-| `frequency_limit` | `int \| None` | `None` | 最大頻度。`None` の場合、累積対象イベント数の分布から `FREQUENCY_LIMIT_RATE` に基づいて自動決定 |
-
-戻り値: `self`
-
 ##### `predict(r, f, kind="emp")`
 
 指定した最新度 $r$・頻度 $f$ の商品選択確率を返す。
@@ -187,21 +155,6 @@ RecencyFrequencyScorer(user_col="user", item_col="item", time_col="datetime", un
 
 戻り値: `pd.DataFrame`。ユーザー・商品カラム名は `__init__`（または引数の上書き）で設定した名前になる。その他のカラム: `recency`, `frequency`, `probability`, `order`
 
-##### `transform_date(df, target_date, kind="emp", user_col=None, item_col=None, time_col=None)`
-
-入力 DataFrame の各 user×item ペアに最新度・頻度・商品選択確率・順位を付与して返す。`target_date` を明示的に指定する `transform()` のラッパー。
-
-| パラメータ | 型 | デフォルト | 説明 |
-|-----------|-----|-----------|------|
-| `df` | `pd.DataFrame` | — | スコアリング対象の閲覧履歴 |
-| `target_date` | `str \| datetime \| int` | — | 最新度・頻度の計算基準値（日付または整数） |
-| `kind` | `str` | `"emp"` | `"emp"`・`"er"`・`"ef"`・`"mono"`・`"mr"`・`"mf"`・`"mrc"`・`"mfc"`・`"mcc"` のいずれか（長名エイリアスも使用可） |
-| `user_col` | `str \| None` | `None` | ユーザーカラム名。省略時は `__init__` で設定した値を使用 |
-| `item_col` | `str \| None` | `None` | 商品カラム名。省略時は `__init__` で設定した値を使用 |
-| `time_col` | `str \| None` | `None` | 時点カラム名。省略時は `__init__` で設定した値を使用 |
-
-戻り値: `pd.DataFrame`。ユーザー・商品カラム名は `__init__`（または引数の上書き）で設定した名前になる。その他のカラム: `recency`, `frequency`, `probability`, `order`
-
 ##### `evaluate(df_rec, df_eval, order=1, user_col=None, item_col=None)`
 
 推薦結果と評価期間のイベント履歴を比較し、各順位カットオフでの評価指標を返す。
@@ -219,7 +172,7 @@ RecencyFrequencyScorer(user_col="user", item_col="item", time_col="datetime", un
 
 ##### `optimize(kind="mono", eps=0.0)`
 
-RF 制約を満たし、経験的商品選択確率との誤差を最小化する最適化商品選択確率を推定する。`fit()`・`fit_date()` または `fit_period()` 後に呼び出す。
+RF 制約を満たし、経験的商品選択確率との誤差を最小化する最適化商品選択確率を推定する。`fit()` 後に呼び出す。
 内部で `optimizer.py` の `RecencyFrequencyOptimizer` を使用して凸2次計画問題を解く。
 結果は `kind` に対応する属性（例: `mr_probability_*`、`mono_probability_*`）に格納されるため、複数モデルの結果を同時に保持できる。
 
@@ -287,7 +240,7 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 
 ##### `show()`
 
-`fit()`・`fit_date()` または `fit_period()` 後の集計情報（レコード数・cv 数・期間・上限値）を標準出力に表示する。デバッグ・動作確認用。
+`fit()` 後の集計情報（レコード数・cv 数・期間・上限値）を標準出力に表示する。デバッグ・動作確認用。
 
 戻り値: なし
 
@@ -295,28 +248,28 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 
 | 属性 | 型 | 説明 | 利用可能なタイミング |
 |------|-----|------|-----------------|
-| `recency_limit` | `int` | 最新度の上限値 | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `frequency_limit` | `int` | 頻度の上限値 | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `R` | `list[int]` | 最新度のリスト（`range(1, recency_limit+1)`） | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `F` | `list[int]` | 頻度のリスト（`range(1, frequency_limit+1)`） | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `RF2N` | `dict` | `(r, f)` → サンプル数 $N_{r,f}$ のマッピング | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `RF2CV` | `dict` | `(r, f)` → cv 数 $n_{r,f}$ のマッピング | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `RF2Prob` | `dict` | `(r, f)` → 経験的商品選択確率 $p_{r,f}$ のマッピング | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `R2N` | `dict` | `r` → 最新度別サンプル数のマッピング（`RF2N` の $f$ 方向集約） | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `R2CV` | `dict` | `r` → 最新度別 cv 数のマッピング | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `R2Prob` | `dict` | `r` → 最新度別経験的商品選択確率のマッピング | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `F2N` | `dict` | `f` → 頻度別サンプル数のマッピング（`RF2N` の $r$ 方向集約） | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `F2CV` | `dict` | `f` → 頻度別 cv 数のマッピング | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `F2Prob` | `dict` | `f` → 頻度別経験的商品選択確率のマッピング | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `emp_probability_` | `pd.DataFrame` | 経験的商品選択確率（カラム: `recency`, `frequency`, `N`, `cv`, `probability`） | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `recency_probability_` | `pd.DataFrame` | 最新度別経験的商品選択確率（カラム: `recency`, `N`, `cv`, `probability`） | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `frequency_probability_` | `pd.DataFrame` | 頻度別経験的商品選択確率（カラム: `frequency`, `N`, `cv`, `probability`） | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `emp_probability_table_` | `pd.DataFrame` | 経験的商品選択確率（横持ち。インデックス: `recency`、カラム: `frequency`） | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `emp_probability_dict_` | `dict` | 経験的商品選択確率（キー: `(r, f)`、値: `probability`） | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `er_probability_` | `pd.DataFrame` | er モデル1次元経験的商品選択確率（最新度のみ。ブロードキャストなし）（カラム: `recency`, `probability`） | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `er_probability_dict_` | `dict` | er モデル1次元経験的商品選択確率（キー: `r`（int）、値: `probability`） | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `ef_probability_` | `pd.DataFrame` | ef モデル1次元経験的商品選択確率（頻度のみ。ブロードキャストなし）（カラム: `frequency`, `probability`） | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `ef_probability_dict_` | `dict` | ef モデル1次元経験的商品選択確率（キー: `f`（int）、値: `probability`） | `fit()`・`fit_date()` または `fit_period()` 後 |
+| `recency_limit` | `int` | 最新度の上限値 | `fit()` 後 |
+| `frequency_limit` | `int` | 頻度の上限値 | `fit()` 後 |
+| `R` | `list[int]` | 最新度のリスト（`range(1, recency_limit+1)`） | `fit()` 後 |
+| `F` | `list[int]` | 頻度のリスト（`range(1, frequency_limit+1)`） | `fit()` 後 |
+| `RF2N` | `dict` | `(r, f)` → サンプル数 $N_{r,f}$ のマッピング | `fit()` 後 |
+| `RF2CV` | `dict` | `(r, f)` → cv 数 $n_{r,f}$ のマッピング | `fit()` 後 |
+| `RF2Prob` | `dict` | `(r, f)` → 経験的商品選択確率 $p_{r,f}$ のマッピング | `fit()` 後 |
+| `R2N` | `dict` | `r` → 最新度別サンプル数のマッピング（`RF2N` の $f$ 方向集約） | `fit()` 後 |
+| `R2CV` | `dict` | `r` → 最新度別 cv 数のマッピング | `fit()` 後 |
+| `R2Prob` | `dict` | `r` → 最新度別経験的商品選択確率のマッピング | `fit()` 後 |
+| `F2N` | `dict` | `f` → 頻度別サンプル数のマッピング（`RF2N` の $r$ 方向集約） | `fit()` 後 |
+| `F2CV` | `dict` | `f` → 頻度別 cv 数のマッピング | `fit()` 後 |
+| `F2Prob` | `dict` | `f` → 頻度別経験的商品選択確率のマッピング | `fit()` 後 |
+| `emp_probability_` | `pd.DataFrame` | 経験的商品選択確率（カラム: `recency`, `frequency`, `N`, `cv`, `probability`） | `fit()` 後 |
+| `recency_probability_` | `pd.DataFrame` | 最新度別経験的商品選択確率（カラム: `recency`, `N`, `cv`, `probability`） | `fit()` 後 |
+| `frequency_probability_` | `pd.DataFrame` | 頻度別経験的商品選択確率（カラム: `frequency`, `N`, `cv`, `probability`） | `fit()` 後 |
+| `emp_probability_table_` | `pd.DataFrame` | 経験的商品選択確率（横持ち。インデックス: `recency`、カラム: `frequency`） | `fit()` 後 |
+| `emp_probability_dict_` | `dict` | 経験的商品選択確率（キー: `(r, f)`、値: `probability`） | `fit()` 後 |
+| `er_probability_` | `pd.DataFrame` | er モデル1次元経験的商品選択確率（最新度のみ。ブロードキャストなし）（カラム: `recency`, `probability`） | `fit()` 後 |
+| `er_probability_dict_` | `dict` | er モデル1次元経験的商品選択確率（キー: `r`（int）、値: `probability`） | `fit()` 後 |
+| `ef_probability_` | `pd.DataFrame` | ef モデル1次元経験的商品選択確率（頻度のみ。ブロードキャストなし）（カラム: `frequency`, `probability`） | `fit()` 後 |
+| `ef_probability_dict_` | `dict` | ef モデル1次元経験的商品選択確率（キー: `f`（int）、値: `probability`） | `fit()` 後 |
 | `mr_probability_` | `pd.DataFrame` | mr モデル1次元最適化商品選択確率（カラム: `recency`, `probability`） | `optimize(kind="mr")` 後 |
 | `mr_probability_dict_` | `dict` | mr モデル最適化商品選択確率（キー: `r`（int）、値: `probability`） | `optimize(kind="mr")` 後 |
 | `mf_probability_` | `pd.DataFrame` | mf モデル1次元最適化商品選択確率（カラム: `frequency`, `probability`） | `optimize(kind="mf")` 後 |
@@ -333,13 +286,32 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 | `mcc_probability_` | `pd.DataFrame` | mcc モデル最適化商品選択確率（カラム: `recency`, `frequency`, `probability`） | `optimize(kind="mcc")` 後 |
 | `mcc_probability_table_` | `pd.DataFrame` | mcc モデル最適化商品選択確率（横持ち） | `optimize(kind="mcc")` 後 |
 | `mcc_probability_dict_` | `dict` | mcc モデル最適化商品選択確率（キー: `(r, f)`、値: `probability`） | `optimize(kind="mcc")` 後 |
-| `record_num` | `int` | 全閲覧履歴のレコード数 | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `record_num_obs` | `int` | 観測期間のレコード数 | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `record_num_eval` | `int` | 評価期間のレコード数 | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `record_num_target_org` | `int` | フィルタリング前の分析対象レコード数 | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `record_num_target` | `int` | フィルタリング後の分析対象レコード数 | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `total_cv_org` | `int` | フィルタリング前の cv 数 | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `total_cv` | `int` | フィルタリング後の cv 数 | `fit()`・`fit_date()` または `fit_period()` 後 |
+| `record_num` | `int` | 全閲覧履歴のレコード数 | `fit()` 後 |
+| `record_num_obs` | `int` | 観測期間のレコード数 | `fit()` 後 |
+| `record_num_eval` | `int` | 評価期間のレコード数 | `fit()` 後 |
+| `record_num_target_org` | `int` | フィルタリング前の分析対象レコード数 | `fit()` 後 |
+| `record_num_target` | `int` | フィルタリング後の分析対象レコード数 | `fit()` 後 |
+| `total_cv_org` | `int` | フィルタリング前の cv 数 | `fit()` 後 |
+| `total_cv` | `int` | フィルタリング後の cv 数 | `fit()` 後 |
+
+## ユーティリティ
+
+### `split_by_date(df, target_date, observation_days=28, evaluation_days=7, time_col="datetime")`
+
+`from rfscorer import split_by_date` で利用可能。`target_date` を基準に単一の DataFrame を観測ログ・評価ログに分割するスタンドアロン関数。`RecencyFrequencyScorer` に依存せず、ローリング workflow など複数 `target_date` を渡す研究的用途にも利用できる。
+
+- 観測期間: `max(df の time_col 最小値, target_date - observation_days 時間単位)` 〜 `target_date`（含む）
+- 評価期間: `target_date の翌時点` 〜 `min(df の time_col 最大値, target_date + evaluation_days 時間単位)`
+
+| パラメータ | 型 | デフォルト | 説明 |
+|-----------|-----|-----------|------|
+| `df` | `pd.DataFrame` | — | 分割対象の DataFrame |
+| `target_date` | `str \| datetime \| int` | — | 観測期間と評価期間の分割点（日付または整数） |
+| `observation_days` | `int \| None` | `28` | `target_date` から遡る最大時間単位数。`None` の場合は df の先頭まで |
+| `evaluation_days` | `int \| None` | `7` | `target_date` から進む最大時間単位数。`None` の場合は df の末尾まで |
+| `time_col` | `str` | `"datetime"` | 時点カラム名 |
+
+戻り値: `tuple[pd.DataFrame, pd.DataFrame]`（`(df_obs, df_eval)`）。元の df の構造を保持したサブセット。
 
 ## データフロー
 
@@ -349,8 +321,7 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
         └──────────┬──────────┘
                    ▼
         fit(df_obs, df_eval)
-        または fit_date(df, target_date)
-        または fit_period(df, observation_period, evaluation_period)
+        （df_obs, df_eval = split_by_date(df, target_date) でユーティリティ分割も可能）
                    │
 user / item / time_col に正規化（datetime64・文字列は ordinal 整数に変換）
 観測期間・評価期間でフィルタ
@@ -366,7 +337,7 @@ RF2N / RF2CV / RF2Prob / R2N / R2CV / R2Prob / F2N / F2CV / F2Prob
         ├─  predict(r, f, kind)  ─→ 特定 (r, f) の商品選択確率を返す
         │
         ├─  transform(df, ref, kind)  ─→ user×item に r・f・確率・順位を付与
-        │   または transform_date(df, target_date, kind)
+        │   （df の事前フィルタはユーザー側で行う）
         │
         ├─  plot_probability_surface(kind)  ─→ 3次元ワイヤーフレームで可視化
         │
@@ -424,14 +395,14 @@ scorer.optimize(kind="mfc")
 scorer.export_probability_csv(kind="all", path="output/probabilities.csv")
 
 # 基準日から期間を自動導出する場合
-scorer.fit_date(df, target_date="2015-07-06")
-df_rec = scorer.transform_date(df, target_date="2015-07-06")
+from rfscorer import split_by_date
+df_obs, df_eval = split_by_date(df, target_date="2015-07-06")
+scorer.fit(df_obs, df_eval)
+df_rec = scorer.transform(df_obs, ref="2015-07-06")
 
-# 期間を明示的に指定する場合
-scorer.fit_period(
-    df,
-    observation_period=("2015-07-02", "2015-07-06"),
-    evaluation_period=("2015-07-07", "2015-07-08"),
-)
+# 期間を明示的に指定する場合（標準 pandas フィルタ）
+mask_obs = (df["date"] >= "2015-07-02") & (df["date"] <= "2015-07-06")
+mask_eval = (df["date"] >= "2015-07-07") & (df["date"] <= "2015-07-08")
+scorer.fit(df[mask_obs], df[mask_eval])
 ```
 

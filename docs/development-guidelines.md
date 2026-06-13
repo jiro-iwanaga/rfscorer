@@ -35,7 +35,7 @@
 
 ## API 設計方針
 
-- scikit-learn スタイル（`fit` / `transform` / `optimize`）に準拠する。`fit_date`・`fit_period` は期間指定の補助メソッドとして提供する
+- scikit-learn スタイル（`fit` / `transform` / `optimize`）に準拠する。期間指定によるデータ準備は `rfscorer.split_by_date()` ユーティリティで分離する
 - 推定後の属性名は末尾に `_` をつける（例: `emp_probability_`）
 - `from rfscorer import RecencyFrequencyScorer` でインポートできるようにする
 - 解釈可能性を重視し、スコアの算出根拠を説明できる設計にする
@@ -44,7 +44,8 @@
 
 - テストコードは `tests/` に配置する
 - `pytest` を使用する
-- `fit()`・`fit_date()`・`fit_period()`・`predict()`・`transform()`・`transform_date()`・`evaluate()`・`optimize()`・`plot_probability_surface()`・`plot_marginal_probability()`・`export_probability_csv()` の正常系・異常系をカバーする
+- `fit()`・`predict()`・`transform()`・`evaluate()`・`optimize()`・`plot_probability_surface()`・`plot_marginal_probability()`・`export_probability_csv()` の正常系・異常系をカバーする
+- `split_by_date()` ユーティリティの正常系・異常系をカバーする
 
 ## ドキュメント管理
 
