@@ -34,7 +34,13 @@ from rfscorer import RecencyFrequencyScorer
 ```
 
 Prepare an interaction log with three columns: `user`, `item`, and a time column (default column name: `datetime`).
-The same user-item pair may appear multiple times, representing repeat visits.
+
+```python
+df_train = ...  # replace with your own training interaction log (columns: user, item, datetime)
+df_test  = ...  # replace with your own test interaction log     (columns: user, item, datetime)
+```
+
+Each DataFrame has the following structure. The same user-item pair may appear multiple times, representing repeat visits.
 
 | user  | item  | datetime   |
 |-------|-------|------------|
