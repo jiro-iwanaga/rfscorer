@@ -1551,8 +1551,6 @@ if __name__ == "__main__":
     scorer.plot_probability_surface("empirical").savefig("surface_emp_probability.png")
     scorer.plot_marginal_probability("recency").savefig("marginal_recency_probability.png")
     scorer.plot_marginal_probability("frequency").savefig("marginal_frequency_probability.png")
-    scorer.plot_probability_surface("er").savefig("surface_er_probability.png")
-    scorer.plot_probability_surface("ef").savefig("surface_ef_probability.png")
 
     scorer.optimize(kind="mr")
     scorer.plot_marginal_probability("recency", kind="mr").savefig(
