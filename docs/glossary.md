@@ -1,6 +1,6 @@
 # ユビキタス言語定義
 
-本プロジェクトで使用するドメイン用語の定義。コード・ドキュメント・会話で一貫して使用する。
+本プロジェクトで使用するドメイン用語の定義。コード・ドキュメントで一貫して使用する。
 
 ## データ
 
@@ -31,7 +31,7 @@
 | 広義単調性 | weak monotonicity | $\varepsilon = 0$ のときの単調性制約。隣接する確率値が同値になることを許す（$\geq$ または $\leq$） |
 | 狭義単調性 | strict monotonicity | $\varepsilon > 0$ のときの単調性制約。隣接する最新度・頻度の確率値が必ず $\varepsilon$ 以上離れることを保証する |
 | $\varepsilon$（eps） | eps | `optimize(eps=ε)` で指定する単調性制約の最小ギャップ。デフォルト `0.0`（広義単調性）。2次元モデル（mono/mrc/mfc/mcc）の上限は $\min(\max(p_{r,f}) / (\lvert R\rvert - 1),\ \max(p_{r,f}) / (\lvert F\rvert - 1))$、`mr` の上限は $\max(p_r) / (\lvert R\rvert - 1)$、`mf` の上限は $\max(p_f) / (\lvert F\rvert - 1)$ で自動計算される |
-| 1次元最適化モデル | 1D optimization model | `optimize(kind='mr')` または `optimize(kind='mf')` で構築する1次元の最適化モデル。`mr` は最新度のみを変数とするモデル（$R2Prob$ を目標）、`mf` は頻度のみを変数とするモデル（$F2Prob$ を目標）。結果は1次元 dict として保存され、2次元にブロードキャストされない |
+| 1次元最適化モデル | 1D optimization model | `optimize(kind='mr')` または `optimize(kind='mf')` で構築する1次元の最適化モデル。`mr` は最新度のみを変数とするモデル（$R2Prob$ を目標）、`mf` は頻度のみを変数とするモデル（$F2Prob$ を目標）。結果は1次元 dict として保存される |
 | 2次元最適化モデル | 2D optimization model | `optimize(kind='mono'/'mrc'/'mfc'/'mcc')` で構築する2次元の最適化モデル。最新度と頻度の全ペア $(r, f) \in R \times F$ を変数とするモデル（$RF2Prob$ を目標）。結果は `RF2X`（dict）に格納される |
 
 ## API
@@ -58,13 +58,13 @@
 | `emp_probability_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる経験的商品選択確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `N`, `cv`, `probability`） |
 | `emp_probability_table_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる経験的商品選択確率（横持ち）。`pd.DataFrame`（インデックス: `recency`、カラム: `frequency`） |
 | `emp_probability_dict_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる経験的商品選択確率。`dict`（キー: `(r, f)`） |
-| `er_probability_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる1次元経験的商品選択確率（最新度のみ。ブロードキャストなし）。`pd.DataFrame`（カラム: `recency`, `probability`） |
+| `er_probability_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる1次元経験的商品選択確率（最新度のみ）。`pd.DataFrame`（カラム: `recency`, `probability`） |
 | `er_probability_dict_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる1次元経験的商品選択確率。`dict`（キー: `r`（int）） |
-| `ef_probability_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる1次元経験的商品選択確率（頻度のみ。ブロードキャストなし）。`pd.DataFrame`（カラム: `frequency`, `probability`） |
+| `ef_probability_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる1次元経験的商品選択確率（頻度のみ）。`pd.DataFrame`（カラム: `frequency`, `probability`） |
 | `ef_probability_dict_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる1次元経験的商品選択確率。`dict`（キー: `f`（int）） |
-| `mr_probability_` | `optimize(kind='mr')` 後に参照できる1次元最適化商品選択確率（最新度のみ。ブロードキャストなし）。`pd.DataFrame`（カラム: `recency`, `probability`） |
+| `mr_probability_` | `optimize(kind='mr')` 後に参照できる1次元最適化商品選択確率（最新度のみ）。`pd.DataFrame`（カラム: `recency`, `probability`） |
 | `mr_probability_dict_` | `optimize(kind='mr')` 後に参照できる1次元最適化商品選択確率。`dict`（キー: `r`（int）） |
-| `mf_probability_` | `optimize(kind='mf')` 後に参照できる1次元最適化商品選択確率（頻度のみ。ブロードキャストなし）。`pd.DataFrame`（カラム: `frequency`, `probability`） |
+| `mf_probability_` | `optimize(kind='mf')` 後に参照できる1次元最適化商品選択確率（頻度のみ）。`pd.DataFrame`（カラム: `frequency`, `probability`） |
 | `mf_probability_dict_` | `optimize(kind='mf')` 後に参照できる1次元最適化商品選択確率。`dict`（キー: `f`（int）） |
 | `mono_probability_` | `optimize(kind='mono')` 後に参照できる最適化商品選択確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`） |
 | `mono_probability_table_` | `optimize(kind='mono')` 後に参照できる最適化商品選択確率（横持ち）。`pd.DataFrame`（インデックス: `recency`、カラム: `frequency`） |

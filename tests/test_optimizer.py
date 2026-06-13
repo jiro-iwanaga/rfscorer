@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from rfscorer.optimizer import RFOptimizer
+from rfscorer.optimizer import RecencyFrequencyOptimizer
 
 # 3×3 テストデータ（頻度単調性を意図的に違反させ、最適化に実作業を与える）
 _R = [1, 2, 3]
@@ -28,19 +28,19 @@ _TOL = 1e-4
 
 @pytest.fixture
 def opt():
-    return RFOptimizer()
+    return RecencyFrequencyOptimizer()
 
 
 @pytest.fixture
 def opt_with_data():
-    o = RFOptimizer()
+    o = RecencyFrequencyOptimizer()
     o.set_data(_R, _F, _RF2N, _RF2Prob)
     return o
 
 
 @pytest.fixture
 def opt_with_marginal_data():
-    o = RFOptimizer()
+    o = RecencyFrequencyOptimizer()
     o.set_data(_R, _F, _RF2N, _RF2Prob)
     o.set_marginal_data(_R2N, _R2Prob, _F2N, _F2Prob)
     return o
@@ -48,7 +48,7 @@ def opt_with_marginal_data():
 
 @pytest.fixture(scope="module")
 def opt_solved_mr():
-    o = RFOptimizer()
+    o = RecencyFrequencyOptimizer()
     o.set_data(_R, _F, _RF2N, _RF2Prob)
     o.set_marginal_data(_R2N, _R2Prob, _F2N, _F2Prob)
     o.build_marginal_model(axis="r")
@@ -59,7 +59,7 @@ def opt_solved_mr():
 
 @pytest.fixture(scope="module")
 def opt_solved_mf():
-    o = RFOptimizer()
+    o = RecencyFrequencyOptimizer()
     o.set_data(_R, _F, _RF2N, _RF2Prob)
     o.set_marginal_data(_R2N, _R2Prob, _F2N, _F2Prob)
     o.build_marginal_model(axis="f")
@@ -70,7 +70,7 @@ def opt_solved_mf():
 
 @pytest.fixture(scope="module")
 def opt_after_solve():
-    o = RFOptimizer()
+    o = RecencyFrequencyOptimizer()
     o.set_data(_R, _F, _RF2N, _RF2Prob)
     o.build_model(kind="mono")
     o.solve()
@@ -80,7 +80,7 @@ def opt_after_solve():
 @pytest.fixture(scope="module")
 def opt_solved_not_postprocessed():
     """show_result のみを目的とした未後処理フィクスチャ。opt_after_solve と分離。"""
-    o = RFOptimizer()
+    o = RecencyFrequencyOptimizer()
     o.set_data(_R, _F, _RF2N, _RF2Prob)
     o.build_model(kind="mono")
     o.solve()
@@ -89,7 +89,7 @@ def opt_solved_not_postprocessed():
 
 @pytest.fixture(scope="module")
 def opt_solved_mono():
-    o = RFOptimizer()
+    o = RecencyFrequencyOptimizer()
     o.set_data(_R, _F, _RF2N, _RF2Prob)
     o.build_model(kind="mono")
     o.solve()
@@ -99,7 +99,7 @@ def opt_solved_mono():
 
 @pytest.fixture(scope="module")
 def opt_solved_mrc():
-    o = RFOptimizer()
+    o = RecencyFrequencyOptimizer()
     o.set_data(_R, _F, _RF2N, _RF2Prob)
     o.build_model(kind="mrc")
     o.solve()
@@ -109,7 +109,7 @@ def opt_solved_mrc():
 
 @pytest.fixture(scope="module")
 def opt_solved_mfc():
-    o = RFOptimizer()
+    o = RecencyFrequencyOptimizer()
     o.set_data(_R, _F, _RF2N, _RF2Prob)
     o.build_model(kind="mfc")
     o.solve()
@@ -119,7 +119,7 @@ def opt_solved_mfc():
 
 @pytest.fixture(scope="module")
 def opt_solved_mcc():
-    o = RFOptimizer()
+    o = RecencyFrequencyOptimizer()
     o.set_data(_R, _F, _RF2N, _RF2Prob)
     o.build_model(kind="mcc")
     o.solve()

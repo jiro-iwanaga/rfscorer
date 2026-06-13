@@ -4,7 +4,7 @@ import time
 import cvxpy as cp
 
 
-class RFOptimizer:
+class RecencyFrequencyOptimizer:
     """Convex quadratic optimizer for RF monotonicity-constrained product-choice probabilities.
 
     Minimizes weighted least-squares deviation from empirical probabilities
@@ -13,7 +13,7 @@ class RFOptimizer:
 
     Typical call sequence for 2D models::
 
-        optimizer = RFOptimizer()
+        optimizer = RecencyFrequencyOptimizer()
         optimizer.set_data(R, F, RF2N, RF2Prob)
         optimizer.build_model(kind="mono")
         optimizer.solve()
@@ -23,7 +23,7 @@ class RFOptimizer:
 
     Typical call sequence for 1D marginal models::
 
-        optimizer = RFOptimizer()
+        optimizer = RecencyFrequencyOptimizer()
         optimizer.set_data(R, F, RF2N, RF2Prob)
         optimizer.set_marginal_data(R2N, R2Prob, F2N, F2Prob)
         optimizer.build_marginal_model(axis="r")
@@ -553,7 +553,7 @@ if __name__ == "__main__":
     RF2Prob = {(row.recency, row.frequency): row.emp_probability for row in df.itertuples()}
 
     # 数理モデルのインスタンスの作成とデータのセット
-    optimizer = RFOptimizer()
+    optimizer = RecencyFrequencyOptimizer()
     optimizer.set_data(R, F, RF2N, RF2Prob)
     optimizer.show_input()
 

@@ -5,7 +5,7 @@
 | モジュール | クラス | 役割 |
 |-----------|--------|------|
 | `scorer.py` | `RecencyFrequencyScorer` | 公開 API。fit・predict・transform・optimize・evaluate・plot・export の各メソッドを提供する |
-| `optimizer.py` | `RFOptimizer` | 内部モジュール。`optimize()` から委譲された凸2次計画問題を cvxpy で求解する |
+| `optimizer.py` | `RecencyFrequencyOptimizer` | 内部モジュール。`optimize()` から委譲された凸2次計画問題を cvxpy で求解する |
 | `__init__.py` | — | `RecencyFrequencyScorer` のみを公開する |
 
 ## 遅延インポート方針

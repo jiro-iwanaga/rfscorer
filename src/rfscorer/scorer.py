@@ -1464,16 +1464,16 @@ class RecencyFrequencyScorer:
             )
 
         try:
-            from .optimizer import RFOptimizer
+            from .optimizer import RecencyFrequencyOptimizer
         except ImportError:
-            from rfscorer.optimizer import RFOptimizer
+            from rfscorer.optimizer import RecencyFrequencyOptimizer
 
         if self.emp_probability_dict_ is None:
             raise RuntimeError(
                 "fit(), fit_date(), or fit_period() must be called before optimize()."
             )
 
-        optimizer = RFOptimizer()
+        optimizer = RecencyFrequencyOptimizer()
         optimizer.set_data(self.R, self.F, self.RF2N, self.RF2Prob)
         optimizer.set_marginal_data(self.R2N, self.R2Prob, self.F2N, self.F2Prob)
 

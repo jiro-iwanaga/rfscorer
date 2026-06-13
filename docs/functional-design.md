@@ -78,7 +78,7 @@ $$\sum_{r\in R, f\in F} N_{r,f} \cdot(p_{r,f} - x_{r,f})^2$$
 
 #### 1次元最適化モデル（`mr` / `mf`）
 
-1次元経験的確率 $p_r$・$p_f$ を目標として1次元で最適化する。結果は1次元 dict に格納され、2次元グリッドへのブロードキャストは行わない。
+1次元経験的確率 $p_r$・$p_f$ を目標として1次元で最適化する。結果は1次元 dict に格納される。
 
 - **`mr`**（Monotonic Recency）: $r$ 方向の単調性と凸性を同時に制約。
   - 変数: $x_r\ (r \in R)$
@@ -220,7 +220,7 @@ RecencyFrequencyScorer(user_col="user", item_col="item", time_col="datetime", un
 ##### `optimize(kind="mono", eps=0.0)`
 
 RF 制約を満たし、経験的商品選択確率との誤差を最小化する最適化商品選択確率を推定する。`fit()`・`fit_date()` または `fit_period()` 後に呼び出す。
-内部で `optimizer.py` の `RFOptimizer` を使用して凸2次計画問題を解く。
+内部で `optimizer.py` の `RecencyFrequencyOptimizer` を使用して凸2次計画問題を解く。
 結果は `kind` に対応する属性（例: `mr_probability_*`、`mono_probability_*`）に格納されるため、複数モデルの結果を同時に保持できる。
 
 | パラメータ | 型 | デフォルト | 説明 |
@@ -374,12 +374,12 @@ RF2N / RF2CV / RF2Prob / R2N / R2CV / R2Prob / F2N / F2CV / F2Prob
         │
         ├─  export_probability_csv(kind, path)  ─→ 確率テーブルを CSV に書き出す
         │
-        ├─  optimize(kind='mr'|'mf')  ← RFOptimizer (optimizer.py) に委譲（1次元最適化）
+        ├─  optimize(kind='mr'|'mf')  ← RecencyFrequencyOptimizer (optimizer.py) に委譲（1次元最適化）
         │   1次元経験的確率を目標とした1次元凸2次計画問題を求解し、結果を1次元 dict に格納（ブロードキャストなし）
         │       ▼
         │   {mr|mf}_probability_ / _dict_
         │
-        └─  optimize(kind='mono'|'mrc'|'mfc'|'mcc')  ← RFOptimizer に委譲（2次元最適化）
+        └─  optimize(kind='mono'|'mrc'|'mfc'|'mcc')  ← RecencyFrequencyOptimizer に委譲（2次元最適化）
             RF 制約付き凸2次計画問題を求解（kind に応じた追加制約を適用）
                 ▼
             {mono|mrc|mfc|mcc}_probability_ / _table_ / _dict_
