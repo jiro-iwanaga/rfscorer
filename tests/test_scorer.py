@@ -279,6 +279,19 @@ class TestFitValidation:
         with pytest.raises(ValueError, match="time value could not be normalized"):
             scorer.fit(df_obs, df_eval, ref=object())
 
+    def test_no_cv_events_raises(self, scorer):
+        # df_eval の user-item ペアが df_obs と完全に不一致 → total_cv=0 で自動上限計算不能
+        df_obs = pd.DataFrame(
+            [("u1", "item1", "2024-01-01")],
+            columns=["user", "item", "datetime"],
+        )
+        df_eval = pd.DataFrame(
+            [("u99", "item99", "2024-01-09")],
+            columns=["user", "item", "datetime"],
+        )
+        with pytest.raises(ValueError, match="No events observed in evaluation period"):
+            scorer.fit(df_obs, df_eval)
+
 
 # ---------------------------------------------------------------------------
 # fit — 正常系 (新 API: df_obs, df_eval)
@@ -370,6 +383,16 @@ class TestFitResult:
             frequency_limit=_FREQUENCY_LIMIT,
         )
         assert s.emp_probability_dict_ is not None
+
+    def test_auto_recency_limit(self):
+        s = RecencyFrequencyScorer()
+        s.fit(self._make_obs(), self._make_eval())
+        assert s.recency_limit == _AUTO_RECENCY_LIMIT
+
+    def test_auto_frequency_limit(self):
+        s = RecencyFrequencyScorer()
+        s.fit(self._make_obs(), self._make_eval())
+        assert s.frequency_limit == _AUTO_FREQUENCY_LIMIT
 
 
 # ---------------------------------------------------------------------------
@@ -542,14 +565,14 @@ class TestOptimize:
             scorer.optimize(kind="mono", eps=-1e-6)
 
     def test_optimize_eps_too_large_mono_raises(self, scorer, df):
-        # eps_max(2D) = max(RF2Prob) / min(nr-1, nf-1) = 1.0 / min(6, 2) = 0.5
+        # eps_max(2D) = min(p_max/(nr-1), p_max/(nf-1)) = min(1.0/6, 1.0/2) = 1.0/6 ≈ 0.167
         scorer.fit(
             *_split_by_period(df, _OBS_PERIOD, _EVAL_PERIOD),
             recency_limit=_RECENCY_LIMIT,
             frequency_limit=_FREQUENCY_LIMIT,
         )
         with pytest.raises(ValueError, match="eps"):
-            scorer.optimize(kind="mono", eps=0.5 + 1e-9)
+            scorer.optimize(kind="mono", eps=1.0 / 6 + 1e-9)
 
     def test_optimize_eps_too_large_mr_raises(self, scorer, df):
         # eps_max(mr) = max(R2Prob) / (nr - 1) = 1.0 / 6 ≈ 0.1667
@@ -579,7 +602,7 @@ class TestOptimize:
             frequency_limit=_FREQUENCY_LIMIT,
         )
         with pytest.raises(ValueError, match="eps"):
-            scorer.optimize(kind="mrc", eps=0.5 + 1e-9)
+            scorer.optimize(kind="mrc", eps=1.0 / 6 + 1e-9)
 
     def test_optimize_with_eps_mono_produces_results(self, scorer, df):
         scorer.fit(
@@ -1203,6 +1226,18 @@ class TestPlotProbabilitySurface:
         assert ax.xaxis.label.get_size() == 16
         assert ax.yaxis.label.get_size() == 16
 
+    def test_recency_label_applied(self, scorer_fitted):
+        fig = scorer_fitted.plot_probability_surface(recency_label="custom_r")
+        assert fig.axes[0].get_xlabel() == "custom_r"
+
+    def test_frequency_label_applied(self, scorer_fitted):
+        fig = scorer_fitted.plot_probability_surface(frequency_label="custom_f")
+        assert fig.axes[0].get_ylabel() == "custom_f"
+
+    def test_probability_label_applied(self, scorer_fitted):
+        fig = scorer_fitted.plot_probability_surface(probability_label="custom_p")
+        assert fig.axes[0].get_zlabel() == "custom_p"
+
 
 # ---------------------------------------------------------------------------
 # 周辺確率属性 (R2N / R2CV / R2Prob / F2N / F2CV / F2Prob)
@@ -1332,6 +1367,18 @@ class TestPlotMarginalProbability:
         assert ax.xaxis.label.get_size() == 16
         assert ax.yaxis.label.get_size() == 16
 
+    def test_recency_label_applied(self, scorer_fitted):
+        fig = scorer_fitted.plot_marginal_probability(axis="recency", recency_label="custom_r")
+        assert fig.axes[0].get_xlabel() == "custom_r"
+
+    def test_frequency_label_applied(self, scorer_fitted):
+        fig = scorer_fitted.plot_marginal_probability(axis="frequency", frequency_label="custom_f")
+        assert fig.axes[0].get_xlabel() == "custom_f"
+
+    def test_probability_label_applied(self, scorer_fitted):
+        fig = scorer_fitted.plot_marginal_probability(probability_label="custom_p")
+        assert fig.axes[0].get_ylabel() == "custom_p"
+
     def test_invalid_kind_raises(self, scorer_fitted):
         with pytest.raises(ValueError, match="kind"):
             scorer_fitted.plot_marginal_probability(axis="recency", kind="invalid")
@@ -1372,6 +1419,13 @@ class TestPlotMarginalProbability:
         ax = fig.axes[0]
         assert ax.get_legend() is not None
 
+    def test_all_recency_draws_emp_and_mr_lines(self, scorer_optimized_mr):
+        fig = scorer_optimized_mr.plot_marginal_probability(axis="recency", kind="all")
+        ax = fig.axes[0]
+        assert len(ax.lines) == 2
+        labels = {line.get_label() for line in ax.lines}
+        assert labels == {"emp", "mr"}
+
     def test_all_frequency_returns_figure_with_legend(self, scorer_optimized_mf):
         import matplotlib.figure
 
@@ -1379,6 +1433,13 @@ class TestPlotMarginalProbability:
         assert isinstance(fig, matplotlib.figure.Figure)
         ax = fig.axes[0]
         assert ax.get_legend() is not None
+
+    def test_all_frequency_draws_emp_and_mf_lines(self, scorer_optimized_mf):
+        fig = scorer_optimized_mf.plot_marginal_probability(axis="frequency", kind="all")
+        ax = fig.axes[0]
+        assert len(ax.lines) == 2
+        labels = {line.get_label() for line in ax.lines}
+        assert labels == {"emp", "mf"}
 
     def test_emp_has_no_legend(self, scorer_fitted):
         fig = scorer_fitted.plot_marginal_probability(axis="recency", kind="emp")

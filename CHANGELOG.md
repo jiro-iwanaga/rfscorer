@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-06-13
+
+### Fixed
+
+- `split_by_date()`: `observation_days=N` now produces an N-unit observation window
+  `[target_date - N + 1, target_date]`, restoring symmetry with `evaluation_days=N`
+  (which produces the N-unit window `[target_date + 1, target_date + N]`).
+  Previously `observation_days=N` produced an `N+1`-unit window
+  `[target_date - N, target_date]` due to an off-by-one in the inclusive start
+  boundary. **Migration**: if you previously called
+  `split_by_date(df, target_date, observation_days=N)` and want the same
+  observation window, pass `observation_days=N+1`.
+- `normalize_ref()`: invalid string dates (e.g., `"not a date"`) now consistently
+  raise `ValueError("time value could not be normalized: ...")`. Previously the
+  str-path bypassed the friendly error and surfaced a raw pandas error.
+- Documentation: numerous accuracy fixes across `docs/` (glossary, functional-design,
+  product-requirements, architecture, repository-structure, development-guidelines)
+  including terminology unification (閲覧, 累積対象イベント発生数), `_plotting.py`
+  reference in the module / repository layout, Python 3.11 minimum requirement,
+  and `kind` enum corrections for `plot_probability_surface()` /
+  `plot_marginal_probability()`.
+
+### Changed
+
+- Internal refactor: extracted `plot_probability_surface()` and
+  `plot_marginal_probability()` to a new private module `src/rfscorer/_plotting.py`
+  as `PlottingMixin`. `RecencyFrequencyScorer` now inherits from `PlottingMixin`,
+  so the public API (`scorer.plot_*()`) is preserved with no caller-visible change.
+- Internal refactor: reorganized `RecencyFrequencyScorer` methods by typical
+  workflow (Initialization → Fitting → Optimization → Inference → Evaluation →
+  Export → Inspection → Internal helpers) and added section divider comments.
+  No behavior change.
+
 ## [0.4.0] - 2026-06-13
 
 ### Added

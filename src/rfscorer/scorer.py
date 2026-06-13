@@ -1,11 +1,11 @@
-import numpy as np
 import pandas as pd
 from pandas.api.types import is_string_dtype
 
+from ._plotting import PlottingMixin
 from ._time_utils import normalize_ref, normalize_sequence_col
 
 
-class RecencyFrequencyScorer:
+class RecencyFrequencyScorer(PlottingMixin):
     """Recency-Frequency based recommendation scorer.
 
     Estimates product-choice probabilities from user-item interaction histories
@@ -15,8 +15,24 @@ class RecencyFrequencyScorer:
     _USER_COL = "user"
     _ITEM_COL = "item"
     _SEQUENCE_COL = "datetime"
-    _FREQUENCY_LIMIT_RATE = 0.95  # 最新度上限値自動計算の際に利用する割合
-    _RECENCY_LIMIT_RATE = 0.95  # 頻度上限値自動計算の際に利用する割合
+    _FREQUENCY_LIMIT_RATE = 0.95  # 頻度上限値自動計算の際に利用する割合
+    _RECENCY_LIMIT_RATE = 0.95  # 最新度上限値自動計算の際に利用する割合
+
+    _KIND_ALIASES = {
+        "empirical": "emp",
+        "empirical_recency": "er",
+        "empirical_frequency": "ef",
+        "monotonic": "mono",
+        "monotonic_recency": "mr",
+        "monotonic_frequency": "mf",
+        "monotonic_recency_convex": "mrc",
+        "monotonic_frequency_concave": "mfc",
+        "monotonic_convex_concave": "mcc",
+    }
+
+    # ---------------------------------------------------------------------------
+    # Initialization
+    # ---------------------------------------------------------------------------
 
     def __init__(self, user_col="user", item_col="item", time_col="datetime", unit=1):
         """Initialize the scorer with column name mappings.
@@ -71,9 +87,7 @@ class RecencyFrequencyScorer:
         # empirical
         self.emp_probability_ = None  # 経験的商品選択確率データフレーム(縦持ち)
         self.emp_probability_table_ = None  # 経験的商品選択確率データフレーム(横持ち)
-        self.emp_probability_dict_ = (
-            None  # 経験的商品選択確率データフレーム(辞書:キーは最新度と頻度のペア)
-        )
+        self.emp_probability_dict_ = None  # 経験的商品選択確率（辞書：キーは最新度と頻度のペア）
         self.recency_probability_ = None  # 最新度別経験的商品選択確率データフレーム
         self.frequency_probability_ = None  # 頻度別経験的商品選択確率データフレーム
 
@@ -121,6 +135,10 @@ class RecencyFrequencyScorer:
         self.record_num_target = None  # 分析対象レコード数
         self.total_cv_org = None  # フィルタリング前 cv 数
         self.total_cv = None  # cv 数
+
+    # ---------------------------------------------------------------------------
+    # Fitting (経験的確率推定)
+    # ---------------------------------------------------------------------------
 
     def fit(
         self,
@@ -344,422 +362,123 @@ class RecencyFrequencyScorer:
             .reset_index(drop=True)
         )
 
-    def show(self):
-        """Print a summary of fit() results to stdout."""
-        print("=== profiling ===")
+    # ---------------------------------------------------------------------------
+    # Optimization (単調性制約付き再推定)
+    # ---------------------------------------------------------------------------
 
-        if self.record_num:
-            print("record_num:", self.record_num)
+    def optimize(self, kind="mono", eps=0.0):
+        """Estimate optimized product-choice probabilities under RF constraints.
 
-        if self.record_num_obs:
-            print("record_num_obs:", self.record_num_obs)
-        if self.record_num_eval:
-            print("record_num_eval:", self.record_num_eval)
+        Solves a convex quadratic programming problem with monotonicity
+        constraints (and optionally convexity/concavity constraints).
+        Uses weighted least squares as objective.
 
-        if self.observation_start_ and self.observation_end_:
-            print("observation: {} -> {}".format(self.observation_start_, self.observation_end_))
-        if self.evaluation_start_ and self.evaluation_end_:
-            print("evaluation: {} -> {}".format(self.evaluation_start_, self.evaluation_end_))
-
-        if self.recency_limit:
-            print("recency_limit:", self.recency_limit)
-        if self.frequency_limit:
-            print("frequency_limit:", self.frequency_limit)
-
-        if self.record_num_target_org and self.record_num_target:
-            print(
-                "target_record_num: {} -> {}".format(
-                    self.record_num_target_org, self.record_num_target
-                )
-            )
-
-        if self.total_cv_org and self.total_cv:
-            print("total_cv: {} -> {}".format(self.total_cv_org, self.total_cv))
-
-        if self.emp_probability_table_ is not None:
-            print("emp_probability_table_:")
-            print(self.emp_probability_table_.round(3).to_string())
-
-    def plot_probability_surface(
-        self,
-        kind="emp",
-        title=None,
-        figsize=(6, 5),
-        fontsize=12,
-        recency_label="recency",
-        frequency_label="frequency",
-        probability_label="probability",
-    ):
-        """Plot product-choice probabilities as a 3D surface.
-
-        Visualizes the probability table as a 3D wireframe with recency on
-        the x-axis, frequency on the y-axis, and probability on the z-axis.
-
-        In Jupyter Lab / Colab the returned figure renders inline automatically.
-        To save to a file, call ``fig.savefig("output.png")`` on the returned
-        figure.
+        Requires fit() to be called first. Depends on cvxpy.
 
         Parameters
         ----------
-        kind : {"emp", "mono", "mrc", "mfc", "mcc"}, default "emp"
-            Which probability to visualize. "emp" uses fit() results; others use optimize() results.
-            Note: "mr", "mf", "er", and "ef" are 1D marginal models and cannot
-            be visualized as a surface; use plot_marginal_probability() instead.
-        title : str or None, default None
-            Figure title. If None, no title is shown.
-        figsize : tuple[float, float], default (6, 5)
-            Figure size in inches as (width, height). For publication, set this
-            to the final printed size (e.g., (3.5, 3.0) for a single-column
-            figure in a two-column journal).
-        fontsize : int, default 12
-            Font size for axis labels and tick labels. For publication, match
-            this to the body text size of the target journal (typically 8–10 pt)
-            and set figsize to the final printed size so the font is not scaled.
-        recency_label : str, default "recency"
-            Label for the x-axis (recency dimension).
-        frequency_label : str, default "frequency"
-            Label for the y-axis (frequency dimension).
-        probability_label : str, default "probability"
-            Label for the z-axis (probability dimension).
+        kind : {"mono", "mr", "mf", "mrc", "mfc", "mcc"}, default "mono"
+            Optimization model to use.
+            "mono" applies monotonicity constraints only (2D joint model).
+            "mr" fits a 1-D recency-only model with monotonicity and convexity.
+                 Result stored as dict[int, float] keyed by recency.
+            "mf" fits a 1-D frequency-only model with monotonicity and concavity.
+                 Result stored as dict[int, float] keyed by frequency.
+            "mrc" additionally applies convexity in recency (2D joint model).
+            "mfc" additionally applies concavity in frequency (2D joint model).
+            "mcc" applies both recency convexity and frequency concavity (2D joint model).
+        eps : float, default 0.0
+            Minimum gap enforced between adjacent values in monotonicity
+            constraints.  When 0.0 (default), weak monotonicity is used
+            (non-strict inequalities allow ties between adjacent levels).
+            When positive, strict monotonicity is enforced, preventing ties
+            between adjacent recency or frequency levels.
 
         Returns
         -------
-        matplotlib.figure.Figure
-
-        Raises
-        ------
-        ValueError
-            If kind is "mr", "mf", "er", or "ef" (1D marginal models cannot
-            be plotted as a surface), or if kind is not one of the accepted
-            values.
-        RuntimeError
-            If fit() has not been called for
-            kind="emp", or if optimize(kind=...) has not been called for
-            the requested optimization kind.
-        """
-        import matplotlib.pyplot as plt
-
-        kind = self._normalize_kind(kind)
-        if kind in ("mr", "mf", "er", "ef"):
-            raise ValueError(
-                f"kind={kind!r} is a 1D marginal model and cannot be plotted as a surface."
-                " Use plot_marginal_probability() instead."
-            )
-        if kind not in ("emp", "mono", "mrc", "mfc", "mcc"):
-            raise ValueError(f"kind must be 'emp', 'mono', 'mrc', 'mfc', or 'mcc', got {kind!r}.")
-        if kind == "emp" and self.emp_probability_table_ is None:
-            raise RuntimeError("fit() must be called before plot_probability_surface().")
-        if kind == "mono" and self.mono_probability_table_ is None:
-            raise RuntimeError(
-                "optimize(kind='mono') must be called before plot_probability_surface(kind='mono')."
-            )
-        if kind == "mrc" and self.mrc_probability_table_ is None:
-            raise RuntimeError(
-                "optimize(kind='mrc') must be called before plot_probability_surface(kind='mrc')."
-            )
-        if kind == "mfc" and self.mfc_probability_table_ is None:
-            raise RuntimeError(
-                "optimize(kind='mfc') must be called before plot_probability_surface(kind='mfc')."
-            )
-        if kind == "mcc" and self.mcc_probability_table_ is None:
-            raise RuntimeError(
-                "optimize(kind='mcc') must be called before plot_probability_surface(kind='mcc')."
-            )
-
-        if kind == "emp":
-            table = self.emp_probability_table_
-        elif kind == "mono":
-            table = self.mono_probability_table_
-        elif kind == "mrc":
-            table = self.mrc_probability_table_
-        elif kind == "mfc":
-            table = self.mfc_probability_table_
-        else:
-            table = self.mcc_probability_table_
-
-        recency = table.index.tolist()
-        frequency = table.columns.tolist()
-        X, Y = np.meshgrid(recency, frequency)
-        Z = table.values.T
-
-        fig = plt.figure(figsize=figsize)
-        ax = fig.add_subplot(111, projection="3d")
-        ax.plot_wireframe(X, Y, Z, color="black")
-        ax.set_xlabel(recency_label, fontsize=fontsize)
-        ax.set_ylabel(frequency_label, fontsize=fontsize)
-        ax.set_zlabel(probability_label, fontsize=fontsize, labelpad=10)
-        ax.tick_params(labelsize=fontsize)
-        for pane in (ax.xaxis.pane, ax.yaxis.pane, ax.zaxis.pane):
-            pane.fill = False
-        if title is not None:
-            ax.set_title(title, fontsize=fontsize)
-        return fig
-
-    def plot_marginal_probability(
-        self,
-        axis="recency",
-        kind="emp",
-        title=None,
-        figsize=(5, 4),
-        fontsize=12,
-        recency_label="recency",
-        frequency_label="frequency",
-        probability_label="probability",
-    ):
-        """Plot product-choice probability aggregated along one RF dimension.
-
-        When axis='recency', plots the empirical recency-marginal probability
-        (aggregated over all frequency levels) and optionally the mr-optimized
-        probability against recency rank.  When axis='frequency', plots the
-        empirical frequency-marginal probability and optionally the mf-optimized
-        probability against frequency.  Both are shown as line charts with markers.
-
-        In Jupyter Lab / Colab the returned figure renders inline automatically.
-        To save to a file, call ``fig.savefig("output.png")`` on the returned figure.
-
-        Parameters
-        ----------
-        axis : {"recency", "frequency"}, default "recency"
-            Which dimension to aggregate and plot.
-            "recency" plots probability vs recency rank (expected: decreasing).
-            "frequency" plots probability vs frequency (expected: increasing).
-        kind : {"emp", "er", "ef", "mr", "mf", "all"}, default "emp"
-            Which probability series to draw.
-            "emp" draws the empirical marginal (R2Prob or F2Prob).
-            "er" draws the empirical recency marginal (valid only when
-            axis="recency"). Equivalent to "emp" on the recency axis.
-            "ef" draws the empirical frequency marginal (valid only when
-            axis="frequency"). Equivalent to "emp" on the frequency axis.
-            "mr" draws the mr-optimized series (valid only when axis="recency").
-            "mf" draws the mf-optimized series (valid only when axis="frequency").
-            "all" draws both the empirical and the optimized series together.
-        title : str or None, default None
-            Figure title. If None, no title is shown.
-        figsize : tuple[float, float], default (5, 4)
-            Figure size in inches as (width, height). For publication, set this
-            to the final printed size (e.g., (3.5, 2.8) for a single-column
-            figure in a two-column journal).
-        fontsize : int, default 12
-            Font size for axis labels and tick labels. For publication, match
-            this to the body text size of the target journal (typically 8–10 pt)
-            and set figsize to the final printed size so the font is not scaled.
-        recency_label : str, default "recency"
-            Label for the x-axis when axis="recency".
-        frequency_label : str, default "frequency"
-            Label for the x-axis when axis="frequency".
-        probability_label : str, default "probability"
-            Label for the y-axis (probability dimension).
-
-        Returns
-        -------
-        matplotlib.figure.Figure
-
-        Raises
-        ------
-        ValueError
-            If axis is not "recency" or "frequency", if kind is not one of the
-            accepted values, or if the axis/kind combination is invalid (e.g.,
-            kind="mf" or "ef" with axis="recency").
-        RuntimeError
-            If fit() has not been called, or if
-            optimize(kind='mr') / optimize(kind='mf') has not been called when
-            kind is "mr", "mf", or "all".
-        """
-        import matplotlib.pyplot as plt
-
-        kind = self._normalize_kind(kind)
-        if axis not in ("recency", "frequency"):
-            raise ValueError(f"axis must be 'recency' or 'frequency', got {axis!r}.")
-        valid_kinds = ("emp", "er", "ef", "mr", "mf", "all")
-        if kind not in valid_kinds:
-            raise ValueError(f"kind must be one of {valid_kinds}, got {kind!r}.")
-        if axis == "recency" and kind in ("mf", "ef"):
-            raise ValueError(f"kind={kind!r} is not valid when axis='recency'. Use 'mr' or 'er'.")
-        if axis == "frequency" and kind in ("mr", "er"):
-            raise ValueError(f"kind={kind!r} is not valid when axis='frequency'. Use 'mf' or 'ef'.")
-        if self.recency_probability_ is None:
-            raise RuntimeError("fit() must be called before plot_marginal_probability().")
-        opt_kind = "mr" if axis == "recency" else "mf"
-        if kind in (opt_kind, "all"):
-            opt_attr = f"{opt_kind}_probability_"
-            if getattr(self, opt_attr) is None:
-                raise RuntimeError(
-                    f"optimize(kind='{opt_kind}') must be called before"
-                    f" plot_marginal_probability(kind='{kind}')."
-                )
-
-        x_col = axis
-        x_label = recency_label if axis == "recency" else frequency_label
-        if axis == "recency":
-            df_emp = self.recency_probability_
-        else:
-            df_emp = self.frequency_probability_
-
-        if kind in (opt_kind, "all"):
-            df_opt = getattr(self, f"{opt_kind}_probability_")[[x_col, "probability"]].reset_index(
-                drop=True
-            )
-
-        fig, ax = plt.subplots(figsize=figsize)
-        if kind in ("emp", "er", "ef", "all"):
-            ax.plot(
-                df_emp[x_col],
-                df_emp["probability"],
-                color="black",
-                linestyle="-",
-                marker="o",
-                linewidth=1.5,
-                markersize=6,
-                label="emp" if kind == "all" else kind,
-            )
-        if kind in (opt_kind, "all"):
-            ax.plot(
-                df_opt[x_col],
-                df_opt["probability"],
-                color="black",
-                linestyle="--" if kind == "all" else "-",
-                marker="s",
-                linewidth=1.5,
-                markersize=6,
-                label=opt_kind,
-            )
-        if kind == "all":
-            ax.legend(fontsize=fontsize)
-        ax.set_xlabel(x_label, fontsize=fontsize)
-        ax.set_ylabel(probability_label, fontsize=fontsize)
-        ax.tick_params(labelsize=fontsize)
-        if title is not None:
-            ax.set_title(title, fontsize=fontsize)
-        fig.tight_layout()
-        return fig
-
-    def export_probability_csv(self, kind="emp", path=None):
-        """Export product-choice probabilities to a CSV file.
-
-        Parameters
-        ----------
-        kind : {"emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc", "all"}, default "emp"
-            Which probability to export. "emp", "er", and "ef" use fit(),
-            fit() results; others use optimize() results;
-            "all" merges all nine models into a single file. For 2D models the
-            merge key is (recency, frequency); for 1D models mr merges on
-            recency and mf merges on frequency, so their probability columns
-            are constant along the other axis.
-        path : str or None, default None
-            Output file path for the CSV. If None, saves as
-            "{kind}_probability.csv" in the current directory.
-            If a directory, saves "{kind}_probability.csv" inside it.
-
-        Returns
-        -------
-        None
+        self
 
         Raises
         ------
         ValueError
             If kind is not one of the accepted values.
         RuntimeError
-            If fit() has not been called for
-            emp/er/ef kinds, or if the required optimize(kind=...) has not been
-            called for the requested optimization kind.
+            If fit() has not been called first.
         """
         kind = self._normalize_kind(kind)
-        if kind not in ("emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc", "all"):
+        if kind not in ("mono", "mr", "mf", "mrc", "mfc", "mcc"):
             raise ValueError(
-                f"kind must be 'emp', 'er', 'ef', 'mono', 'mr', 'mf', 'mrc', 'mfc', 'mcc',"
-                f" or 'all', got {kind!r}."
-            )
-        if kind in ("emp", "er", "ef", "all") and self.emp_probability_ is None:
-            raise RuntimeError("fit() must be called before export_probability_csv().")
-        if kind in ("mono", "all") and self.mono_probability_ is None:
-            raise RuntimeError(
-                "optimize(kind='mono') must be called before export_probability_csv(kind='mono')."
-            )
-        if kind in ("mr", "all") and self.mr_probability_ is None:
-            raise RuntimeError(
-                "optimize(kind='mr') must be called before export_probability_csv(kind='mr')."
-            )
-        if kind in ("mf", "all") and self.mf_probability_ is None:
-            raise RuntimeError(
-                "optimize(kind='mf') must be called before export_probability_csv(kind='mf')."
-            )
-        if kind in ("mrc", "all") and self.mrc_probability_ is None:
-            raise RuntimeError(
-                "optimize(kind='mrc') must be called before export_probability_csv(kind='mrc')."
-            )
-        if kind in ("mfc", "all") and self.mfc_probability_ is None:
-            raise RuntimeError(
-                "optimize(kind='mfc') must be called before export_probability_csv(kind='mfc')."
-            )
-        if kind in ("mcc", "all") and self.mcc_probability_ is None:
-            raise RuntimeError(
-                "optimize(kind='mcc') must be called before export_probability_csv(kind='mcc')."
+                f"kind must be 'mono', 'mr', 'mf', 'mrc', 'mfc', or 'mcc', got {kind!r}."
             )
 
-        from pathlib import Path
+        try:
+            from .optimizer import RecencyFrequencyOptimizer
+        except ImportError:
+            from rfscorer.optimizer import RecencyFrequencyOptimizer
 
-        default_filename = f"{kind}_probability.csv"
-        if path is None:
-            output_path = Path(default_filename)
-        else:
-            p = Path(path)
-            output_path = p / default_filename if p.is_dir() else p
+        if self.emp_probability_dict_ is None:
+            raise RuntimeError("fit() must be called before optimize().")
 
-        if kind == "all":
-            df = (
-                self.emp_probability_.rename(columns={"probability": "emp_probability"})
-                .merge(
-                    self.mono_probability_.rename(columns={"probability": "mono_probability"}),
-                    on=["recency", "frequency"],
-                )
-                .merge(
-                    self.mrc_probability_.rename(columns={"probability": "mrc_probability"}),
-                    on=["recency", "frequency"],
-                )
-                .merge(
-                    self.mfc_probability_.rename(columns={"probability": "mfc_probability"}),
-                    on=["recency", "frequency"],
-                )
-                .merge(
-                    self.mcc_probability_.rename(columns={"probability": "mcc_probability"}),
-                    on=["recency", "frequency"],
-                )
-                .merge(
-                    self.er_probability_.rename(columns={"probability": "er_probability"}),
-                    on="recency",
-                )
-                .merge(
-                    self.mr_probability_.rename(columns={"probability": "mr_probability"}),
-                    on="recency",
-                )
-                .merge(
-                    self.ef_probability_.rename(columns={"probability": "ef_probability"}),
-                    on="frequency",
-                )
-                .merge(
-                    self.mf_probability_.rename(columns={"probability": "mf_probability"}),
-                    on="frequency",
-                )
+        optimizer = RecencyFrequencyOptimizer()
+        optimizer.set_data(self.R, self.F, self.RF2N, self.RF2Prob)
+        optimizer.set_marginal_data(self.R2N, self.R2Prob, self.F2N, self.F2Prob)
+
+        if kind == "mr":
+            optimizer.build_marginal_model(axis="r", eps=eps)
+            optimizer.solve()
+            optimizer.show_solve_info()
+            optimizer.postprocess()
+            self.mr_probability_dict_ = optimizer.R2X
+            self.mr_probability_ = (
+                pd.DataFrame(list(optimizer.R2X.items()), columns=["recency", "probability"])
+                .sort_values("recency")
+                .reset_index(drop=True)
             )
-        elif kind == "emp":
-            df = self.emp_probability_
-        elif kind == "er":
-            df = self.er_probability_
-        elif kind == "ef":
-            df = self.ef_probability_
-        elif kind == "mono":
-            df = self.mono_probability_
-        elif kind == "mr":
-            df = self.mr_probability_
+
         elif kind == "mf":
-            df = self.mf_probability_
-        elif kind == "mrc":
-            df = self.mrc_probability_
-        elif kind == "mfc":
-            df = self.mfc_probability_
+            optimizer.build_marginal_model(axis="f", eps=eps)
+            optimizer.solve()
+            optimizer.show_solve_info()
+            optimizer.postprocess()
+            self.mf_probability_dict_ = optimizer.F2X
+            self.mf_probability_ = (
+                pd.DataFrame(list(optimizer.F2X.items()), columns=["frequency", "probability"])
+                .sort_values("frequency")
+                .reset_index(drop=True)
+            )
+
         else:
-            df = self.mcc_probability_
-        df.to_csv(output_path, index=False)
+            optimizer.build_model(kind=kind, eps=eps)
+            optimizer.solve()
+            optimizer.show_solve_info()
+            optimizer.postprocess()
+
+            rows = [(r, f, optimizer.RF2X[(r, f)]) for r in self.R for f in self.F]
+            df_opt = pd.DataFrame(rows, columns=["recency", "frequency", "probability"])
+            table = df_opt.pivot_table(index="recency", columns="frequency", values="probability")
+
+            if kind == "mono":
+                self.mono_probability_dict_ = optimizer.RF2X
+                self.mono_probability_ = df_opt
+                self.mono_probability_table_ = table
+            elif kind == "mrc":
+                self.mrc_probability_dict_ = optimizer.RF2X
+                self.mrc_probability_ = df_opt
+                self.mrc_probability_table_ = table
+            elif kind == "mfc":
+                self.mfc_probability_dict_ = optimizer.RF2X
+                self.mfc_probability_ = df_opt
+                self.mfc_probability_table_ = table
+            else:
+                self.mcc_probability_dict_ = optimizer.RF2X
+                self.mcc_probability_ = df_opt
+                self.mcc_probability_table_ = table
+
+        return self
+
+    # ---------------------------------------------------------------------------
+    # Inference (推論・スコアリング)
+    # ---------------------------------------------------------------------------
 
     def predict(self, r, f, kind="emp"):
         """Return the product-choice probability for a given recency and frequency.
@@ -976,6 +695,10 @@ class RecencyFrequencyScorer:
 
         return df_rf
 
+    # ---------------------------------------------------------------------------
+    # Evaluation (推薦精度評価)
+    # ---------------------------------------------------------------------------
+
     def evaluate(self, df_rec, df_eval, order=1, user_col=None, item_col=None):
         """Evaluate recommendation quality at each order cutoff.
 
@@ -1061,6 +784,182 @@ class RecencyFrequencyScorer:
 
         return df_result
 
+    # ---------------------------------------------------------------------------
+    # Export (CSV 出力)
+    # ---------------------------------------------------------------------------
+
+    def export_probability_csv(self, kind="emp", path=None):
+        """Export product-choice probabilities to a CSV file.
+
+        Parameters
+        ----------
+        kind : {"emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc", "all"}, default "emp"
+            Which probability to export. "emp", "er", and "ef" use fit(),
+            fit() results; others use optimize() results;
+            "all" merges all nine models into a single file. For 2D models the
+            merge key is (recency, frequency); for 1D models mr merges on
+            recency and mf merges on frequency, so their probability columns
+            are constant along the other axis.
+        path : str or None, default None
+            Output file path for the CSV. If None, saves as
+            "{kind}_probability.csv" in the current directory.
+            If a directory, saves "{kind}_probability.csv" inside it.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        ValueError
+            If kind is not one of the accepted values.
+        RuntimeError
+            If fit() has not been called for
+            emp/er/ef kinds, or if the required optimize(kind=...) has not been
+            called for the requested optimization kind.
+        """
+        kind = self._normalize_kind(kind)
+        if kind not in ("emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc", "all"):
+            raise ValueError(
+                f"kind must be 'emp', 'er', 'ef', 'mono', 'mr', 'mf', 'mrc', 'mfc', 'mcc',"
+                f" or 'all', got {kind!r}."
+            )
+        if kind in ("emp", "er", "ef", "all") and self.emp_probability_ is None:
+            raise RuntimeError("fit() must be called before export_probability_csv().")
+        if kind in ("mono", "all") and self.mono_probability_ is None:
+            raise RuntimeError(
+                "optimize(kind='mono') must be called before export_probability_csv(kind='mono')."
+            )
+        if kind in ("mr", "all") and self.mr_probability_ is None:
+            raise RuntimeError(
+                "optimize(kind='mr') must be called before export_probability_csv(kind='mr')."
+            )
+        if kind in ("mf", "all") and self.mf_probability_ is None:
+            raise RuntimeError(
+                "optimize(kind='mf') must be called before export_probability_csv(kind='mf')."
+            )
+        if kind in ("mrc", "all") and self.mrc_probability_ is None:
+            raise RuntimeError(
+                "optimize(kind='mrc') must be called before export_probability_csv(kind='mrc')."
+            )
+        if kind in ("mfc", "all") and self.mfc_probability_ is None:
+            raise RuntimeError(
+                "optimize(kind='mfc') must be called before export_probability_csv(kind='mfc')."
+            )
+        if kind in ("mcc", "all") and self.mcc_probability_ is None:
+            raise RuntimeError(
+                "optimize(kind='mcc') must be called before export_probability_csv(kind='mcc')."
+            )
+
+        from pathlib import Path
+
+        default_filename = f"{kind}_probability.csv"
+        if path is None:
+            output_path = Path(default_filename)
+        else:
+            p = Path(path)
+            output_path = p / default_filename if p.is_dir() else p
+
+        if kind == "all":
+            df = (
+                self.emp_probability_.rename(columns={"probability": "emp_probability"})
+                .merge(
+                    self.mono_probability_.rename(columns={"probability": "mono_probability"}),
+                    on=["recency", "frequency"],
+                )
+                .merge(
+                    self.mrc_probability_.rename(columns={"probability": "mrc_probability"}),
+                    on=["recency", "frequency"],
+                )
+                .merge(
+                    self.mfc_probability_.rename(columns={"probability": "mfc_probability"}),
+                    on=["recency", "frequency"],
+                )
+                .merge(
+                    self.mcc_probability_.rename(columns={"probability": "mcc_probability"}),
+                    on=["recency", "frequency"],
+                )
+                .merge(
+                    self.er_probability_.rename(columns={"probability": "er_probability"}),
+                    on="recency",
+                )
+                .merge(
+                    self.mr_probability_.rename(columns={"probability": "mr_probability"}),
+                    on="recency",
+                )
+                .merge(
+                    self.ef_probability_.rename(columns={"probability": "ef_probability"}),
+                    on="frequency",
+                )
+                .merge(
+                    self.mf_probability_.rename(columns={"probability": "mf_probability"}),
+                    on="frequency",
+                )
+            )
+        elif kind == "emp":
+            df = self.emp_probability_
+        elif kind == "er":
+            df = self.er_probability_
+        elif kind == "ef":
+            df = self.ef_probability_
+        elif kind == "mono":
+            df = self.mono_probability_
+        elif kind == "mr":
+            df = self.mr_probability_
+        elif kind == "mf":
+            df = self.mf_probability_
+        elif kind == "mrc":
+            df = self.mrc_probability_
+        elif kind == "mfc":
+            df = self.mfc_probability_
+        else:
+            df = self.mcc_probability_
+        df.to_csv(output_path, index=False)
+
+    # ---------------------------------------------------------------------------
+    # Inspection (デバッグ / 集計情報)
+    # ---------------------------------------------------------------------------
+
+    def show(self):
+        """Print a summary of fit() results to stdout."""
+        print("=== profiling ===")
+
+        if self.record_num:
+            print("record_num:", self.record_num)
+
+        if self.record_num_obs:
+            print("record_num_obs:", self.record_num_obs)
+        if self.record_num_eval:
+            print("record_num_eval:", self.record_num_eval)
+
+        if self.observation_start_ and self.observation_end_:
+            print("observation: {} -> {}".format(self.observation_start_, self.observation_end_))
+        if self.evaluation_start_ and self.evaluation_end_:
+            print("evaluation: {} -> {}".format(self.evaluation_start_, self.evaluation_end_))
+
+        if self.recency_limit:
+            print("recency_limit:", self.recency_limit)
+        if self.frequency_limit:
+            print("frequency_limit:", self.frequency_limit)
+
+        if self.record_num_target_org and self.record_num_target:
+            print(
+                "target_record_num: {} -> {}".format(
+                    self.record_num_target_org, self.record_num_target
+                )
+            )
+
+        if self.total_cv_org and self.total_cv:
+            print("total_cv: {} -> {}".format(self.total_cv_org, self.total_cv))
+
+        if self.emp_probability_table_ is not None:
+            print("emp_probability_table_:")
+            print(self.emp_probability_table_.round(3).to_string())
+
+    # ---------------------------------------------------------------------------
+    # Internal helpers
+    # ---------------------------------------------------------------------------
+
     def _build_ui_rf_df(self, df, ref_int):
         """Compute recency and frequency for each (user, item) pair.
 
@@ -1075,18 +974,6 @@ class RecencyFrequencyScorer:
             .agg(recency=("recency", "min"), frequency=("recency", "count"))
             .reset_index()
         )
-
-    _KIND_ALIASES = {
-        "empirical": "emp",
-        "empirical_recency": "er",
-        "empirical_frequency": "ef",
-        "monotonic": "mono",
-        "monotonic_recency": "mr",
-        "monotonic_frequency": "mf",
-        "monotonic_recency_convex": "mrc",
-        "monotonic_frequency_concave": "mfc",
-        "monotonic_convex_concave": "mcc",
-    }
 
     def _normalize_kind(self, kind):
         return self._KIND_ALIASES.get(kind, kind)
@@ -1112,116 +999,6 @@ class RecencyFrequencyScorer:
         if kind == "ef":
             return self.ef_probability_dict_
         raise ValueError(f"_marginal_dict called with non-marginal kind: {kind!r}")
-
-    def optimize(self, kind="mono", eps=0.0):
-        """Estimate optimized product-choice probabilities under RF constraints.
-
-        Solves a convex quadratic programming problem with monotonicity
-        constraints (and optionally convexity/concavity constraints).
-        Uses weighted least squares as objective.
-
-        Requires fit() to be called first. Depends on cvxpy.
-
-        Parameters
-        ----------
-        kind : {"mono", "mr", "mf", "mrc", "mfc", "mcc"}, default "mono"
-            Optimization model to use.
-            "mono" applies monotonicity constraints only (2D joint model).
-            "mr" fits a 1-D recency-only model with monotonicity and convexity.
-                 Result stored as dict[int, float] keyed by recency.
-            "mf" fits a 1-D frequency-only model with monotonicity and concavity.
-                 Result stored as dict[int, float] keyed by frequency.
-            "mrc" additionally applies convexity in recency (2D joint model).
-            "mfc" additionally applies concavity in frequency (2D joint model).
-            "mcc" applies both recency convexity and frequency concavity (2D joint model).
-        eps : float, default 0.0
-            Minimum gap enforced between adjacent values in monotonicity
-            constraints.  When 0.0 (default), weak monotonicity is used
-            (non-strict inequalities allow ties between adjacent levels).
-            When positive, strict monotonicity is enforced, preventing ties
-            between adjacent recency or frequency levels.
-
-        Returns
-        -------
-        self
-
-        Raises
-        ------
-        ValueError
-            If kind is not one of the accepted values.
-        RuntimeError
-            If fit() has not been called first.
-        """
-        kind = self._normalize_kind(kind)
-        if kind not in ("mono", "mr", "mf", "mrc", "mfc", "mcc"):
-            raise ValueError(
-                f"kind must be 'mono', 'mr', 'mf', 'mrc', 'mfc', or 'mcc', got {kind!r}."
-            )
-
-        try:
-            from .optimizer import RecencyFrequencyOptimizer
-        except ImportError:
-            from rfscorer.optimizer import RecencyFrequencyOptimizer
-
-        if self.emp_probability_dict_ is None:
-            raise RuntimeError("fit() must be called before optimize().")
-
-        optimizer = RecencyFrequencyOptimizer()
-        optimizer.set_data(self.R, self.F, self.RF2N, self.RF2Prob)
-        optimizer.set_marginal_data(self.R2N, self.R2Prob, self.F2N, self.F2Prob)
-
-        if kind == "mr":
-            optimizer.build_marginal_model(axis="r", eps=eps)
-            optimizer.solve()
-            optimizer.show_solve_info()
-            optimizer.postprocess()
-            self.mr_probability_dict_ = optimizer.R2X
-            self.mr_probability_ = (
-                pd.DataFrame(list(optimizer.R2X.items()), columns=["recency", "probability"])
-                .sort_values("recency")
-                .reset_index(drop=True)
-            )
-
-        elif kind == "mf":
-            optimizer.build_marginal_model(axis="f", eps=eps)
-            optimizer.solve()
-            optimizer.show_solve_info()
-            optimizer.postprocess()
-            self.mf_probability_dict_ = optimizer.F2X
-            self.mf_probability_ = (
-                pd.DataFrame(list(optimizer.F2X.items()), columns=["frequency", "probability"])
-                .sort_values("frequency")
-                .reset_index(drop=True)
-            )
-
-        else:
-            optimizer.build_model(kind=kind, eps=eps)
-            optimizer.solve()
-            optimizer.show_solve_info()
-            optimizer.postprocess()
-
-            rows = [(r, f, optimizer.RF2X[(r, f)]) for r in self.R for f in self.F]
-            df_opt = pd.DataFrame(rows, columns=["recency", "frequency", "probability"])
-            table = df_opt.pivot_table(index="recency", columns="frequency", values="probability")
-
-            if kind == "mono":
-                self.mono_probability_dict_ = optimizer.RF2X
-                self.mono_probability_ = df_opt
-                self.mono_probability_table_ = table
-            elif kind == "mrc":
-                self.mrc_probability_dict_ = optimizer.RF2X
-                self.mrc_probability_ = df_opt
-                self.mrc_probability_table_ = table
-            elif kind == "mfc":
-                self.mfc_probability_dict_ = optimizer.RF2X
-                self.mfc_probability_ = df_opt
-                self.mfc_probability_table_ = table
-            else:
-                self.mcc_probability_dict_ = optimizer.RF2X
-                self.mcc_probability_ = df_opt
-                self.mcc_probability_table_ = table
-
-        return self
 
 
 if __name__ == "__main__":
