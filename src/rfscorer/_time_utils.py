@@ -16,6 +16,9 @@ from pandas.api.types import (
     is_string_dtype,
 )
 
+# Origin for the vectorized ordinal computation in normalize_sequence_col.
+# (series - _ORDINAL_ORIGIN).dt.days + 1 yields the same proleptic Gregorian
+# ordinal as scalar .toordinal() used in normalize_ref.
 _ORDINAL_ORIGIN = pd.Timestamp("0001-01-01")
 
 
@@ -24,7 +27,10 @@ def normalize_ref(value) -> int:
     if isinstance(value, (pd.Timestamp, datetime.datetime)):
         return value.toordinal()
     elif isinstance(value, str):
-        return pd.to_datetime(value).toordinal()
+        try:
+            return pd.to_datetime(value).toordinal()
+        except Exception:
+            raise ValueError(f"time value could not be normalized: {value!r}")
     elif isinstance(value, (int, float, np.integer, np.floating)):
         return int(value)
     else:

@@ -41,6 +41,10 @@ class TestNormalizeRef:
         with pytest.raises(ValueError, match="time value could not be normalized"):
             normalize_ref(object())
 
+    def test_invalid_string_date_raises(self):
+        with pytest.raises(ValueError, match="time value could not be normalized"):
+            normalize_ref("not a real date")
+
 
 # ---------------------------------------------------------------------------
 # normalize_sequence_col
