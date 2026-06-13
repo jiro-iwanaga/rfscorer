@@ -200,8 +200,8 @@ class TestInit:
         assert scorer.R == []
         assert scorer.F == []
         assert scorer.RF2N == {}
-        assert scorer.empirical_probability_ is None
-        assert scorer.empirical_probability_dict_ is None
+        assert scorer.emp_probability_ is None
+        assert scorer.emp_probability_dict_ is None
         assert scorer.record_num is None
         assert scorer.recency_limit is None
         assert scorer.frequency_limit is None
@@ -357,9 +357,9 @@ class TestFitPeriodResult:
         # (4,1) u2-item1: cv=0/N=1 → prob=0.0
         assert scorer_fitted.RF2Prob[4, 1] == pytest.approx(0.0)
 
-    def test_empirical_probability_is_dataframe(self, scorer_fitted):
-        assert isinstance(scorer_fitted.empirical_probability_, pd.DataFrame)
-        assert set(scorer_fitted.empirical_probability_.columns) == {
+    def test_emp_probability_is_dataframe(self, scorer_fitted):
+        assert isinstance(scorer_fitted.emp_probability_, pd.DataFrame)
+        assert set(scorer_fitted.emp_probability_.columns) == {
             "recency",
             "frequency",
             "N",
@@ -367,16 +367,16 @@ class TestFitPeriodResult:
             "probability",
         }
 
-    def test_empirical_probability_row_count(self, scorer_fitted):
+    def test_emp_probability_row_count(self, scorer_fitted):
         expected_rows = _RECENCY_LIMIT * _FREQUENCY_LIMIT
-        assert len(scorer_fitted.empirical_probability_) == expected_rows
+        assert len(scorer_fitted.emp_probability_) == expected_rows
 
-    def test_empirical_probability_dict_keys(self, scorer_fitted):
+    def test_emp_probability_dict_keys(self, scorer_fitted):
         expected = {(r, f) for r in scorer_fitted.R for f in scorer_fitted.F}
-        assert set(scorer_fitted.empirical_probability_dict_.keys()) == expected
+        assert set(scorer_fitted.emp_probability_dict_.keys()) == expected
 
-    def test_empirical_probability_table_shape(self, scorer_fitted):
-        tbl = scorer_fitted.empirical_probability_table_
+    def test_emp_probability_table_shape(self, scorer_fitted):
+        tbl = scorer_fitted.emp_probability_table_
         assert tbl.shape == (_RECENCY_LIMIT, _FREQUENCY_LIMIT)
 
     def test_auto_limits(self, df):
@@ -401,7 +401,7 @@ class TestFitPeriodResult:
             frequency_limit=_FREQUENCY_LIMIT,
         )
         assert s.record_num == len(df_custom)
-        assert s.empirical_probability_dict_ is not None
+        assert s.emp_probability_dict_ is not None
 
     def test_does_not_mutate_input(self, df):
         original_columns = list(df.columns)
@@ -591,14 +591,14 @@ class TestFitDateResult:
             recency_limit=_RECENCY_LIMIT,
             frequency_limit=_FREQUENCY_LIMIT,
         )
-        assert s1.empirical_probability_dict_ == s2.empirical_probability_dict_
+        assert s1.emp_probability_dict_ == s2.emp_probability_dict_
 
-    def test_empirical_probability_dict_populated(self, df):
+    def test_emp_probability_dict_populated(self, df):
         s = RecencyFrequencyScorer()
         s.fit_date(
             df, _FIT_TARGET_DATE, recency_limit=_RECENCY_LIMIT, frequency_limit=_FREQUENCY_LIMIT
         )
-        assert s.empirical_probability_dict_ is not None
+        assert s.emp_probability_dict_ is not None
 
 
 # ---------------------------------------------------------------------------
@@ -639,7 +639,7 @@ class TestFitResult:
             recency_limit=_RECENCY_LIMIT,
             frequency_limit=_FREQUENCY_LIMIT,
         )
-        assert s1.empirical_probability_dict_ == s2.empirical_probability_dict_
+        assert s1.emp_probability_dict_ == s2.emp_probability_dict_
 
     def test_ref_date_default_is_obs_max(self):
         # ref=None → df_obs の最大日 (2024-01-07) が observation_end_ に ordinal で格納される
@@ -684,7 +684,7 @@ class TestFitResult:
         assert s.evaluation_start_ == pd.Timestamp("2024-01-09").toordinal()
         assert s.evaluation_end_ == pd.Timestamp("2024-01-10").toordinal()
 
-    def test_empirical_probability_dict_populated(self):
+    def test_emp_probability_dict_populated(self):
         s = RecencyFrequencyScorer()
         s.fit(
             self._make_obs(),
@@ -692,7 +692,7 @@ class TestFitResult:
             recency_limit=_RECENCY_LIMIT,
             frequency_limit=_FREQUENCY_LIMIT,
         )
-        assert s.empirical_probability_dict_ is not None
+        assert s.emp_probability_dict_ is not None
 
 
 # ---------------------------------------------------------------------------
@@ -1093,14 +1093,14 @@ class TestPredict:
         # (predict同士の比較だと両辺 0.0 で vacuous になるため)
         r_over = _RECENCY_LIMIT + 10
         for f in scorer_fitted.F:
-            expected = scorer_fitted.empirical_probability_dict_[_RECENCY_LIMIT, f]
+            expected = scorer_fitted.emp_probability_dict_[_RECENCY_LIMIT, f]
             assert scorer_fitted.predict(r_over, f) == pytest.approx(expected)
 
     def test_clamps_f_to_frequency_limit(self, scorer_fitted):
         # dict と直接比較してクランプが機能していることを検証
         f_over = _FREQUENCY_LIMIT + 10
         for r in scorer_fitted.R:
-            expected = scorer_fitted.empirical_probability_dict_[r, _FREQUENCY_LIMIT]
+            expected = scorer_fitted.emp_probability_dict_[r, _FREQUENCY_LIMIT]
             assert scorer_fitted.predict(r, f_over) == pytest.approx(expected)
 
     def test_clamps_r_to_recency_limit_mr(self, scorer_optimized_mr):
@@ -1316,7 +1316,7 @@ class TestTransform:
         result = scorer_fitted.transform(df_obs, ref=_FIT_TARGET_DATE)
         u3_row = result[(result["user"] == "u3") & (result["item"] == "item3")].iloc[0]
         assert u3_row["recency"] == 9  # 出力の recency は元値を保持
-        expected = scorer_fitted.empirical_probability_dict_[_RECENCY_LIMIT, 1]
+        expected = scorer_fitted.emp_probability_dict_[_RECENCY_LIMIT, 1]
         assert u3_row["probability"] == pytest.approx(expected)
 
     def test_clamps_frequency_above_limit(self, scorer_fitted):
@@ -1329,7 +1329,7 @@ class TestTransform:
         u3_row = result[(result["user"] == "u3") & (result["item"] == "item3")].iloc[0]
         assert u3_row["frequency"] == 4  # 出力の frequency は元値を保持
         # min recency = Jan07→recency=1, frequency_adj = min(4, 3) = 3
-        expected = scorer_fitted.empirical_probability_dict_[1, _FREQUENCY_LIMIT]
+        expected = scorer_fitted.emp_probability_dict_[1, _FREQUENCY_LIMIT]
         assert u3_row["probability"] == pytest.approx(expected)
 
 
@@ -1947,7 +1947,7 @@ class TestExportProbabilityCsv:
             "frequency",
             "N",
             "cv",
-            "empirical_probability",
+            "emp_probability",
             "er_probability",
             "ef_probability",
             "mono_probability",
@@ -2073,7 +2073,7 @@ class TestIntegerTimeCol:
         evl = df[df["seq"] > target_ord]
         s = RecencyFrequencyScorer(time_col="seq")
         s.fit(obs, evl, recency_limit=_RECENCY_LIMIT, frequency_limit=_FREQUENCY_LIMIT)
-        assert isinstance(s.empirical_probability_dict_, dict)
+        assert isinstance(s.emp_probability_dict_, dict)
 
     def test_fit_date_with_integer_col(self):
         df = self._make_int_df()
@@ -2085,7 +2085,7 @@ class TestIntegerTimeCol:
             recency_limit=_RECENCY_LIMIT,
             frequency_limit=_FREQUENCY_LIMIT,
         )
-        assert isinstance(s.empirical_probability_dict_, dict)
+        assert isinstance(s.emp_probability_dict_, dict)
 
     def test_fit_period_with_integer_col(self):
         df = self._make_int_df()
@@ -2101,7 +2101,7 @@ class TestIntegerTimeCol:
             recency_limit=_RECENCY_LIMIT,
             frequency_limit=_FREQUENCY_LIMIT,
         )
-        assert isinstance(s.empirical_probability_dict_, dict)
+        assert isinstance(s.emp_probability_dict_, dict)
 
     def test_integer_and_datetime_produce_same_rf_distribution(self):
         """整数入力と日付入力で同一の RF 分布が得られること。"""
@@ -2130,7 +2130,7 @@ class TestIntegerTimeCol:
             frequency_limit=_FREQUENCY_LIMIT,
         )
 
-        assert s_date.empirical_probability_dict_ == s_int.empirical_probability_dict_
+        assert s_date.emp_probability_dict_ == s_int.emp_probability_dict_
 
 
 # ---------------------------------------------------------------------------

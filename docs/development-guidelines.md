@@ -36,7 +36,7 @@
 ## API 設計方針
 
 - scikit-learn スタイル（`fit` / `transform` / `optimize`）に準拠する。`fit_date`・`fit_period` は期間指定の補助メソッドとして提供する
-- 推定後の属性名は末尾に `_` をつける（例: `empirical_probability_`）
+- 推定後の属性名は末尾に `_` をつける（例: `emp_probability_`）
 - `from rfscorer import RecencyFrequencyScorer` でインポートできるようにする
 - 解釈可能性を重視し、スコアの算出根拠を説明できる設計にする
 

@@ -75,9 +75,9 @@ class RecencyFrequencyScorer:
         self.F2Prob = {}  # 頻度に対して経験的商品選択確率を紐づける辞書
 
         # empirical
-        self.empirical_probability_ = None  # 経験的商品選択確率データフレーム(縦持ち)
-        self.empirical_probability_table_ = None  # 経験的商品選択確率データフレーム(横持ち)
-        self.empirical_probability_dict_ = (
+        self.emp_probability_ = None  # 経験的商品選択確率データフレーム(縦持ち)
+        self.emp_probability_table_ = None  # 経験的商品選択確率データフレーム(横持ち)
+        self.emp_probability_dict_ = (
             None  # 経験的商品選択確率データフレーム(辞書:キーは最新度と頻度のペア)
         )
         self.recency_probability_ = None  # 最新度別経験的商品選択確率データフレーム
@@ -181,8 +181,8 @@ class RecencyFrequencyScorer:
         -----
         After a successful call, the following attributes become available
         for use with predict(), transform(), and plot_*() methods:
-        ``empirical_probability_``, ``empirical_probability_table_``,
-        ``empirical_probability_dict_``, ``recency_probability_``,
+        ``emp_probability_``, ``emp_probability_table_``,
+        ``emp_probability_dict_``, ``recency_probability_``,
         ``frequency_probability_``, ``recency_limit``, ``frequency_limit``.
         """
         if not isinstance(df_obs, pd.DataFrame):
@@ -273,8 +273,8 @@ class RecencyFrequencyScorer:
         Notes
         -----
         After a successful call, the same attributes as fit() become available:
-        ``empirical_probability_``, ``empirical_probability_table_``,
-        ``empirical_probability_dict_``, ``recency_probability_``,
+        ``emp_probability_``, ``emp_probability_table_``,
+        ``emp_probability_dict_``, ``recency_probability_``,
         ``frequency_probability_``, ``recency_limit``, ``frequency_limit``.
         """
         if not isinstance(df, pd.DataFrame):
@@ -363,8 +363,8 @@ class RecencyFrequencyScorer:
         Notes
         -----
         After a successful call, the same attributes as fit() become available:
-        ``empirical_probability_``, ``empirical_probability_table_``,
-        ``empirical_probability_dict_``, ``recency_probability_``,
+        ``emp_probability_``, ``emp_probability_table_``,
+        ``emp_probability_dict_``, ``recency_probability_``,
         ``frequency_probability_``, ``recency_limit``, ``frequency_limit``.
         """
         if not isinstance(df, pd.DataFrame):
@@ -535,24 +535,24 @@ class RecencyFrequencyScorer:
                 self.RF2Prob[r, f] = prob
                 RowsRF.append((r, f, self.RF2N[r, f], self.RF2CV[r, f], prob))
 
-        self.empirical_probability_dict_ = {(r, f): prob for r, f, _, _, prob in RowsRF}
-        self.empirical_probability_ = pd.DataFrame(
+        self.emp_probability_dict_ = {(r, f): prob for r, f, _, _, prob in RowsRF}
+        self.emp_probability_ = pd.DataFrame(
             RowsRF, columns=["recency", "frequency", "N", "cv", "probability"]
         )
-        self.empirical_probability_table_ = self.empirical_probability_.pivot_table(
+        self.emp_probability_table_ = self.emp_probability_.pivot_table(
             index="recency",
             columns="frequency",
             values="probability",
         )
 
-        df_r = self.empirical_probability_.groupby("recency")[["N", "cv"]].sum().reset_index()
+        df_r = self.emp_probability_.groupby("recency")[["N", "cv"]].sum().reset_index()
         df_r["probability"] = (df_r["cv"] / df_r["N"]).where(df_r["N"] > 0, 0.0)
         self.recency_probability_ = df_r
         self.R2N = dict(zip(df_r["recency"], df_r["N"]))
         self.R2CV = dict(zip(df_r["recency"], df_r["cv"]))
         self.R2Prob = dict(zip(df_r["recency"], df_r["probability"]))
 
-        df_f = self.empirical_probability_.groupby("frequency")[["N", "cv"]].sum().reset_index()
+        df_f = self.emp_probability_.groupby("frequency")[["N", "cv"]].sum().reset_index()
         df_f["probability"] = (df_f["cv"] / df_f["N"]).where(df_f["N"] > 0, 0.0)
         self.frequency_probability_ = df_f
         self.F2N = dict(zip(df_f["frequency"], df_f["N"]))
@@ -605,9 +605,9 @@ class RecencyFrequencyScorer:
         if self.total_cv_org and self.total_cv:
             print("total_cv: {} -> {}".format(self.total_cv_org, self.total_cv))
 
-        if self.empirical_probability_table_ is not None:
-            print("empirical_probability_table_:")
-            print(self.empirical_probability_table_.round(3).to_string())
+        if self.emp_probability_table_ is not None:
+            print("emp_probability_table_:")
+            print(self.emp_probability_table_.round(3).to_string())
 
     def plot_probability_surface(
         self,
@@ -677,7 +677,7 @@ class RecencyFrequencyScorer:
             )
         if kind not in ("emp", "mono", "mrc", "mfc", "mcc"):
             raise ValueError(f"kind must be 'emp', 'mono', 'mrc', 'mfc', or 'mcc', got {kind!r}.")
-        if kind == "emp" and self.empirical_probability_table_ is None:
+        if kind == "emp" and self.emp_probability_table_ is None:
             raise RuntimeError(
                 "fit(), fit_date(), or fit_period() must be called"
                 " before plot_probability_surface()."
@@ -700,7 +700,7 @@ class RecencyFrequencyScorer:
             )
 
         if kind == "emp":
-            table = self.empirical_probability_table_
+            table = self.emp_probability_table_
         elif kind == "mono":
             table = self.mono_probability_table_
         elif kind == "mrc":
@@ -905,7 +905,7 @@ class RecencyFrequencyScorer:
                 f"kind must be 'emp', 'er', 'ef', 'mono', 'mr', 'mf', 'mrc', 'mfc', 'mcc',"
                 f" or 'all', got {kind!r}."
             )
-        if kind in ("emp", "er", "ef", "all") and self.empirical_probability_ is None:
+        if kind in ("emp", "er", "ef", "all") and self.emp_probability_ is None:
             raise RuntimeError(
                 "fit(), fit_date(), or fit_period() must be called before export_probability_csv()."
             )
@@ -945,7 +945,7 @@ class RecencyFrequencyScorer:
 
         if kind == "all":
             df = (
-                self.empirical_probability_.rename(columns={"probability": "empirical_probability"})
+                self.emp_probability_.rename(columns={"probability": "emp_probability"})
                 .merge(
                     self.mono_probability_.rename(columns={"probability": "mono_probability"}),
                     on=["recency", "frequency"],
@@ -980,7 +980,7 @@ class RecencyFrequencyScorer:
                 )
             )
         elif kind == "emp":
-            df = self.empirical_probability_
+            df = self.emp_probability_
         elif kind == "er":
             df = self.er_probability_
         elif kind == "ef":
@@ -1045,7 +1045,7 @@ class RecencyFrequencyScorer:
                 f"kind must be 'emp', 'er', 'ef', 'mono', 'mr', 'mf', 'mrc', 'mfc', or 'mcc',"
                 f" got {kind!r}."
             )
-        if kind in ("emp", "er", "ef") and self.empirical_probability_dict_ is None:
+        if kind in ("emp", "er", "ef") and self.emp_probability_dict_ is None:
             raise RuntimeError(
                 "fit(), fit_date(), or fit_period() must be called before predict()."
             )
@@ -1072,7 +1072,7 @@ class RecencyFrequencyScorer:
         r = min(r, self.recency_limit)
         f = min(f, self.frequency_limit)
         if kind == "emp":
-            prob = self.empirical_probability_dict_.get((r, f), 0.0)
+            prob = self.emp_probability_dict_.get((r, f), 0.0)
         elif kind == "mono":
             prob = self.mono_probability_dict_.get((r, f), 0.0)
         elif kind == "mrc":
@@ -1146,7 +1146,7 @@ class RecencyFrequencyScorer:
                 f"kind must be 'emp', 'er', 'ef', 'mono', 'mr', 'mf', 'mrc', 'mfc', or 'mcc',"
                 f" got {kind!r}."
             )
-        if self.empirical_probability_dict_ is None:
+        if self.emp_probability_dict_ is None:
             raise RuntimeError(
                 "fit(), fit_date(), or fit_period() must be called before transform()."
             )
@@ -1405,7 +1405,7 @@ class RecencyFrequencyScorer:
             return self.mfc_probability_dict_
         if kind == "mcc":
             return self.mcc_probability_dict_
-        return self.empirical_probability_dict_
+        return self.emp_probability_dict_
 
     def _marginal_dict(self, kind):
         if kind == "mr":
@@ -1468,7 +1468,7 @@ class RecencyFrequencyScorer:
         except ImportError:
             from rfscorer.optimizer import RFOptimizer
 
-        if self.empirical_probability_dict_ is None:
+        if self.emp_probability_dict_ is None:
             raise RuntimeError(
                 "fit(), fit_date(), or fit_period() must be called before optimize()."
             )

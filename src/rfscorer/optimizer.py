@@ -550,7 +550,7 @@ if __name__ == "__main__":
     R = df.recency.unique()
     F = df.frequency.unique()
     RF2N = {(row.recency, row.frequency): row.N for row in df.itertuples()}
-    RF2Prob = {(row.recency, row.frequency): row.empirical_probability for row in df.itertuples()}
+    RF2Prob = {(row.recency, row.frequency): row.emp_probability for row in df.itertuples()}
 
     # 数理モデルのインスタンスの作成とデータのセット
     optimizer = RFOptimizer()
