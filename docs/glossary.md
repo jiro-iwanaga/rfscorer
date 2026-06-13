@@ -58,12 +58,10 @@
 | `empirical_probability_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる経験的商品選択確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `N`, `cv`, `probability`） |
 | `empirical_probability_table_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる経験的商品選択確率（横持ち）。`pd.DataFrame`（インデックス: `recency`、カラム: `frequency`） |
 | `empirical_probability_dict_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる経験的商品選択確率。`dict`（キー: `(r, f)`） |
-| `er_probability_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる周辺的経験的商品選択確率（Recency 方向）。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`） |
-| `er_probability_table_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる周辺的経験的商品選択確率（横持ち） |
-| `er_probability_dict_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる周辺的経験的商品選択確率。`dict`（キー: `(r, f)`） |
-| `ef_probability_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる周辺的経験的商品選択確率（Frequency 方向）。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`） |
-| `ef_probability_table_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる周辺的経験的商品選択確率（横持ち） |
-| `ef_probability_dict_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる周辺的経験的商品選択確率。`dict`（キー: `(r, f)`） |
+| `er_probability_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる1次元経験的商品選択確率（最新度のみ。ブロードキャストなし）。`pd.DataFrame`（カラム: `recency`, `probability`） |
+| `er_probability_dict_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる1次元経験的商品選択確率。`dict`（キー: `r`（int）） |
+| `ef_probability_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる1次元経験的商品選択確率（頻度のみ。ブロードキャストなし）。`pd.DataFrame`（カラム: `frequency`, `probability`） |
+| `ef_probability_dict_` | `fit()`・`fit_date()` または `fit_period()` 後に参照できる1次元経験的商品選択確率。`dict`（キー: `f`（int）） |
 | `mr_probability_` | `optimize(kind='mr')` 後に参照できる1次元最適化商品選択確率（最新度のみ。ブロードキャストなし）。`pd.DataFrame`（カラム: `recency`, `probability`） |
 | `mr_probability_dict_` | `optimize(kind='mr')` 後に参照できる1次元最適化商品選択確率。`dict`（キー: `r`（int）） |
 | `mf_probability_` | `optimize(kind='mf')` 後に参照できる1次元最適化商品選択確率（頻度のみ。ブロードキャストなし）。`pd.DataFrame`（カラム: `frequency`, `probability`） |

@@ -32,15 +32,14 @@
 
 $$p_{r,f} := \frac{n_{r,f}}{N_{r,f}}\ \ \  (r\in R, f\in F)$$
 
-### 周辺的経験的商品選択確率の推定（`er` / `ef`）
+### 1次元経験的商品選択確率の推定（`er` / `ef`）
 
-$p_{r,f}$ を一方の次元で集約した周辺確率を RF グリッド全体にブロードキャストする。
-`fit()`・`fit_date()` または `fit_period()` 呼び出し時に自動計算される。
+$p_{r,f}$ を一方の次元で集約した1次元周辺確率を、`fit()`・`fit_date()` または `fit_period()` 呼び出し時に自動計算する。結果は1次元 dict / DataFrame として保持され、2次元グリッドへのブロードキャストは行わない。
 
-- **`er`**（Empirical Recency）: 最新度 $r$ の周辺確率を全ての $f$ に展開。
-$$x_{r,f} = p_r\ \ \ (r\in R, f\in F)$$
-- **`ef`**（Empirical Frequency）: 頻度 $f$ の周辺確率を全ての $r$ に展開。
-$$x_{r,f} = p_f\ \ \ (r\in R, f\in F)$$
+- **`er`**（Empirical Recency）: 最新度 $r$ の周辺確率。
+$$x_r = p_r\ \ \ (r\in R)$$
+- **`ef`**（Empirical Frequency）: 頻度 $f$ の周辺確率。
+$$x_f = p_f\ \ \ (f\in F)$$
 
 ### 最適化商品選択確率の推定
 
@@ -314,12 +313,10 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 | `frequency_probability_` | `pd.DataFrame` | 頻度別経験的商品選択確率（カラム: `frequency`, `N`, `cv`, `probability`） | `fit()`・`fit_date()` または `fit_period()` 後 |
 | `empirical_probability_table_` | `pd.DataFrame` | 経験的商品選択確率（横持ち。インデックス: `recency`、カラム: `frequency`） | `fit()`・`fit_date()` または `fit_period()` 後 |
 | `empirical_probability_dict_` | `dict` | 経験的商品選択確率（キー: `(r, f)`、値: `probability`） | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `er_probability_` | `pd.DataFrame` | er モデル周辺的経験的商品選択確率・R2Prob を全 f にブロードキャスト（カラム: `recency`, `frequency`, `probability`） | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `er_probability_table_` | `pd.DataFrame` | er モデル周辺的経験的商品選択確率（横持ち） | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `er_probability_dict_` | `dict` | er モデル周辺的経験的商品選択確率（キー: `(r, f)`、値: `probability`） | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `ef_probability_` | `pd.DataFrame` | ef モデル周辺的経験的商品選択確率・F2Prob を全 r にブロードキャスト（カラム: `recency`, `frequency`, `probability`） | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `ef_probability_table_` | `pd.DataFrame` | ef モデル周辺的経験的商品選択確率（横持ち） | `fit()`・`fit_date()` または `fit_period()` 後 |
-| `ef_probability_dict_` | `dict` | ef モデル周辺的経験的商品選択確率（キー: `(r, f)`、値: `probability`） | `fit()`・`fit_date()` または `fit_period()` 後 |
+| `er_probability_` | `pd.DataFrame` | er モデル1次元経験的商品選択確率（最新度のみ。ブロードキャストなし）（カラム: `recency`, `probability`） | `fit()`・`fit_date()` または `fit_period()` 後 |
+| `er_probability_dict_` | `dict` | er モデル1次元経験的商品選択確率（キー: `r`（int）、値: `probability`） | `fit()`・`fit_date()` または `fit_period()` 後 |
+| `ef_probability_` | `pd.DataFrame` | ef モデル1次元経験的商品選択確率（頻度のみ。ブロードキャストなし）（カラム: `frequency`, `probability`） | `fit()`・`fit_date()` または `fit_period()` 後 |
+| `ef_probability_dict_` | `dict` | ef モデル1次元経験的商品選択確率（キー: `f`（int）、値: `probability`） | `fit()`・`fit_date()` または `fit_period()` 後 |
 | `mr_probability_` | `pd.DataFrame` | mr モデル1次元最適化商品選択確率（カラム: `recency`, `probability`） | `optimize(kind="mr")` 後 |
 | `mr_probability_dict_` | `dict` | mr モデル最適化商品選択確率（キー: `r`（int）、値: `probability`） | `optimize(kind="mr")` 後 |
 | `mf_probability_` | `pd.DataFrame` | mf モデル1次元最適化商品選択確率（カラム: `frequency`, `probability`） | `optimize(kind="mf")` 後 |
@@ -362,8 +359,8 @@ r（最新度）・f（頻度）を算出
 p_{r,f} = n_{r,f} / N_{r,f}（2次元）、p_r・p_f も同時に計算
         ▼
 empirical_probability_ / _table_ / _dict_   ← 2次元経験的商品選択確率（emp）
-er_probability_ / _table_ / _dict_          ← R2Prob を全 f にブロードキャスト（er）
-ef_probability_ / _table_ / _dict_          ← F2Prob を全 r にブロードキャスト（ef）
+er_probability_ / _dict_                    ← R2Prob を1次元 dict / DataFrame として保持（er）
+ef_probability_ / _dict_                    ← F2Prob を1次元 dict / DataFrame として保持（ef）
 RF2N / RF2CV / RF2Prob / R2N / R2CV / R2Prob / F2N / F2CV / F2Prob
         │
         ├─  predict(r, f, kind)  ─→ 特定 (r, f) の商品選択確率を返す

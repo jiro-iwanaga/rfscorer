@@ -420,12 +420,10 @@ class TestFitPeriodResult:
     def test_er_set_after_fit(self, scorer_fitted):
         assert scorer_fitted.er_probability_ is not None
         assert scorer_fitted.er_probability_dict_ is not None
-        assert scorer_fitted.er_probability_table_ is not None
 
     def test_ef_set_after_fit(self, scorer_fitted):
         assert scorer_fitted.ef_probability_ is not None
         assert scorer_fitted.ef_probability_dict_ is not None
-        assert scorer_fitted.ef_probability_table_ is not None
 
     def test_mr_probability_dict_none_after_fit(self, scorer_fitted):
         # optimize() 前は 1D 属性が None のまま (1D 分離設計の invariant)
@@ -434,35 +432,29 @@ class TestFitPeriodResult:
     def test_mf_probability_dict_none_after_fit(self, scorer_fitted):
         assert scorer_fitted.mf_probability_dict_ is None
 
-    def test_er_constant_across_frequency(self, scorer_fitted):
-        tol = 1e-9
-        for r in scorer_fitted.R:
-            vals = [scorer_fitted.er_probability_dict_[r, f] for f in scorer_fitted.F]
-            assert all(abs(v - vals[0]) < tol for v in vals)
-
-    def test_ef_constant_across_recency(self, scorer_fitted):
-        tol = 1e-9
-        for f in scorer_fitted.F:
-            vals = [scorer_fitted.ef_probability_dict_[r, f] for r in scorer_fitted.R]
-            assert all(abs(v - vals[0]) < tol for v in vals)
-
     def test_er_matches_R2Prob(self, scorer_fitted):
         for r in scorer_fitted.R:
             expected = scorer_fitted.R2Prob[r]
-            for f in scorer_fitted.F:
-                assert scorer_fitted.er_probability_dict_[r, f] == pytest.approx(expected)
+            assert scorer_fitted.er_probability_dict_[r] == pytest.approx(expected)
 
     def test_ef_matches_F2Prob(self, scorer_fitted):
         for f in scorer_fitted.F:
             expected = scorer_fitted.F2Prob[f]
-            for r in scorer_fitted.R:
-                assert scorer_fitted.ef_probability_dict_[r, f] == pytest.approx(expected)
+            assert scorer_fitted.ef_probability_dict_[f] == pytest.approx(expected)
 
-    def test_er_table_shape(self, scorer_fitted):
-        assert scorer_fitted.er_probability_table_.shape == (_RECENCY_LIMIT, _FREQUENCY_LIMIT)
+    def test_er_dataframe_columns(self, scorer_fitted):
+        # er は1次元: recency, probability のみ
+        assert set(scorer_fitted.er_probability_.columns) == {"recency", "probability"}
 
-    def test_ef_table_shape(self, scorer_fitted):
-        assert scorer_fitted.ef_probability_table_.shape == (_RECENCY_LIMIT, _FREQUENCY_LIMIT)
+    def test_ef_dataframe_columns(self, scorer_fitted):
+        # ef は1次元: frequency, probability のみ
+        assert set(scorer_fitted.ef_probability_.columns) == {"frequency", "probability"}
+
+    def test_er_dataframe_row_count(self, scorer_fitted):
+        assert len(scorer_fitted.er_probability_) == _RECENCY_LIMIT
+
+    def test_ef_dataframe_row_count(self, scorer_fitted):
+        assert len(scorer_fitted.ef_probability_) == _FREQUENCY_LIMIT
 
 
 # ---------------------------------------------------------------------------
@@ -1180,12 +1172,34 @@ class TestPredict:
     def test_er_kind(self, scorer_fitted):
         prob = scorer_fitted.predict(1, 1, kind="er")
         assert isinstance(prob, float)
-        assert prob == pytest.approx(scorer_fitted.er_probability_dict_[1, 1])
+        # er は 1D: recency=1 のみで参照
+        assert prob == pytest.approx(scorer_fitted.er_probability_dict_[1])
 
     def test_ef_kind(self, scorer_fitted):
         prob = scorer_fitted.predict(1, 1, kind="ef")
         assert isinstance(prob, float)
-        assert prob == pytest.approx(scorer_fitted.ef_probability_dict_[1, 1])
+        # ef は 1D: frequency=1 のみで参照
+        assert prob == pytest.approx(scorer_fitted.ef_probability_dict_[1])
+
+    def test_er_ignores_f(self, scorer_fitted):
+        # er は 1D モデル: f の値が変わっても確率は変わらない
+        assert scorer_fitted.predict(1, 1, kind="er") == scorer_fitted.predict(1, 999, kind="er")
+
+    def test_ef_ignores_r(self, scorer_fitted):
+        # ef は 1D モデル: r の値が変わっても確率は変わらない
+        assert scorer_fitted.predict(1, 1, kind="ef") == scorer_fitted.predict(999, 1, kind="ef")
+
+    def test_clamps_r_to_recency_limit_er(self, scorer_fitted):
+        # er: r > recency_limit のとき recency_limit にクランプされる
+        r_over = _RECENCY_LIMIT + 10
+        expected = scorer_fitted.er_probability_dict_[_RECENCY_LIMIT]
+        assert scorer_fitted.predict(r_over, 1, kind="er") == pytest.approx(expected)
+
+    def test_clamps_f_to_frequency_limit_ef(self, scorer_fitted):
+        # ef: f > frequency_limit のとき frequency_limit にクランプされる
+        f_over = _FREQUENCY_LIMIT + 10
+        expected = scorer_fitted.ef_probability_dict_[_FREQUENCY_LIMIT]
+        assert scorer_fitted.predict(1, f_over, kind="ef") == pytest.approx(expected)
 
     def test_emp_alias_equals_empirical(self, scorer_fitted):
         prob_emp = scorer_fitted.predict(1, 1, kind="emp")
@@ -1278,6 +1292,20 @@ class TestTransform:
         for _, row in result.iterrows():
             f_adj = min(int(row["frequency"]), _FREQUENCY_LIMIT)
             expected = scorer_optimized_mf.mf_probability_dict_[f_adj]
+            assert row["probability"] == pytest.approx(expected)
+
+    def test_er_probability_matches_dict(self, scorer_fitted):
+        result = scorer_fitted.transform(self._make_obs(), ref=_FIT_TARGET_DATE, kind="er")
+        for _, row in result.iterrows():
+            r_adj = min(int(row["recency"]), _RECENCY_LIMIT)
+            expected = scorer_fitted.er_probability_dict_[r_adj]
+            assert row["probability"] == pytest.approx(expected)
+
+    def test_ef_probability_matches_dict(self, scorer_fitted):
+        result = scorer_fitted.transform(self._make_obs(), ref=_FIT_TARGET_DATE, kind="ef")
+        for _, row in result.iterrows():
+            f_adj = min(int(row["frequency"]), _FREQUENCY_LIMIT)
+            expected = scorer_fitted.ef_probability_dict_[f_adj]
             assert row["probability"] == pytest.approx(expected)
 
     def test_clamps_recency_above_limit(self, scorer_fitted):
@@ -1588,17 +1616,15 @@ class TestPlotProbabilitySurface:
         fig = scorer_optimized_mcc.plot_probability_surface(kind="mcc")
         assert isinstance(fig, matplotlib.figure.Figure)
 
-    def test_returns_figure_er(self, scorer_fitted):
-        import matplotlib.figure
+    def test_er_raises_value_error(self, scorer_fitted):
+        # er は 1D 周辺モデルのためサーフェス描画不可
+        with pytest.raises(ValueError, match="1D marginal"):
+            scorer_fitted.plot_probability_surface(kind="er")
 
-        fig = scorer_fitted.plot_probability_surface(kind="er")
-        assert isinstance(fig, matplotlib.figure.Figure)
-
-    def test_returns_figure_ef(self, scorer_fitted):
-        import matplotlib.figure
-
-        fig = scorer_fitted.plot_probability_surface(kind="ef")
-        assert isinstance(fig, matplotlib.figure.Figure)
+    def test_ef_raises_value_error(self, scorer_fitted):
+        # ef は 1D 周辺モデルのためサーフェス描画不可
+        with pytest.raises(ValueError, match="1D marginal"):
+            scorer_fitted.plot_probability_surface(kind="ef")
 
     def test_figsize_applied(self, scorer_fitted):
         fig = scorer_fitted.plot_probability_surface(figsize=(4, 3))
@@ -1802,6 +1828,31 @@ class TestPlotMarginalProbability:
         ax = fig.axes[0]
         assert ax.get_legend() is None
 
+    def test_returns_figure_er_recency(self, scorer_fitted):
+        import matplotlib.figure
+
+        fig = scorer_fitted.plot_marginal_probability(axis="recency", kind="er")
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_returns_figure_ef_frequency(self, scorer_fitted):
+        import matplotlib.figure
+
+        fig = scorer_fitted.plot_marginal_probability(axis="frequency", kind="ef")
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_ef_on_recency_axis_raises(self, scorer_fitted):
+        with pytest.raises(ValueError, match="kind='ef'"):
+            scorer_fitted.plot_marginal_probability(axis="recency", kind="ef")
+
+    def test_er_on_frequency_axis_raises(self, scorer_fitted):
+        with pytest.raises(ValueError, match="kind='er'"):
+            scorer_fitted.plot_marginal_probability(axis="frequency", kind="er")
+
+    def test_er_has_no_legend(self, scorer_fitted):
+        fig = scorer_fitted.plot_marginal_probability(axis="recency", kind="er")
+        ax = fig.axes[0]
+        assert ax.get_legend() is None
+
 
 # ---------------------------------------------------------------------------
 # export_probability_csv
@@ -1855,13 +1906,13 @@ class TestExportProbabilityCsv:
         out = tmp_path / "er.csv"
         scorer_fitted.export_probability_csv(kind="er", path=str(out))
         df = pd.read_csv(out)
-        assert set(df.columns) == {"recency", "frequency", "probability"}
+        assert set(df.columns) == {"recency", "probability"}
 
     def test_ef_output_columns(self, scorer_fitted, tmp_path):
         out = tmp_path / "ef.csv"
         scorer_fitted.export_probability_csv(kind="ef", path=str(out))
         df = pd.read_csv(out)
-        assert set(df.columns) == {"recency", "frequency", "probability"}
+        assert set(df.columns) == {"frequency", "probability"}
 
     def test_mono_output_columns(self, scorer_optimized_mono, tmp_path):
         out = tmp_path / "mono.csv"
