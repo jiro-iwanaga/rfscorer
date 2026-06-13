@@ -123,8 +123,8 @@ RecencyFrequencyScorer(user_col="user", item_col="item", time_col="datetime", un
 | `df_obs` | `pd.DataFrame` | — | 観測期間の閲覧履歴 |
 | `df_eval` | `pd.DataFrame` | — | 評価期間のイベント履歴（閲覧・購買・CV など推定対象のイベント） |
 | `ref` | `str \| datetime \| int \| None` | `None` | 最新度計算の基準値（日付または整数）。`None` の場合は `df_obs[time_col].max()` を使用 |
-| `recency_limit` | `int \| None` | `None` | 最大最新度。`None` の場合、累積対象イベント数の分布から `RECENCY_LIMIT_RATE` に基づいて自動決定 |
-| `frequency_limit` | `int \| None` | `None` | 最大頻度。`None` の場合、累積対象イベント数の分布から `FREQUENCY_LIMIT_RATE` に基づいて自動決定 |
+| `recency_limit` | `int \| None` | `None` | 最大最新度。`None` の場合、累積対象イベント発生数の分布から `RECENCY_LIMIT_RATE` に基づいて自動決定 |
+| `frequency_limit` | `int \| None` | `None` | 最大頻度。`None` の場合、累積対象イベント発生数の分布から `FREQUENCY_LIMIT_RATE` に基づいて自動決定 |
 
 戻り値: `self`
 
