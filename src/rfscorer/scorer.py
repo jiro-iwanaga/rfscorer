@@ -13,7 +13,7 @@ from pandas.api.types import (
 class RecencyFrequencyScorer:
     """Recency-Frequency based recommendation scorer.
 
-    Estimates revisit probabilities from user-item interaction histories
+    Estimates product-choice probabilities from user-item interaction histories
     using recency and frequency as behavioral signals.
     """
 
@@ -65,23 +65,23 @@ class RecencyFrequencyScorer:
         self.R = []  # 最新度のリスト
         self.F = []  # 頻度のリスト
         self.RF2N = {}  # 最新度と頻度に対して閲覧数合計を紐づける辞書
-        self.RF2CV = {}  # 最新度と頻度に対して再閲覧数合計を紐づける辞書
-        self.RF2Prob = {}  # 最新度と頻度に対して経験的再閲覧確率を紐づける辞書
+        self.RF2CV = {}  # 最新度と頻度に対して対象イベント発生数合計を紐づける辞書
+        self.RF2Prob = {}  # 最新度と頻度に対して経験的商品選択確率を紐づける辞書
         self.R2N = {}  # 最新度に対して閲覧数合計を紐づける辞書
-        self.R2CV = {}  # 最新度に対して再閲覧数合計を紐づける辞書
-        self.R2Prob = {}  # 最新度に対して経験的再閲覧確率を紐づける辞書
+        self.R2CV = {}  # 最新度に対して対象イベント発生数合計を紐づける辞書
+        self.R2Prob = {}  # 最新度に対して経験的商品選択確率を紐づける辞書
         self.F2N = {}  # 頻度に対して閲覧数合計を紐づける辞書
-        self.F2CV = {}  # 頻度に対して再閲覧数合計を紐づける辞書
-        self.F2Prob = {}  # 頻度に対して経験的再閲覧確率を紐づける辞書
+        self.F2CV = {}  # 頻度に対して対象イベント発生数合計を紐づける辞書
+        self.F2Prob = {}  # 頻度に対して経験的商品選択確率を紐づける辞書
 
         # empirical
-        self.empirical_probability_ = None  # 経験的再閲覧確率データフレーム(縦持ち)
-        self.empirical_probability_table_ = None  # 経験的再閲覧確率データフレーム(横持ち)
+        self.empirical_probability_ = None  # 経験的商品選択確率データフレーム(縦持ち)
+        self.empirical_probability_table_ = None  # 経験的商品選択確率データフレーム(横持ち)
         self.empirical_probability_dict_ = (
-            None  # 経験的再閲覧確率データフレーム(辞書:キーは最新度と頻度のペア)
+            None  # 経験的商品選択確率データフレーム(辞書:キーは最新度と頻度のペア)
         )
-        self.recency_probability_ = None  # 最新度別経験的再閲覧確率データフレーム
-        self.frequency_probability_ = None  # 頻度別経験的再閲覧確率データフレーム
+        self.recency_probability_ = None  # 最新度別経験的商品選択確率データフレーム
+        self.frequency_probability_ = None  # 頻度別経験的商品選択確率データフレーム
 
         # er
         self.er_probability_ = None
@@ -138,7 +138,7 @@ class RecencyFrequencyScorer:
         recency_limit=None,
         frequency_limit=None,
     ):
-        """Estimate empirical revisit probabilities from pre-split interaction data.
+        """Estimate empirical product-choice probabilities from pre-split interaction data.
 
         Accepts observation and evaluation DataFrames that have already been
         filtered to the respective periods by the caller.  This is the primary
@@ -160,10 +160,10 @@ class RecencyFrequencyScorer:
             maximum value in df_obs time_col.
         recency_limit : int, optional
             Maximum recency rank to include. If None, automatically set to
-            the recency rank covering 95% of cumulative revisits.
+            the recency rank covering 95% of cumulative events.
         frequency_limit : int, optional
             Maximum frequency to include. If None, automatically set to
-            the frequency covering 95% of cumulative revisits.
+            the frequency covering 95% of cumulative events.
 
         Returns
         -------
@@ -175,7 +175,7 @@ class RecencyFrequencyScorer:
             If df_obs or df_eval is not a pandas DataFrame.
         ValueError
             If required columns (user, item, time_col) are missing from
-            df_obs or df_eval, if ref cannot be normalized, or if no revisits
+            df_obs or df_eval, if ref cannot be normalized, or if no events
             are observed in the evaluation period (cannot determine
             recency_limit or frequency_limit automatically).
 
@@ -233,7 +233,7 @@ class RecencyFrequencyScorer:
         recency_limit=None,
         frequency_limit=None,
     ):
-        """Estimate empirical revisit probabilities using target_date as split point.
+        """Estimate empirical product-choice probabilities using target_date as split point.
 
         Derives observation and evaluation periods automatically from target_date:
         observation spans from at most observation_days before target_date up to
@@ -270,7 +270,7 @@ class RecencyFrequencyScorer:
             If df is not a pandas DataFrame.
         ValueError
             If time_col is missing from df, if target_date cannot be
-            normalized, or if no revisits are observed in the evaluation period.
+            normalized, or if no events are observed in the evaluation period.
 
         Notes
         -----
@@ -324,7 +324,7 @@ class RecencyFrequencyScorer:
         recency_limit=None,
         frequency_limit=None,
     ):
-        """Estimate empirical revisit probabilities from interaction history.
+        """Estimate empirical product-choice probabilities from interaction history.
 
         Use this when you need explicit control over both periods.
         For the common case of splitting on a single date, prefer fit_date().
@@ -343,10 +343,10 @@ class RecencyFrequencyScorer:
             Accepts the same types as time_col (datetime or integer).
         recency_limit : int, optional
             Maximum recency rank to include. If None, automatically set to
-            the recency rank covering 95% of cumulative revisits.
+            the recency rank covering 95% of cumulative events.
         frequency_limit : int, optional
             Maximum frequency to include. If None, automatically set to
-            the frequency covering 95% of cumulative revisits.
+            the frequency covering 95% of cumulative events.
 
         Returns
         -------
@@ -359,7 +359,7 @@ class RecencyFrequencyScorer:
         ValueError
             If required columns are missing from df, if observation_period or
             evaluation_period cannot be normalized, if a period is not ordered
-            as (start, end), if the periods overlap, or if no revisits are
+            as (start, end), if the periods overlap, or if no events are
             observed in the evaluation period.
 
         Notes
@@ -482,7 +482,7 @@ class RecencyFrequencyScorer:
             total_cv = df_recency2cv.cv.sum()
             if total_cv == 0:
                 raise ValueError(
-                    "No revisits observed in evaluation period. "
+                    "No events observed in evaluation period. "
                     "Cannot determine recency_limit automatically."
                 )
             cv_sum = 0
@@ -501,7 +501,7 @@ class RecencyFrequencyScorer:
             total_cv = df_frequency2cv.cv.sum()
             if total_cv == 0:
                 raise ValueError(
-                    "No revisits observed in evaluation period. "
+                    "No events observed in evaluation period. "
                     "Cannot determine frequency_limit automatically."
                 )
             cv_sum = 0
@@ -625,7 +625,7 @@ class RecencyFrequencyScorer:
         frequency_label="frequency",
         probability_label="probability",
     ):
-        """Plot revisit probabilities as a 3D surface.
+        """Plot product-choice probabilities as a 3D surface.
 
         Visualizes the probability table as a 3D wireframe with recency on
         the x-axis, frequency on the y-axis, and probability on the z-axis.
@@ -755,7 +755,7 @@ class RecencyFrequencyScorer:
         frequency_label="frequency",
         probability_label="probability",
     ):
-        """Plot revisit probability aggregated along one RF dimension.
+        """Plot product-choice probability aggregated along one RF dimension.
 
         When axis='recency', plots the empirical recency-marginal probability
         (aggregated over all frequency levels) and optionally the mr-optimized
@@ -882,7 +882,7 @@ class RecencyFrequencyScorer:
         return fig
 
     def export_probability_csv(self, kind="emp", path=None):
-        """Export revisit probabilities to a CSV file.
+        """Export product-choice probabilities to a CSV file.
 
         Parameters
         ----------
@@ -1012,7 +1012,7 @@ class RecencyFrequencyScorer:
         df.to_csv(output_path, index=False)
 
     def predict(self, r, f, kind="emp"):
-        """Return the revisit probability for a given recency and frequency.
+        """Return the product-choice probability for a given recency and frequency.
 
         Parameters
         ----------
@@ -1107,10 +1107,10 @@ class RecencyFrequencyScorer:
         item_col=None,
         time_col=None,
     ):
-        """Add recency, frequency, and revisit probability columns to a DataFrame.
+        """Add recency, frequency, and product-choice probability columns to a DataFrame.
 
         Computes recency rank and frequency for each user-item pair relative to
-        ref, then appends the corresponding revisit probability from fit() or
+        ref, then appends the corresponding product-choice probability from fit() or
         optimize() results.  Does not filter df; pass a pre-filtered DataFrame
         or use transform_date() to apply automatic filtering.
         Recency values above recency_limit and frequency values above
@@ -1341,7 +1341,7 @@ class RecencyFrequencyScorer:
         if missing:
             raise ValueError(f"Missing required columns in df_eval: {missing}")
 
-        UIrevisit = set(zip(df_eval[user_col].astype(str), df_eval[item_col].astype(str)))
+        UIevent = set(zip(df_eval[user_col].astype(str), df_eval[item_col].astype(str)))
 
         df_rec = df_rec.copy()
         try:
@@ -1361,14 +1361,14 @@ class RecencyFrequencyScorer:
         for recommend_num in target_orders:
             df_k = df_rec[df_rec["order"] <= recommend_num]
             UIrec = set(zip(df_k[user_col], df_k[item_col]))
-            n_hit = len(UIrec & UIrevisit)
+            n_hit = len(UIrec & UIevent)
             n_recommended = len(UIrec)
             precision = n_hit / n_recommended if n_recommended > 0 else 0.0
             Rows.append((recommend_num, n_recommended, n_hit, precision))
         df_result = pd.DataFrame(Rows, columns=["order", "n_recommended", "n_hit", "precision"])
 
         total_hit = df_result.n_hit.max()
-        df_result["recall"] = df_result.n_hit / len(UIrevisit)
+        df_result["recall"] = df_result.n_hit / len(UIevent)
         denom = df_result.precision + df_result.recall
         df_result["f1"] = (2 * df_result.precision * df_result.recall).where(
             denom > 0, 0.0
@@ -1427,7 +1427,7 @@ class RecencyFrequencyScorer:
         return self.empirical_probability_dict_
 
     def optimize(self, kind="mono", eps=0.0):
-        """Estimate optimized revisit probabilities under RF constraints.
+        """Estimate optimized product-choice probabilities under RF constraints.
 
         Solves a convex quadratic programming problem with monotonicity
         constraints (and optionally convexity/concavity constraints).

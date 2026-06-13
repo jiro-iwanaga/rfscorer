@@ -2,31 +2,45 @@
 
 ## 背景
 
-EC サイトやコンテンツプラットフォームでは、ユーザーの閲覧履歴に基づいて商品推薦を行いたいというニーズがある。  一般的なブラックボックス型の推薦モデルは精度が高い一方、スコアの根拠を説明しにくく、運用・デバッグが困難な場合がある。
+EC サイトやコンテンツプラットフォームでは、ユーザーの閲覧履歴に基づいて商品推薦を行いたいというニーズがある。  一般的なブラックボックス型の推薦モデルは、スコアの根拠を説明しにくく、運用・デバッグが困難な場合がある。
 
-本パッケージは、Recency（最新度）と Frequency（頻度）という2つの行動シグナルのみを用いた、解釈可能な推薦スコアリング手法を提供する。手法の理論的基盤は以下の学術論文に基づく。
+本パッケージは、解釈可能な推薦スコアリング手法を提供する。Recency（最新度: ユーザーが商品と最後に接触してからの経過時間）と Frequency（頻度: ユーザーが商品と接触した回数）の2つの行動シグナルのみを用い、ユーザー × 商品ペアごとに商品選択確率を推定する。各ペアに付与される商品選択確率は選好スコアとして機能し、得られる行列は評価値行列（rating matrix）と類似した構造を持つため、協調フィルタリングや機械学習を用いた推薦モデルの入力（特徴量）としても活用できる。手法の理論的基盤は以下の学術論文に基づく。
 
 > Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano,  
 > "Estimating product-choice probabilities from recency and frequency of page views,"  
 > *Knowledge-Based Systems*, Volume 99, 2016, Pages 157–167.
 
+また、本手法から得られたスコアを協調フィルタリングの入力として利用する応用は、以下の論文で実証されている。
+
+> Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano,  
+> "Improving collaborative filtering recommendations by estimating user preferences from clickstream data,"  
+> *Electronic Commerce Research and Applications*, Volume 37, Article 100877, 2019.
+
 ## 目的
 
-RF スコアリング手法を Python パッケージとして PyPI に公開し、`pip install rfscorer` で誰でも利用できるようにする。
+RF（Recency-Frequency）スコアリング手法を Python パッケージとして PyPI に公開し、`pip install rfscorer` で誰でも利用できるようにする。
 
 ## ターゲットユーザー
-
-- Python とデータ分析に習熟したデータサイエンティスト・機械学習エンジニア
-- EC サイト・コンテンツプラットフォームの推薦システム担当者
-- 解釈可能な推薦スコアを必要とするビジネスアナリスト
-
+- 実務家
+  - Python とデータ分析に習熟したデータサイエンティスト・機械学習エンジニア
+  - EC サイト・コンテンツプラットフォームの推薦システム担当者
+  - 解釈可能な選好スコアを必要とするビジネスアナリスト
+- 研究者
+  - 推薦システム・情報検索
+  - マーケティングサイエンス・消費者行動論
+  - オペレーションズリサーチ・数理最適化
+  - 認知心理学（記憶・単純接触効果）  
+      
 ## 解決する課題
 
 | 課題 | 説明 |
 |------|------|
-| 推薦スコアの算出 | ユーザー × 商品の閲覧履歴から、各ユーザーが各商品を選択するスコアを推定したい（∝再閲覧確率） |
-| 解釈可能性の確保 | スコアの根拠を説明できる手法が求められる |
-| 実装コストの削減 | RF スコアリングを自前実装する手間をなくす |
+| 選好スコアの算出 | ユーザー × 商品の行動履歴から、各ユーザー × 商品ペアの選好スコアを推定する（∝対象イベント発生確率: 再閲覧・購買・CV など） |
+| 解釈可能性の確保 | スコアの根拠を説明できる |
+| ノイズの除去と自然な選好順序の獲得 | 観測データから直接得られる経験的確率は標本ノイズを含み、選好順序が不自然になる場合がある。最適化により単調性を満たした滑らかな分布として獲得できる |
+| 選好分布の傾きと形状の把握 | 最新度・頻度に対する選好の減衰・増加傾向（傾き）と凹凸性を定量的に把握できる |
+| 後段モデルへの入力としての活用 | 推定した選好スコアを協調フィルタリングの評価値行列や機械学習の特徴量として直接利用できる |
+| 実装コストの削減 | RF スコアリングを自前実装する手間を削減する |
 
 ## 機能要求
 
@@ -57,31 +71,31 @@ RF スコアリング手法を Python パッケージとして PyPI に公開し
 
 | 機能 | 説明 |
 |------|------|
-| 経験的再閲覧確率の推定（`emp`） | 観測期間における最新度 $r$・頻度 $f$ 別に、評価期間での再閲覧比率を直接推定する |
-| 周辺的経験的再閲覧確率の推定（`er` / `ef`） | `fit()`・`fit_date()` または `fit_period()` 時に自動計算。最新度方向（`er`）・頻度方向（`ef`）の周辺確率を RF グリッド全体にブロードキャストした確率面 |
-| 1次元最適化再閲覧確率の推定（`mr` / `mf`） | 周辺確率を目標とした1次元の凸2次計画問題を解く。`mr` は Recency 単調性 + 凸性、`mf` は Frequency 単調性 + 凹性を制約として課す。結果は1次元 dict に格納され、2次元グリッドへのブロードキャストは行わない |
-| 2次元最適化再閲覧確率の推定（`mono` / `mrc` / `mfc` / `mcc`） | RF 制約と最小二乗誤差を目的関数にもつ凸2次計画問題を解いて推定する。制約の組み合わせにより `mono`（単調性のみ）・`mrc`（+ Recency 凸性）・`mfc`（+ Frequency 凹性）・`mcc`（+ 両凹凸性）の4モデルを提供する |
+| 経験的商品選択確率の推定（`emp`） | 観測期間における最新度 $r$・頻度 $f$ 別に、評価期間での対象イベント発生比率を直接推定する |
+| 周辺的経験的商品選択確率の推定（`er` / `ef`） | `fit()`・`fit_date()` または `fit_period()` 時に自動計算。最新度方向（`er`）・頻度方向（`ef`）の周辺確率を RF グリッド全体にブロードキャストした確率面 |
+| 1次元最適化商品選択確率の推定（`mr` / `mf`） | 周辺確率を目標とした1次元の凸2次計画問題を解く。`mr` は Recency 単調性 + 凸性、`mf` は Frequency 単調性 + 凹性を制約として課す。結果は1次元 dict に格納され、2次元グリッドへのブロードキャストは行わない |
+| 2次元最適化商品選択確率の推定（`mono` / `mrc` / `mfc` / `mcc`） | RF 制約と最小二乗誤差を目的関数にもつ凸2次計画問題を解いて推定する。制約の組み合わせにより `mono`（単調性のみ）・`mrc`（+ Recency 凸性）・`mfc`（+ Frequency 凹性）・`mcc`（+ 両凹凸性）の4モデルを提供する |
 | 狭義単調性（`eps` パラメータ） | `optimize(eps=ε)` に正の値を指定すると、隣接する最新度・頻度の確率値が必ず $\varepsilon$ 以上離れる狭義単調性制約を付与する。デフォルト（`eps=0.0`）は従来の広義単調性と等価 |
 | 推薦精度の評価（`evaluate`） | 推薦結果と評価期間のイベント履歴を比較し、各順位カットオフでの precision・recall・f1 を返す |
-| 推薦スコアリング（`transform`） | 観測期間の閲覧履歴 DataFrame の各 user×item ペアに最新度・頻度・再閲覧確率・推薦順位を付与して返す |
-| 個別確率取得（`predict`） | 指定した最新度 $r$・頻度 $f$ に対応する再閲覧確率を1件返す |
-| 確率面の3次元可視化（`plot_probability_surface`） | 再閲覧確率を recency × frequency の3次元ワイヤーフレームで可視化し `Figure` を返す |
-| 周辺確率の折れ線可視化（`plot_marginal_probability`） | 最新度または頻度の一方向の再閲覧確率を折れ線グラフで可視化し `Figure` を返す。経験的確率と最適化確率を重ねて表示可能 |
-| 確率テーブルの CSV 出力（`export_probability_csv`） | 任意のモデルの再閲覧確率テーブルを CSV ファイルに書き出す。`kind="all"` で全モデルを1ファイルにまとめて出力 |
+| 推薦スコアリング（`transform`） | 観測期間の閲覧履歴 DataFrame の各 user×item ペアに最新度・頻度・商品選択確率・推薦順位を付与して返す |
+| 個別確率取得（`predict`） | 指定した最新度 $r$・頻度 $f$ に対応する商品選択確率を1件返す |
+| 確率面の3次元可視化（`plot_probability_surface`） | 商品選択確率を recency × frequency の3次元ワイヤーフレームで可視化し `Figure` を返す |
+| 周辺確率の折れ線可視化（`plot_marginal_probability`） | 最新度または頻度の一方向の商品選択確率を折れ線グラフで可視化し `Figure` を返す。経験的確率と最適化確率を重ねて表示可能 |
+| 確率テーブルの CSV 出力（`export_probability_csv`） | 任意のモデルの商品選択確率テーブルを CSV ファイルに書き出す。`kind="all"` で全モデルを1ファイルにまとめて出力 |
 
 ### 出力
 
 | 属性 | 説明 |
 |------|------|
-| `empirical_probability_` | 経験的再閲覧確率（`emp`）。`pd.DataFrame`（カラム: `recency`, `frequency`, `N`, `cv`, `probability`）。`fit()`・`fit_date()` または `fit_period()` 後にアクセス可能 |
-| `er_probability_` | 周辺的経験的再閲覧確率（`er`）。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`fit()`・`fit_date()` または `fit_period()` 後にアクセス可能 |
-| `ef_probability_` | 周辺的経験的再閲覧確率（`ef`）。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`fit()`・`fit_date()` または `fit_period()` 後にアクセス可能 |
-| `mr_probability_` | mr モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `probability`）。`optimize(kind='mr')` 後にアクセス可能 |
-| `mf_probability_` | mf モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `frequency`, `probability`）。`optimize(kind='mf')` 後にアクセス可能 |
-| `mono_probability_` | mono モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mono')` 後にアクセス可能 |
-| `mrc_probability_` | mrc モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mrc')` 後にアクセス可能 |
-| `mfc_probability_` | mfc モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mfc')` 後にアクセス可能 |
-| `mcc_probability_` | mcc モデル最適化再閲覧確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mcc')` 後にアクセス可能 |
+| `empirical_probability_` | 経験的商品選択確率（`emp`）。`pd.DataFrame`（カラム: `recency`, `frequency`, `N`, `cv`, `probability`）。`fit()`・`fit_date()` または `fit_period()` 後にアクセス可能 |
+| `er_probability_` | 周辺的経験的商品選択確率（`er`）。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`fit()`・`fit_date()` または `fit_period()` 後にアクセス可能 |
+| `ef_probability_` | 周辺的経験的商品選択確率（`ef`）。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`fit()`・`fit_date()` または `fit_period()` 後にアクセス可能 |
+| `mr_probability_` | mr モデル最適化商品選択確率。`pd.DataFrame`（カラム: `recency`, `probability`）。`optimize(kind='mr')` 後にアクセス可能 |
+| `mf_probability_` | mf モデル最適化商品選択確率。`pd.DataFrame`（カラム: `frequency`, `probability`）。`optimize(kind='mf')` 後にアクセス可能 |
+| `mono_probability_` | mono モデル最適化商品選択確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mono')` 後にアクセス可能 |
+| `mrc_probability_` | mrc モデル最適化商品選択確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mrc')` 後にアクセス可能 |
+| `mfc_probability_` | mfc モデル最適化商品選択確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mfc')` 後にアクセス可能 |
+| `mcc_probability_` | mcc モデル最適化商品選択確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `probability`）。`optimize(kind='mcc')` 後にアクセス可能 |
 
 ### kind エイリアス
 
@@ -112,9 +126,9 @@ scorer = RecencyFrequencyScorer(user_col="user_id", item_col="item_id", time_col
 df_obs = df[df["date"] <= "2015-07-06"]
 df_eval = df[df["date"] > "2015-07-06"]
 scorer.fit(df_obs, df_eval)
-df_emp = scorer.empirical_probability_  # 経験的再閲覧確率（2次元）
-df_er  = scorer.er_probability_         # 周辺的経験的再閲覧確率・Recency 方向（fit 時に自動計算）
-df_ef  = scorer.ef_probability_         # 周辺的経験的再閲覧確率・Frequency 方向（fit 時に自動計算）
+df_emp = scorer.empirical_probability_  # 経験的商品選択確率（2次元）
+df_er  = scorer.er_probability_         # 周辺的経験的商品選択確率・Recency 方向（fit 時に自動計算）
+df_ef  = scorer.ef_probability_         # 周辺的経験的商品選択確率・Frequency 方向（fit 時に自動計算）
 
 df_rec = scorer.transform(df_obs)      # 推薦スコアリング
 scorer.evaluate(df_rec, df_eval)       # 評価

@@ -41,7 +41,7 @@ def _make_df():
         ("u2", "item1", "2024-01-04"),
         ("u2", "item2", "2024-01-06"),
         ("u2", "item2", "2024-01-07"),
-        # 評価期間: u1→item1, u2→item2 を再閲覧
+        # 評価期間: u1→item1, u2→item2 で対象イベント発生
         ("u1", "item1", "2024-01-09"),
         ("u2", "item2", "2024-01-10"),
     ]
@@ -292,13 +292,13 @@ class TestFitPeriodValidation:
             scorer.fit_period(df, ("2024-01-01", "2024-01-09"), ("2024-01-08", "2024-01-14"))
 
     def test_no_cv_auto_limit_raises(self, scorer):
-        # 評価期間に再閲覧なし → 自動上限計算で ValueError
+        # 評価期間に対象イベントなし → 自動上限計算で ValueError
         rows = [
             ("u1", "item1", "2024-01-03"),
             ("u1", "item1", "2024-01-04"),  # 評価期間に閲覧なし
         ]
         df_no_cv = pd.DataFrame(rows, columns=["user", "item", "datetime"])
-        with pytest.raises(ValueError, match="No revisits"):
+        with pytest.raises(ValueError, match="No events"):
             scorer.fit_period(df_no_cv, _OBS_PERIOD, _EVAL_PERIOD)
 
 
@@ -1390,7 +1390,7 @@ class TestTransformDate:
 #   u1: item1(r=3,f=3,prob=1.0,order=1), item2(r=6,f=1,prob=0.0,order=2)
 #   u2: item2(r=1,f=2,prob=1.0,order=1), item1(r=4,f=1,prob=0.0,order=2)
 #
-# df_eval: u1-item1(Jan09), u2-item2(Jan10) → 再閲覧ペア数=2
+# df_eval: u1-item1(Jan09), u2-item2(Jan10) → 対象イベント発生ペア数=2
 #
 # order=1: UIrec={(u1,item1),(u2,item2)}, n_hit=2, n_rec=2
 #   precision=1.0, recall=1.0, f1=1.0, recall_norm=1.0, f1_norm=1.0
@@ -1455,7 +1455,7 @@ class TestEvaluate:
         row = result[result["order"] == 2].iloc[0]
         assert row["precision"] == pytest.approx(0.5)
 
-    def test_recall_norm_with_unseen_revisits(self, scorer_fitted, df_rec, df_eval):
+    def test_recall_norm_with_unseen_events(self, scorer_fitted, df_rec, df_eval):
         # df_eval に存在しないペアを行追加すると recall < recall_norm
         extra = pd.DataFrame([("u3", "item3", "2024-01-11")], columns=["user", "item", "datetime"])
         df_eval_extended = pd.concat([df_eval, extra], ignore_index=True)
@@ -1464,7 +1464,7 @@ class TestEvaluate:
         assert row["recall"] == pytest.approx(2 / 3)
         assert row["recall_norm"] == pytest.approx(1.0)
 
-    def test_f1_norm_with_unseen_revisits(self, scorer_fitted, df_rec, df_eval):
+    def test_f1_norm_with_unseen_events(self, scorer_fitted, df_rec, df_eval):
         extra = pd.DataFrame([("u3", "item3", "2024-01-11")], columns=["user", "item", "datetime"])
         df_eval_extended = pd.concat([df_eval, extra], ignore_index=True)
         result = scorer_fitted.evaluate(df_rec, df_eval_extended, order=1)

@@ -5,7 +5,7 @@ import cvxpy as cp
 
 
 class RFOptimizer:
-    """Convex quadratic optimizer for RF monotonicity-constrained revisit probabilities.
+    """Convex quadratic optimizer for RF monotonicity-constrained product-choice probabilities.
 
     Minimizes weighted least-squares deviation from empirical probabilities
     over a recency-frequency grid under RF constraints. Intended to be called
@@ -82,7 +82,7 @@ class RFOptimizer:
         RF2N : dict[tuple[int, int], float]
             Number of observations for each (recency, frequency) pair.
         RF2Prob : dict[tuple[int, int], float]
-            Empirical revisit probability for each (recency, frequency) pair.
+            Empirical product-choice probability for each (recency, frequency) pair.
         """
         if len(R) == 0:
             raise ValueError("R must not be empty")
@@ -138,11 +138,11 @@ class RFOptimizer:
         R2N : dict[int, float]
             Number of observations for each recency value.
         R2Prob : dict[int, float]
-            Empirical revisit probability for each recency value.
+            Empirical product-choice probability for each recency value.
         F2N : dict[int, float]
             Number of observations for each frequency value.
         F2Prob : dict[int, float]
-            Empirical revisit probability for each frequency value.
+            Empirical product-choice probability for each frequency value.
         """
         if len(self.R) == 0 or len(self.F) == 0:
             raise RuntimeError("set_data() must be called before set_marginal_data()")
