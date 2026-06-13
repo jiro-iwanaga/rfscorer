@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Python 3.10 support. Minimum supported version is now Python 3.11.
 - `er_probability_table_` and `ef_probability_table_` attributes.
   These were 2-D broadcast grids produced by the previous implementation and are no longer generated.
 
