@@ -394,8 +394,9 @@ RF2N / RF2CV / RF2Prob / R2N / R2CV / R2Prob / F2N / F2CV / F2Prob
 import pandas as pd
 from rfscorer import RecencyFrequencyScorer
 
-df = pd.read_csv("examples/access_log.csv")
-# access_log.csv のカラム: user_id, item_id, date
+# サンプルデータ: ohmsha/PyOptBook (MIT License) — カラム: user_id, item_id, date
+url = "https://raw.githubusercontent.com/ohmsha/PyOptBook/main/7.recommendation/access_log.csv"
+df = pd.read_csv(url)
 
 scorer = RecencyFrequencyScorer(user_col="user_id", item_col="item_id", time_col="date")
 
