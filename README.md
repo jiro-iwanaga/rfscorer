@@ -19,6 +19,7 @@ The package is designed for product recommendation and repeat-engagement modelin
 - **Explainable scoring** — probabilities are derived through mathematical optimization under Recency-Frequency monotonicity constraints, making every score fully traceable and auditable; 3D surface visualization further supports intuitive understanding
 - **Probabilistic output** — product-choice probabilities serve as preference scores, enabling expected value calculations and probabilistic ranking of recommendations
 - **Extensible** — the probability matrix from `transform()` can be directly used as input to collaborative filtering or other downstream recommendation models
+- **Calibration-free probabilities** — unlike typical ML models, probabilities are computed directly from interaction frequency without requiring calibration, providing high trustworthiness and interpretability. Every score is fully traceable and auditable.
 
 ## Installation
 
@@ -63,6 +64,8 @@ df_scores = scorer.transform(df_test_obs, target_date, kind="mono")
 | u_002  | i_011  |       1 |         2 |      0.0621 |     1 |
 | u_002  | i_058  |       4 |         1 |      0.0182 |     2 |
 
+The `probability` score determines recommendation rank. For each user, recommend items in order of decreasing probability. Since probabilities are available, you can also calculate expected values (e.g., expected revenue per recommendation). The `order` column makes it easy to implement business rules (e.g., "recommend top 2 items per user").     
+
 ### Visualization: Comparing Optimization Approaches
 While the package supports many optimization approaches, here we visualize three key methods: 
 
@@ -91,8 +94,8 @@ scorer.plot_probability_surface(kind="mcc")
 
 Each surface optimizes under different assumptions about **recency** (how recently a user interacted) and **frequency** (how often):
 
-- **Empirical**: Raw event rates; noisy and potentially violates monotonicity, leading to unnatural ranking orders.                  
-- **Monotone**: Enforces monotonic relationships, ensuring natural and stable rankings.
+- **Empirical**: Raw event rates; noisy and may violate monotonicity, sometimes recommending products in unnatural order.                  
+- **Monotone**: Enforces monotonic relationships, ensuring products are recommended in natural and stable order.
 - **Monotonicity-Convex-Concave**: Adds smoothness constraints with monotonically decreasing slopes in recency, producing the smoothest surface. Note: stronger constraints may overfit to training data; validate on test data.                            
 
 ## Examples
