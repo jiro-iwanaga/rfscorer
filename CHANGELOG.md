@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-06-14
+
+### Changed
+
+- Documentation: Comprehensive README.md improvements including:
+  - Added **Citation** section with in-text academic citation templates and BibTeX references
+    for citing the package in research papers.
+  - Added **Minimal Example** demonstrating end-to-end workflow with `split_by_date()`,
+    `fit()`, `optimize()`, `visualize()`, `transform()`, and `evaluate()` methods.
+  - Improved **Visualization** section with side-by-side comparison of three representative
+    optimization methods (Empirical, Monotone, Monotonicity-Convex-Concave) using horizontal layout.
+  - Resized visualization images for optimal display in documentation.
+  - Simplified English language throughout Features, Usage, and method descriptions for clarity.
+  - Created comprehensive **Japanese README** (`# RFScorer (日本語README)`) with complete
+    translation of all explanatory text while preserving code examples and diagrams exactly.
+  - Aligned English and Japanese versions to ensure consistent technical terminology
+    (product-choice probabilities, optimization methods, feature descriptions).
+
 ## [0.4.1] - 2026-06-13
 
 ### Fixed
