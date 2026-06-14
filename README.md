@@ -15,11 +15,11 @@ The package is designed for product recommendation and repeat-engagement modelin
 ## Features
 
 - **scikit-learn-style API** — familiar `fit()` / `transform()` interface makes it easy to integrate into existing data science workflows
-- **Minimal data requirements** — works with any interaction log with three columns: user, item, and timestamp; no pre-labeled ratings or explicit feedback required
-- **Explainable scoring** — probabilities are derived through mathematical optimization under Recency-Frequency monotonicity constraints, making every score fully traceable and auditable; 3D surface visualization further supports intuitive understanding
-- **Probabilistic output** — product-choice probabilities serve as preference scores, enabling expected value calculations and probabilistic ranking of recommendations
+- **Minimal data requirements** — works with any interaction log with three columns: user, item, and timestamp; no ratings or explicit feedback required
+- **Explainable scoring** — probabilities are computed using optimization with Recency-Frequency monotonicity constraints, making every score fully traceable and auditable; 3D surface visualization further supports intuitive understanding
+- **Probabilistic output** — product-choice probabilities work as preference scores, enabling expected value calculations and probabilistic ranking of recommendations
 - **Extensible** — the probability matrix from `transform()` can be directly used as input to collaborative filtering or other downstream recommendation models
-- **Calibration-free probabilities** — unlike typical ML models, probabilities are computed directly from interaction frequency without requiring calibration, providing high trustworthiness and interpretability. Every score is fully traceable and auditable.
+- **Calibration-free probabilities** — unlike typical ML models, probabilities are computed directly from interaction frequency without requiring calibration, making them reliable and easy to interpret.
 
 ## Installation
 
@@ -43,7 +43,7 @@ df = ...  # columns: user, item, datetime
 
 # Split by target date
 target_date = "2026-07-07"
-df_obs, df_eval = split_by_date(df, target_date)
+df_obs, df_eval = split_by_date(df, target_date)  # default: obs=28 days, eval=7 days
 
 # Fit and optimize
 scorer = RecencyFrequencyScorer()
@@ -64,7 +64,7 @@ df_scores = scorer.transform(df_test_obs, target_date, kind="mono")
 | u_002  | i_011  |       1 |         2 |      0.0621 |     1 |
 | u_002  | i_058  |       4 |         1 |      0.0182 |     2 |
 
-The `probability` score determines recommendation rank. For each user, recommend items in order of decreasing probability. Since probabilities are available, you can also calculate expected values (e.g., expected revenue per recommendation). The `order` column makes it easy to implement business rules (e.g., "recommend top 2 items per user").     
+The `probability` score determines recommendation rank. For each user, recommend items from highest to lowest probability. Because each score is a probability, you can also calculate expected values (e.g., expected revenue per recommendation). The `order` column makes it easy to implement business rules (e.g., "recommend top 2 items per user").     
 
 ### Visualization: Comparing Optimization Approaches
 While the package supports many optimization approaches, here we visualize three key methods: 
@@ -92,15 +92,15 @@ scorer.plot_probability_surface(kind="mcc")
   </tr>
 </table>
 
-Each surface optimizes under different assumptions about **recency** (how recently a user interacted) and **frequency** (how often):
+Each surface reflects different assumptions about **recency** (how recently a user interacted) and **frequency** (how often):
 
 - **Empirical**: Raw event rates; noisy and may violate monotonicity, sometimes recommending products in unnatural order.                  
-- **Monotone**: Enforces monotonic relationships, ensuring products are recommended in natural and stable order.
+- **Monotonicity**: Enforces monotonic relationships, ensuring products are recommended in natural and stable order.
 - **Monotonicity-Convex-Concave**: Adds smoothness constraints with monotonically decreasing slopes in recency, producing the smoothest surface. Note: stronger constraints may overfit to training data; validate on test data.                            
 
 ## Examples
 
-- [examples/basic_usage.ipynb](examples/basic_usage.ipynb) — end-to-end walkthrough: load data, fit, optimize, transform, and evaluate
+- [examples/basic_usage.ipynb](examples/basic_usage.ipynb) — end-to-end walkthrough: load data, fit, optimize, transform, and evaluate recommendation quality (precision, recall, F1 at each rank cutoff)
 
 ## References
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
