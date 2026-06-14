@@ -1,4 +1,4 @@
-# rfscorer
+# RFscorer
 
 [![CI](https://github.com/jiro-iwanaga/rfscorer/actions/workflows/ci.yml/badge.svg)](https://github.com/jiro-iwanaga/rfscorer/actions/workflows/ci.yml)
 [![PyPI version](https://img.shields.io/pypi/v/rfscorer.svg)](https://pypi.org/project/rfscorer/)
@@ -6,19 +6,19 @@
 
 `rfscorer` is a Python package for Recency-Frequency based recommendation scoring.
 
-It estimates **product-choice probabilities** — the preference score for each user-item pair, forming a matrix analogous to a rating matrix — from interaction histories, using two simple but powerful behavioral signals: **recency**, which captures how recently a user interacted with an item, and **frequency**, which captures how often the user has interacted with it. The target event whose probability is estimated (revisits, purchases, conversions, etc.) is configurable through the evaluation log.
+It estimates **product-choice probabilities** — the preference score for each user-item pair, forming a matrix like a rating matrix — from interaction history using two key signals: **recency** (how recently a user interacted with an item) and **frequency** (how often). You can configure which events to predict (revisits, purchases, conversions, etc.) using your evaluation data.
 
-The package is designed for product recommendation and repeat-engagement modeling, especially in settings where interpretable scoring based on interaction history is preferred over black-box recommendation models.
+The package is designed for product recommendation and repeat-engagement modeling, especially when you prefer interpretable scoring based on interaction history over black-box models.
 
 > Note: In this package, **RF** stands for **Recency-Frequency**, not Random Forest.
 
 ## Features
 
 - **scikit-learn-style API** — familiar `fit()` / `transform()` interface makes it easy to integrate into existing data science workflows
-- **Minimal data requirements** — works with any interaction log that has three columns: `user`, `item`, and a time column (`datetime` by default, configurable via `time_col`; accepts datetime or integer); no ratings or explicit feedback needed
-- **Explainable scoring** — probabilities are derived through mathematical optimization under RF monotonicity constraints, making every score fully traceable and auditable; 3D surface visualization further supports intuitive understanding
+- **Minimal data requirements** — works with any interaction log with three columns: user, item, and timestamp; no pre-labeled ratings or explicit feedback required
+- **Explainable scoring** — probabilities are derived through mathematical optimization under Recency-Frequency monotonicity constraints, making every score fully traceable and auditable; 3D surface visualization further supports intuitive understanding
 - **Probabilistic output** — product-choice probabilities serve as preference scores, enabling expected value calculations and probabilistic ranking of recommendations
-- **Extensible** — the user–item probability matrix produced by `transform()` can be directly used as input to collaborative filtering or other downstream recommendation models
+- **Extensible** — the probability matrix from `transform()` can be directly used as input to collaborative filtering or other downstream recommendation models
 
 ## Installation
 
