@@ -114,13 +114,6 @@ df_rec = scorer.transform(df_test_obs, target_date, kind="mcc")
 
 Within each user, rows are sorted by `probability` descending; `order` represents the recommendation rank.
 
-Call `evaluate()` to measure recommendation quality at each rank cutoff.
-It returns precision, recall, and F1 for each cutoff from 1 to `order`.
-
-```python
-scorer.evaluate(df_rec, df_test_eval, order=5)
-```
-
 ## Examples
 
 - [examples/basic_usage.ipynb](examples/basic_usage.ipynb) — end-to-end walkthrough: load data, fit, optimize, transform, and evaluate
@@ -136,7 +129,14 @@ scorer.evaluate(df_rec, df_test_eval, order=5)
 
 ## Citation
 
-If you use `rfscorer` in academic work, please cite the following paper:
+If you use `rfscorer` in academic work, you can cite it as follows in the body of your paper:
+
+> We used `rfscorer` (Iwanaga et al., 2016), a Python library for Recency-Frequency
+> based recommendation scoring for product recommendation.¹
+>
+> ¹ https://github.com/jiro-iwanaga/rfscorer
+
+The full reference is:
 
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
 
