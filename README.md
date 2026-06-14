@@ -28,80 +28,31 @@ pip install rfscorer
 
 ## Usage
 
+Below is a minimal example of building a model and scoring recommendations from an interaction log.
+For complete, working code with data loading and evaluation, see [examples/basic_usage.ipynb](examples/basic_usage.ipynb).
+
+### Minimal Example
+
 ```python
 import pandas as pd
-from rfscorer import RecencyFrequencyScorer
-```
+from rfscorer import RecencyFrequencyScorer, split_by_date
 
-Prepare an interaction log with three columns: `user`, `item`, and a time column (default column name: `datetime`).
+# Load your interaction log
+df = ...  # columns: user, item, datetime
 
-```python
-df_train = ...  # replace with your own training interaction log (columns: user, item, datetime)
-df_test  = ...  # replace with your own test interaction log     (columns: user, item, datetime)
-```
-
-Each DataFrame has the following structure. The same user-item pair may appear multiple times, representing repeat visits.
-
-| user  | item  | datetime   |
-|-------|-------|------------|
-| u_001 | i_032 | 2026-07-01 |
-| u_001 | i_017 | 2026-07-03 |
-| u_001 | i_032 | 2026-07-05 |
-| u_002 | i_011 | 2026-07-02 |
-| u_002 | i_058 | 2026-07-04 |
-
-Split users into training and test sets, then split each by `target_date` into an observation window and an evaluation window.
-
-```python
+# Split by target date
 target_date = "2026-07-07"
+df_obs, df_eval = split_by_date(df, target_date)
 
-df_train_obs  = df_train[df_train.datetime <= target_date]
-df_train_eval = df_train[df_train.datetime >  target_date]
-```
-
-Call `fit()` to estimate empirical product-choice probabilities.
-Recency and frequency are computed from the observation window; the evaluation window provides ground-truth event labels (revisits, purchases, conversions, etc.).
-
-```python
+# Fit and optimize
 scorer = RecencyFrequencyScorer()
-scorer.fit(df_train_obs, df_train_eval)
-```
-
-The empirical surface reflects raw event rates and may be irregular due to sparse data.
-
-```python
-fig = scorer.plot_probability_surface(kind="emp")
-```
-
-![empirical probability surface](https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/surface_emp_probability.png)
-
-Call `optimize()` to smooth the surface under RF monotonicity constraints using convex quadratic programming.
-`kind="mono"` enforces recency and frequency monotonicity.
-
-```python
+scorer.fit(df_obs, df_eval)
 scorer.optimize(kind="mono")
-fig = scorer.plot_probability_surface(kind="mono")
-```
 
-![mono probability surface](https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/surface_mono_probability.png)
-
-`kind="mcc"` additionally adds convexity in recency and concavity in frequency, yielding a smoother surface.
-
-```python
-scorer.optimize(kind="mcc")
-fig = scorer.plot_probability_surface(kind="mcc")
-```
-
-![mcc probability surface](https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/surface_mcc_probability.png)
-
-Call `transform()` to score each user-item pair in the test observation window.
-It returns a DataFrame with columns `user`, `item`, `recency`, `frequency`, `probability`, and `order` (rank within each user, sorted by probability descending).
-
-```python
-df_test_obs  = df_test[df_test.datetime <= target_date]
-df_test_eval = df_test[df_test.datetime >  target_date]
-
-df_rec = scorer.transform(df_test_obs, target_date, kind="mcc")
+# Score recommendations (on test data)
+df_test = ...  # test data (columns: user, item, datetime)
+df_test_obs, _ = split_by_date(df_test, target_date)
+df_scores = scorer.transform(df_test_obs, target_date, kind="mono")
 ```
 
 | user   | item   | recency | frequency | probability | order |
@@ -112,7 +63,37 @@ df_rec = scorer.transform(df_test_obs, target_date, kind="mcc")
 | u_002  | i_011  |       1 |         2 |      0.0621 |     1 |
 | u_002  | i_058  |       4 |         1 |      0.0182 |     2 |
 
-Within each user, rows are sorted by `probability` descending; `order` represents the recommendation rank.
+### Visualization: Comparing Optimization Approaches
+While the package supports many optimization approaches, here we visualize three key methods: 
+
+```python
+scorer.plot_probability_surface(kind="emp")  # empirical (raw rates)
+
+scorer.optimize(kind="mono")  # RF monotonicity
+scorer.plot_probability_surface(kind="mono")
+
+scorer.optimize(kind="mcc")   # convex in R, concave in F
+scorer.plot_probability_surface(kind="mcc")
+```
+
+<table>
+  <tr>
+    <td><img src="https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/surface_emp_probability.png" width="300"/></td>
+    <td><img src="https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/surface_mono_probability.png" width="300"/></td>
+    <td><img src="https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/surface_mcc_probability.png" width="300"/></td>
+  </tr>
+  <tr>
+    <td align="center"><i>Empirical</i></td>
+    <td align="center"><i>Monotonicity</i></td>
+    <td align="center"><i>Monotonicity-Convex-Concave</i></td>
+  </tr>
+</table>
+
+Each surface optimizes under different assumptions about **recency** (how recently a user interacted) and **frequency** (how often):
+
+- **Empirical**: Raw event rates; noisy and potentially violates monotonicity, leading to unnatural ranking orders.                  
+- **Monotone**: Enforces monotonic relationships, ensuring natural and stable rankings.
+- **Monotonicity-Convex-Concave**: Adds smoothness constraints with monotonically decreasing slopes in recency, producing the smoothest surface. Note: stronger constraints may overfit to training data; validate on test data.                            
 
 ## Examples
 
