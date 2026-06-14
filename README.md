@@ -8,9 +8,9 @@
 
 `rfscorer` is a Python package for Recency-Frequency based recommendation scoring.
 
-It estimates **product-choice probabilities** — the preference score for each user-item pair, forming a matrix like a rating matrix — from interaction history using two key signals: **recency** (how recently a user interacted with an item) and **frequency** (how often). You can configure which events to predict (revisits, purchases, conversions, etc.) using your evaluation data.
+It estimates **product-choice probabilities** — the preference score for each user-item pair, forming a matrix equivalent to a rating matrix — from interaction history using two key signals: **recency** (how recently a user interacted with an item) and **frequency** (how often). You can configure which events to predict (revisits, purchases, conversions, etc.) using your evaluation data.
 
-The package is designed for product recommendation, especially when you prefer interpretable scoring based on interaction history over black-box models.
+The package is designed for product recommendation, especially when you prefer interpretable recommendations based on interaction history over black-box models.
 
 > Note: In this package, **RF** stands for **Recency-Frequency**, not Random Forest.
 
@@ -69,7 +69,7 @@ df_scores = scorer.transform(df_test_obs, target_date, kind="mono")
 The `probability` score determines recommendation rank. For each user, recommend items from highest to lowest probability. Because each score is a probability, you can also calculate expected values (e.g., expected revenue per recommendation). The `order` column makes it easy to implement business rules (e.g., "recommend top 2 items per user").     
 
 ### Visualization: Comparing Optimization Approaches
-While the package supports many optimization approaches, here we visualize three key methods: 
+While the package supports many optimization approaches, here we visualize three representative methods: 
 
 ```python
 scorer.plot_probability_surface(kind="emp")  # empirical (raw rates)
@@ -94,15 +94,15 @@ scorer.plot_probability_surface(kind="mcc")
   </tr>
 </table>
 
-Each surface reflects different assumptions about **recency** (how recently a user interacted) and **frequency** (how often):
+Each surface reflects different assumptions about **recency** (time since a user interacted with an item) and **frequency** (number of interactions):
 
-- **Empirical**: Raw event rates; noisy and may violate monotonicity, sometimes recommending products in unnatural order.                  
+- **Empirical**: Raw product-choice probabilities without constraints; noisy and may violate monotonicity, sometimes recommending products in unnatural order.                  
 - **Monotonicity**: Enforces monotonic relationships, ensuring products are recommended in natural and stable order.
 - **Monotonicity-Convex-Concave**: Adds smoothness constraints with monotonically decreasing slopes in recency, producing the smoothest surface. Note: stronger constraints may overfit to training data; validate on test data.                            
 
 ## Examples
 
-- [examples/basic_usage.ipynb](examples/basic_usage.ipynb) — end-to-end walkthrough: load data, fit, optimize, transform, and evaluate recommendation quality (precision, recall, F1 at each rank cutoff)
+- [examples/basic_usage.ipynb](examples/basic_usage.ipynb) — end-to-end walkthrough: load data, fit, optimize, visualize, transform, and evaluate recommendation quality (precision, recall, F1 at each rank cutoff)
 
 ## References
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
