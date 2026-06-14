@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rfscorer"
-version = "0.4.1"
+version = "0.4.2"
 description = "Recency-Frequency based recommendation scoring"
 readme = "README.md"
 license = { file = "LICENSE" }
