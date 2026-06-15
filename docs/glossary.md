@@ -57,6 +57,10 @@
 | `plot_probability_surface(kind='emp', title=None, figsize=(6, 5), fontsize=12, recency_label='recency', frequency_label='frequency', probability_label='probability')` | 商品選択確率を3次元ワイヤーフレームで可視化し `matplotlib.figure.Figure` を返すメソッド。軸ラベル・タイトル・図サイズ・フォントサイズを指定可能。日本語ラベルには `rfscorer[ja]` が必要。`fit()` 後（`kind='mono'/'mrc'/'mfc'/'mcc'` の場合は `optimize()` 後）に利用可能。`kind='mr'`・`'mf'`・`'er'`・`'ef'` は1次元モデルのため `ValueError` を送出する（折れ線表示には `plot_marginal_probability()` を使用する） |
 | `plot_marginal_probability(axis='recency', kind='emp', title=None, figsize=(5, 4), fontsize=12, recency_label='recency', frequency_label='frequency', probability_label='probability')` | 最新度または頻度の一方向の商品選択確率を折れ線グラフで可視化し `matplotlib.figure.Figure` を返すメソッド。`kind='emp'/'er'/'ef'` で1次元経験的確率のみ、`kind='mr'/'mf'` で1次元最適化確率のみ、`kind='all'` で両者を重ねて表示する。単調性確認や最適化前後の比較に使用する。日本語ラベルには `rfscorer[ja]` が必要。`fit()` 後に利用可能（`kind='mr'/'mf'/'all'` の場合は `optimize()` 後も必要） |
 | `optimize(kind='mono', eps=0.0)` | `fit()` の結果を用いて、RF 制約付きの最適化商品選択確率を推定するメソッド。`kind='mono'`（単調性のみ）・`'mrc'`（単調性 + Recency 凸性）・`'mfc'`（単調性 + Frequency 凹性）・`'mcc'`（単調性 + 両凹凸性）・`'mr'`（1次元 Recency）・`'mf'`（1次元 Frequency）を指定する（長名エイリアスも使用可）。`eps > 0` で狭義単調性を適用する |
+| `save(path=None)` | フィット済みモデルを pickle 形式で保存するメソッド。`path=None` でカレントディレクトリに `rfscorer.pkl` を生成。ディレクトリを指定するとその中に `rfscorer.pkl` を生成。ファイルパスを指定すると指定名で保存。`fit()` 後に利用可能 |
+| `load(path)` | `save()` で保存した pickle ファイルからモデルを復元するクラスメソッド。保存時と現在のバージョンの major または minor が異なる場合は `UserWarning` を発行してロードを続行する。戻り値は `RecencyFrequencyScorer` インスタンス |
+| `save_zip(path=None)` | フィット済みモデルを zip アーカイブとして保存するメソッド。アーカイブには `rfscorer.pkl`・`metadata.json`・`probabilities/`（確率テーブル CSV）・`plots/`（確率曲面 PNG）が含まれる。`path=None` でカレントディレクトリに `scorer.zip` を生成。`fit()` 後に利用可能 |
+| `load_zip(path)` | `save_zip()` で保存した zip アーカイブからモデルを復元するクラスメソッド。バージョン不一致の扱いは `load()` と同じ。戻り値は `RecencyFrequencyScorer` インスタンス |
 | `show()` | `fit()` 後の集計情報（レコード数・cv 数・期間・上限値）を標準出力に表示するデバッグ用メソッド |
 | `R` | `fit()` 後に参照できる最新度のリスト |
 | `F` | `fit()` 後に参照できる頻度のリスト |
