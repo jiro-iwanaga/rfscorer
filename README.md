@@ -32,7 +32,7 @@ pip install rfscorer
 ## Usage
 
 Below is a minimal example of building a model and scoring recommendations from an interaction log.
-For complete, working code with data loading and evaluation, see [examples/basic_usage.ipynb](examples/basic_usage.ipynb).
+For complete, working code with data loading and evaluation, see [examples/tutorial_beginner_en.ipynb](tutorial_beginner_en.ipynb).
 
 ### Minimal Example
 
@@ -261,7 +261,7 @@ scorer.plot_probability_surface(kind="mcc")
 
 ## サンプル
 
-- [examples/basic_usage.ipynb](examples/basic_usage.ipynb) — データロードからモデル構築、最適化、可視化、推薦スコア算出、推薦品質の評価までのコードを紹介します。
+- [examples/tutorial_beginner_ja.ipynb](examples/tutorial_beginner_ja.ipynb) — データロードからモデル構築、最適化、可視化、推薦スコア算出、推薦品質の評価までのコードを紹介します。
 
 ## 参考文献
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, "Estimating product-choice probabilities from recency and frequency of page views," Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
