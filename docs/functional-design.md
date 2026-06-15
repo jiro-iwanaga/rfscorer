@@ -264,7 +264,7 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 
 `fit()` / `optimize()` 後のインスタンスを zip アーカイブとして保存する。zip 内には以下が含まれる。
 
-- `rfscorer.pkl` — モデル本体（`load_zip()` はここから復元）
+- `scorer.pkl` — モデル本体（`load_zip()` はここから復元）
 - `metadata.json` — バージョン・パラメータ・統計情報（`rfscorer_version`, `user_col`, `item_col`, `time_col`, `unit`, `recency_limit`, `frequency_limit`, `observation_start`, `observation_end`, `record_num`, `total_cv`, `optimized_kinds`）
 - `probabilities/` — 計算済みの各モデルの確率テーブル CSV（`emp_probability.csv`, `er_probability.csv`, `ef_probability.csv`, および `optimize()` 済みのモデル分）
 - `plots/` — 計算済みの各モデルの確率グラフ PNG（2D モデルは `plot_probability_surface()` の出力、1D モデルは `plot_marginal_probability()` の出力）

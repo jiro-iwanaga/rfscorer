@@ -999,7 +999,7 @@ class RecencyFrequencyScorer(PlottingMixin):
 
         The archive contains:
 
-        - ``rfscorer.pkl`` — the model for :meth:`load_zip`
+        - ``scorer.pkl`` — the model for :meth:`load_zip`
         - ``metadata.json`` — version, parameters, and fit statistics
         - ``probabilities/`` — one CSV per computed probability kind
         - ``plots/`` — one PNG per computed probability kind
@@ -1007,8 +1007,8 @@ class RecencyFrequencyScorer(PlottingMixin):
         Parameters
         ----------
         path : str, Path, or None, default None
-            Destination for the zip file. If None, saves as "rfscorer.zip" in
-            the current directory. If a directory, saves "rfscorer.zip" inside
+            Destination for the zip file. If None, saves as "scorer.zip" in
+            the current directory. If a directory, saves "scorer.zip" inside
             it. If a file path, saves directly to that path.
         """
         import io
@@ -1020,7 +1020,7 @@ class RecencyFrequencyScorer(PlottingMixin):
 
         import matplotlib.pyplot as plt
 
-        default_filename = "rfscorer.zip"
+        default_filename = "scorer.zip"
         if path is None:
             output_path = Path(default_filename)
         else:
@@ -1057,7 +1057,7 @@ class RecencyFrequencyScorer(PlottingMixin):
 
             pkl_buf = io.BytesIO()
             pickle.dump({"rfscorer_version": current_ver, "scorer": self}, pkl_buf)
-            zf.writestr("rfscorer.pkl", pkl_buf.getvalue())
+            zf.writestr("scorer.pkl", pkl_buf.getvalue())
 
             if self.emp_probability_ is not None:
                 for kind, df in [
@@ -1124,7 +1124,7 @@ class RecencyFrequencyScorer(PlottingMixin):
         from pathlib import Path
 
         with zipfile.ZipFile(Path(path), "r") as zf:
-            with zf.open("rfscorer.pkl") as f:
+            with zf.open("scorer.pkl") as f:
                 payload = pickle.load(io.BytesIO(f.read()))  # noqa: S301
 
         saved_ver = payload.get("rfscorer_version", "unknown")
@@ -1282,7 +1282,7 @@ if __name__ == "__main__":
     # scorer_loaded = RecencyFrequencyScorer.load("rfscorer.pkl")
     # print("load ok:", scorer_loaded.predict(1, 1, kind="mono"))
 
-    scorer.save_zip("rfscorer.zip")
+    scorer.save_zip("scorer.zip")
     # scorer_loaded_zip = RecencyFrequencyScorer.load_zip("rfscorer.zip")
     # print("load_zip ok:", scorer_loaded_zip.predict(1, 1, kind="mono"))
 
