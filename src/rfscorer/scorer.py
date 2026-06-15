@@ -185,9 +185,10 @@ class RecencyFrequencyScorer(PlottingMixin):
             If df_obs or df_gt is not a pandas DataFrame.
         ValueError
             If required columns (user, item, time_col) are missing from
-            df_obs or df_gt, if ref cannot be normalized, or if no events
-            are observed in the ground truth period (cannot determine
-            recency_limit or frequency_limit automatically).
+            df_obs, if required columns (user, item) are missing from df_gt,
+            if ref cannot be normalized, or if no events are observed in the
+            ground truth period (cannot determine recency_limit or
+            frequency_limit automatically).
 
         Notes
         -----
@@ -202,16 +203,22 @@ class RecencyFrequencyScorer(PlottingMixin):
         if not isinstance(df_gt, pd.DataFrame):
             raise TypeError("df_gt must be a pandas DataFrame.")
 
-        required_columns = [self.user_col, self.item_col, self.time_col]
-        missing_obs = [c for c in required_columns if c not in df_obs.columns]
+        missing_obs = [
+            c for c in [self.user_col, self.item_col, self.time_col] if c not in df_obs.columns
+        ]
         if missing_obs:
             raise ValueError(f"Missing required columns in df_obs: {missing_obs}")
-        missing_gt = [c for c in required_columns if c not in df_gt.columns]
+        missing_gt = [c for c in [self.user_col, self.item_col] if c not in df_gt.columns]
         if missing_gt:
             raise ValueError(f"Missing required columns in df_gt: {missing_gt}")
 
         obs_log = self._to_internal(df_obs)
-        gt_log = self._to_internal(df_gt)
+        gt_log = df_gt[[self.user_col, self.item_col]].copy()
+        gt_log.columns = [self._USER_COL, self._ITEM_COL]
+        if not is_string_dtype(gt_log[self._USER_COL]):
+            gt_log[self._USER_COL] = gt_log[self._USER_COL].astype(str)
+        if not is_string_dtype(gt_log[self._ITEM_COL]):
+            gt_log[self._ITEM_COL] = gt_log[self._ITEM_COL].astype(str)
 
         self.record_num = len(obs_log) + len(gt_log)
 
@@ -224,8 +231,6 @@ class RecencyFrequencyScorer(PlottingMixin):
             int(obs_log[self._SEQUENCE_COL].min()) if len(obs_log) > 0 else None
         )
         self.observation_end_ = ref_int
-        self.gt_start_ = int(gt_log[self._SEQUENCE_COL].min()) if len(gt_log) > 0 else None
-        self.gt_end_ = int(gt_log[self._SEQUENCE_COL].max()) if len(gt_log) > 0 else None
 
         self._fit_impl(obs_log, gt_log, ref_int, recency_limit, frequency_limit)
         return self
@@ -913,6 +918,233 @@ class RecencyFrequencyScorer(PlottingMixin):
         df.to_csv(output_path, index=False)
 
     # ---------------------------------------------------------------------------
+    # Persistence
+    # ---------------------------------------------------------------------------
+
+    def save(self, path=None) -> None:
+        """Save the fitted model to a file.
+
+        Parameters
+        ----------
+        path : str, Path, or None, default None
+            Destination for the saved file. If None, saves as "rfscorer.pkl"
+            in the current directory. If a directory, saves "rfscorer.pkl"
+            inside it. If a file path, saves directly to that path.
+
+        Notes
+        -----
+        This method uses :mod:`pickle`. Never load files from untrusted sources.
+        """
+        import pickle
+        from importlib.metadata import version
+        from pathlib import Path
+
+        payload = {
+            "rfscorer_version": version("rfscorer"),
+            "scorer": self,
+        }
+        default_filename = "rfscorer.pkl"
+        if path is None:
+            output_path = Path(default_filename)
+        else:
+            p = Path(path)
+            output_path = p / default_filename if p.is_dir() else p
+        with output_path.open("wb") as f:
+            pickle.dump(payload, f)
+
+    @classmethod
+    def load(cls, path) -> "RecencyFrequencyScorer":
+        """Load a fitted model from a file.
+
+        Parameters
+        ----------
+        path : str or Path
+            Path to the saved file.
+
+        Returns
+        -------
+        RecencyFrequencyScorer
+
+        Warnings
+        --------
+        This method uses :mod:`pickle`. Never load files from untrusted sources.
+        """
+        import pickle
+        import warnings
+        from importlib.metadata import version
+        from pathlib import Path
+
+        with Path(path).open("rb") as f:
+            payload = pickle.load(f)  # noqa: S301
+
+        saved_ver = payload.get("rfscorer_version", "unknown")
+        current_ver = version("rfscorer")
+
+        def _major_minor(v: str) -> tuple[int, int]:
+            parts = v.split(".")
+            return int(parts[0]), int(parts[1])
+
+        if saved_ver != "unknown" and _major_minor(saved_ver) != _major_minor(current_ver):
+            warnings.warn(
+                f"Version mismatch: saved={saved_ver}, current={current_ver}. "
+                "If you encounter unexpected behavior, re-fit the model with the current version.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        return payload["scorer"]
+
+    def save_zip(self, path=None) -> None:
+        """Save the fitted model as a zip archive with probabilities and plots.
+
+        The archive contains:
+
+        - ``rfscorer.pkl`` — the model for :meth:`load_zip`
+        - ``metadata.json`` — version, parameters, and fit statistics
+        - ``probabilities/`` — one CSV per computed probability kind
+        - ``plots/`` — one PNG per computed probability kind
+
+        Parameters
+        ----------
+        path : str, Path, or None, default None
+            Destination for the zip file. If None, saves as "scorer.zip" in
+            the current directory. If a directory, saves "scorer.zip" inside
+            it. If a file path, saves directly to that path.
+        """
+        import io
+        import json
+        import pickle
+        import zipfile
+        from importlib.metadata import version
+        from pathlib import Path
+
+        import matplotlib.pyplot as plt
+
+        default_filename = "scorer.zip"
+        if path is None:
+            output_path = Path(default_filename)
+        else:
+            p = Path(path)
+            output_path = p / default_filename if p.is_dir() else p
+
+        current_ver = version("rfscorer")
+        optimized_kinds = [
+            k
+            for k in ("mono", "mr", "mf", "mrc", "mfc", "mcc")
+            if getattr(self, f"{k}_probability_", None) is not None
+        ]
+
+        def _to_python(v):
+            return int(v) if v is not None else None
+
+        metadata = {
+            "rfscorer_version": current_ver,
+            "user_col": self.user_col,
+            "item_col": self.item_col,
+            "time_col": self.time_col,
+            "unit": _to_python(self.unit),
+            "recency_limit": _to_python(self.recency_limit),
+            "frequency_limit": _to_python(self.frequency_limit),
+            "observation_start": _to_python(self.observation_start_),
+            "observation_end": _to_python(self.observation_end_),
+            "record_num": _to_python(self.record_num),
+            "total_cv": _to_python(self.total_cv),
+            "optimized_kinds": optimized_kinds,
+        }
+
+        with zipfile.ZipFile(output_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("metadata.json", json.dumps(metadata, indent=2, ensure_ascii=False))
+
+            pkl_buf = io.BytesIO()
+            pickle.dump({"rfscorer_version": current_ver, "scorer": self}, pkl_buf)
+            zf.writestr("rfscorer.pkl", pkl_buf.getvalue())
+
+            if self.emp_probability_ is not None:
+                for kind, df in [
+                    ("emp", self.emp_probability_),
+                    ("er", self.er_probability_),
+                    ("ef", self.ef_probability_),
+                ]:
+                    buf = io.StringIO()
+                    df.to_csv(buf, index=False)
+                    zf.writestr(f"probabilities/{kind}_probability.csv", buf.getvalue())
+
+            for kind in optimized_kinds:
+                df = getattr(self, f"{kind}_probability_")
+                buf = io.StringIO()
+                df.to_csv(buf, index=False)
+                zf.writestr(f"probabilities/{kind}_probability.csv", buf.getvalue())
+
+            _surface_kinds = ("emp", "mono", "mrc", "mfc", "mcc")
+            if self.emp_probability_ is not None:
+                for kind in [k for k in ["emp"] + optimized_kinds if k in _surface_kinds]:
+                    fig = self.plot_probability_surface(kind=kind)
+                    buf = io.BytesIO()
+                    fig.savefig(buf, format="png", bbox_inches="tight")
+                    zf.writestr(f"plots/{kind}_surface.png", buf.getvalue())
+                    plt.close(fig)
+
+                for name, axis, kind in [("er", "recency", "er"), ("ef", "frequency", "ef")]:
+                    fig = self.plot_marginal_probability(axis=axis, kind=kind)
+                    buf = io.BytesIO()
+                    fig.savefig(buf, format="png", bbox_inches="tight")
+                    zf.writestr(f"plots/{name}_marginal.png", buf.getvalue())
+                    plt.close(fig)
+
+            for name, axis in [("mr", "recency"), ("mf", "frequency")]:
+                if name in optimized_kinds:
+                    fig = self.plot_marginal_probability(axis=axis, kind=name)
+                    buf = io.BytesIO()
+                    fig.savefig(buf, format="png", bbox_inches="tight")
+                    zf.writestr(f"plots/{name}_marginal.png", buf.getvalue())
+                    plt.close(fig)
+
+    @classmethod
+    def load_zip(cls, path) -> "RecencyFrequencyScorer":
+        """Load a fitted model from a zip archive created by :meth:`save_zip`.
+
+        Parameters
+        ----------
+        path : str or Path
+            Path to the zip file.
+
+        Returns
+        -------
+        RecencyFrequencyScorer
+
+        Warnings
+        --------
+        This method uses :mod:`pickle`. Never load files from untrusted sources.
+        """
+        import io
+        import pickle
+        import warnings
+        import zipfile
+        from importlib.metadata import version
+        from pathlib import Path
+
+        with zipfile.ZipFile(Path(path), "r") as zf:
+            with zf.open("rfscorer.pkl") as f:
+                payload = pickle.load(io.BytesIO(f.read()))  # noqa: S301
+
+        saved_ver = payload.get("rfscorer_version", "unknown")
+        current_ver = version("rfscorer")
+
+        def _major_minor(v: str) -> tuple[int, int]:
+            parts = v.split(".")
+            return int(parts[0]), int(parts[1])
+
+        if saved_ver != "unknown" and _major_minor(saved_ver) != _major_minor(current_ver):
+            warnings.warn(
+                f"Version mismatch: saved={saved_ver}, current={current_ver}. "
+                "If you encounter unexpected behavior, re-fit the model with the current version.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        return payload["scorer"]
+
+    # ---------------------------------------------------------------------------
     # Inspection (デバッグ / 集計情報)
     # ---------------------------------------------------------------------------
 
@@ -930,8 +1162,6 @@ class RecencyFrequencyScorer(PlottingMixin):
 
         if self.observation_start_ and self.observation_end_:
             print("observation: {} -> {}".format(self.observation_start_, self.observation_end_))
-        if self.gt_start_ and self.gt_end_:
-            print("ground_truth: {} -> {}".format(self.gt_start_, self.gt_end_))
 
         if self.recency_limit:
             print("recency_limit:", self.recency_limit)
@@ -998,6 +1228,11 @@ class RecencyFrequencyScorer(PlottingMixin):
 
 
 if __name__ == "__main__":
+    try:
+        from rfscorer import split_by_date
+    except ImportError:
+        from .utils import split_by_date
+
     # データの読み込み（オーム社『Pythonではじめる数理最適化』サポートデータより引用）
     url = "https://raw.githubusercontent.com/ohmsha/PyOptBook/main/7.recommendation/access_log.csv"
     df = pd.read_csv(url)
@@ -1009,9 +1244,8 @@ if __name__ == "__main__":
 
     target_date = "2015-07-07"
 
-    # 観測期間・正解期間に分割してから fit
-    df_train_obs = df_train[df_train.datetime <= target_date]
-    df_train_gt = df_train[df_train.datetime > target_date]
+    # split_by_date を使用して観測期間・正解期間に分割
+    df_train_obs, df_train_gt = split_by_date(df_train, target_date)
     scorer.fit(df_train_obs, df_train_gt)
 
     scorer.plot_probability_surface("empirical").savefig("surface_emp_probability.png")
@@ -1044,11 +1278,21 @@ if __name__ == "__main__":
     scorer.plot_probability_surface("mcc").savefig("surface_mcc_probability.png")
     scorer.export_probability_csv("all")
 
-    df_test_obs = df_test[df_test.datetime <= target_date]
-    df_test_gt = df_test[df_test.datetime > target_date]
+    scorer.save("rfscorer.pkl")
+    # scorer_loaded = RecencyFrequencyScorer.load("rfscorer.pkl")
+    # print("load ok:", scorer_loaded.predict(1, 1, kind="mono"))
+
+    scorer.save_zip("scorer.zip")
+    # scorer_loaded_zip = RecencyFrequencyScorer.load_zip("rfscorer.zip")
+    # print("load_zip ok:", scorer_loaded_zip.predict(1, 1, kind="mono"))
+
+    df_test_obs, df_test_gt = split_by_date(df_test, target_date)
 
     for kind in ("emp", "er", "ef", "mr", "mf", "mono", "mrc", "mfc", "mcc"):
         print(f"--- {kind} ---")
         df_rec = scorer.transform(df_test_obs, kind=kind)
         df_rec.to_csv(f"df_recommend_{kind}.csv", index=False)
-        print(scorer.evaluate(df_rec, df_test_gt, order=10))
+
+        df_eval = scorer.evaluate(df_rec, df_test_gt, order=10)
+        print(df_eval)
+        df_eval.to_csv(f"df_evaluate_{kind}.csv", index=False)
