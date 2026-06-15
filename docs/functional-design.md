@@ -238,6 +238,55 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 
 戻り値: `matplotlib.figure.Figure`
 
+##### `save(path=None)`
+
+`fit()` / `optimize()` 後のインスタンスを pickle 形式でファイルに保存する。
+
+| パラメータ | 型 | デフォルト | 説明 |
+|-----------|-----|-----------|------|
+| `path` | `str \| Path \| None` | `None` | 保存先。`None` の場合カレントディレクトリに `rfscorer.pkl` を保存。ディレクトリを指定した場合はそのディレクトリ内に `rfscorer.pkl` として保存。ファイルパスを指定した場合はそのパスに直接保存 |
+
+戻り値: なし
+
+##### `load(path)` （クラスメソッド）
+
+`save()` で保存したファイルからインスタンスを復元する。
+
+| パラメータ | 型 | デフォルト | 説明 |
+|-----------|-----|-----------|------|
+| `path` | `str \| Path` | — | ロードするファイルパス |
+
+戻り値: `RecencyFrequencyScorer`
+
+バージョンのメジャー・マイナーが異なる場合は `UserWarning` を出してロードを続行する。pickle を使用するため、信頼できないソースのファイルはロードしないこと。
+
+##### `save_zip(path=None)`
+
+`fit()` / `optimize()` 後のインスタンスを zip アーカイブとして保存する。zip 内には以下が含まれる。
+
+- `rfscorer.pkl` — モデル本体（`load_zip()` はここから復元）
+- `metadata.json` — バージョン・パラメータ・統計情報（`rfscorer_version`, `user_col`, `item_col`, `time_col`, `unit`, `recency_limit`, `frequency_limit`, `observation_start`, `observation_end`, `record_num`, `total_cv`, `optimized_kinds`）
+- `probabilities/` — 計算済みの各モデルの確率テーブル CSV（`emp_probability.csv`, `er_probability.csv`, `ef_probability.csv`, および `optimize()` 済みのモデル分）
+- `plots/` — 計算済みの各モデルの確率グラフ PNG（2D モデルは `plot_probability_surface()` の出力、1D モデルは `plot_marginal_probability()` の出力）
+
+| パラメータ | 型 | デフォルト | 説明 |
+|-----------|-----|-----------|------|
+| `path` | `str \| Path \| None` | `None` | 保存先。`None` の場合カレントディレクトリに `rfscorer.zip` を保存。ディレクトリを指定した場合はそのディレクトリ内に `rfscorer.zip` として保存。ファイルパスを指定した場合はそのパスに直接保存 |
+
+戻り値: なし
+
+##### `load_zip(path)` （クラスメソッド）
+
+`save_zip()` で保存した zip アーカイブからインスタンスを復元する。
+
+| パラメータ | 型 | デフォルト | 説明 |
+|-----------|-----|-----------|------|
+| `path` | `str \| Path` | — | ロードする zip ファイルのパス |
+
+戻り値: `RecencyFrequencyScorer`
+
+バージョンのメジャー・マイナーが異なる場合は `UserWarning` を出してロードを続行する。pickle を使用するため、信頼できないソースのファイルはロードしないこと。
+
 ##### `show()`
 
 `fit()` 後の集計情報（レコード数・cv 数・期間・上限値）を標準出力に表示する。デバッグ・動作確認用。
@@ -345,6 +394,10 @@ RF2N / RF2CV / RF2Prob / R2N / R2CV / R2Prob / F2N / F2CV / F2Prob
         │
         ├─  export_probability_csv(kind, path)  ─→ 確率テーブルを CSV に書き出す
         │
+        ├─  save(path)  ─→ インスタンスを pickle 形式でファイルに保存
+        │
+        ├─  save_zip(path)  ─→ pickle + metadata.json + CSV + PNG を zip アーカイブに保存
+        │
         ├─  optimize(kind='mr'|'mf')  ← RecencyFrequencyOptimizer (optimizer.py) に委譲（1次元最適化）
         │   1次元経験的確率を目標とした1次元凸2次計画問題を求解し、結果を1次元 dict に格納（ブロードキャストなし）
         │       ▼
@@ -357,6 +410,9 @@ RF2N / RF2CV / RF2Prob / R2N / R2CV / R2Prob / F2N / F2CV / F2Prob
                 │
                 └─  export_probability_csv(kind='all', path)
                     ─→ emp + er + ef + mr + mf + mono + mrc + mfc + mcc を併記した CSV を書き出す
+
+RecencyFrequencyScorer.load(path)     ─→ pickle ファイルからインスタンスを復元
+RecencyFrequencyScorer.load_zip(path) ─→ zip アーカイブからインスタンスを復元
 ```
 
 ## 入出力例

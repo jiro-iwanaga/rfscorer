@@ -31,7 +31,8 @@ rfscorer/
 ├── tests/
 │   ├── test_scorer.py
 │   ├── test_optimizer.py
-│   └── test_utils.py
+│   ├── test_utils.py
+│   └── test_save_load.py
 ├── examples/
 │   └── basic_usage.ipynb
 ├── img/                              # README 向け画像
@@ -85,6 +86,7 @@ rfscorer/
 | `test_scorer.py` | `RecencyFrequencyScorer` のユニットテスト |
 | `test_optimizer.py` | `RecencyFrequencyOptimizer` のユニットテスト |
 | `test_utils.py` | `split_by_date()` など、ユーティリティのユニットテスト |
+| `test_save_load.py` | `save()` / `load()` / `save_zip()` / `load_zip()` のユニットテスト |
 
 ### `examples/`
 
