@@ -34,7 +34,8 @@ rfscorer/
 │   ├── test_utils.py
 │   └── test_save_load.py
 ├── examples/
-│   └── basic_usage.ipynb
+│   ├── tutorial_beginner_en.ipynb        # 初級チュートリアル（英語）
+│   └── tutorial_beginner_ja.ipynb        # 初級チュートリアル（日本語）
 ├── img/                              # README 向け画像
 └── docs/                             # 永続的ドキュメント
     ├── product-requirements.md       # プロダクト要求定義書
@@ -92,7 +93,8 @@ rfscorer/
 
 | パス | 説明 |
 |------|------|
-| `basic_usage.ipynb` | 基本的な使用例を示す Jupyter ノートブック |
+| `tutorial_beginner_en.ipynb` | 初級チュートリアル（英語）。fit・optimize・transform・evaluate・save・load の基本ワークフローを解説 |
+| `tutorial_beginner_ja.ipynb` | 初級チュートリアル（日本語）。同上 |
 
 
 ### `img/`
