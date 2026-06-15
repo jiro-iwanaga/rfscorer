@@ -18,6 +18,8 @@
 | 商品 | item | 閲覧対象。`item` カラムで識別する |
 | 観測期間 | observation period | 最新度・頻度を算出するために使用する期間。`fit()` に `df_obs` として渡す。`split_by_date()` を使えば単一の DataFrame から `target_date` を基準に自動分割できる |
 | 正解期間 | ground truth period | 対象イベント（閲覧・購買・CV など）の発生を観測するために使用する期間。観測期間の直後に設定する。`fit()` に `df_eval` として渡す |
+| 観測ログ | observation log | 観測期間に該当する閲覧ログ DataFrame。`fit(df_obs, ...)` に `df_obs` として渡す。最新度・頻度を計算する基となる閲覧履歴 |
+| 正解ログ | ground truth log | 正解期間に該当するイベント履歴 DataFrame。`fit(..., df_eval)` に `df_eval` として渡す。対象イベント（再閲覧・購買・CV など）の発生を記録 |
 
 ## アルゴリズム
 
