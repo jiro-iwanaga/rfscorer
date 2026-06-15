@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Tutorial notebooks: Created bilingual beginner tutorials
+  - `examples/tutorial_beginner_en.ipynb`: English version translated from Japanese tutorial
+    using terminology from `docs/glossary.md` (interaction log, observation log, ground truth log, etc.)
+  - Covers complete workflow: data loading, splitting, model building (emp/mono/mcc),
+    probability visualization, scoring, and evaluation.
+  - Updated README.md example references to point to the new tutorial notebooks
+    (`examples/tutorial_beginner_en.ipynb` for English section,
+    `examples/tutorial_beginner_ja.ipynb` for Japanese section).
+
 ## [0.4.2] - 2026-06-14
 
 ### Changed
