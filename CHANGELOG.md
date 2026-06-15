@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-06-15
+
+### Added
+
+- `save(path=None)` / `load(path)`: persist a fitted model to a pickle file and restore it
+  without retraining. `path=None` saves `rfscorer.pkl` to the current directory; a directory
+  path saves `rfscorer.pkl` inside it; a file path saves directly. On major or minor version
+  mismatch, `load()` emits a `UserWarning` and continues loading.
+- `save_zip(path=None)` / `load_zip(path)`: save/restore the model as a zip archive bundling
+  `rfscorer.pkl`, `metadata.json` (version, parameters, fit statistics), probability-table CSVs,
+  and plot PNGs for all computed model kinds. `path=None` saves `scorer.zip` to the current
+  directory. Intended for research sharing and artifact management.
+- Tutorial notebooks (`tutorial_beginner_en.ipynb` / `tutorial_beginner_ja.ipynb`): added
+  Section 10 covering `save()` / `load()` usage with a Google Colab persistence guide.
+  Also added a commented `# !pip install rfscorer` line to the import cell.
+
 ### Changed
 
 - Terminology unification: renamed all `eval`-prefixed names to `gt` (ground truth)
@@ -21,6 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Attribute `evaluation_end_` → `gt_end_`
   - `show()` output label `evaluation:` → `ground_truth:`
   - Error message "No events observed in evaluation period" → "No events observed in ground truth period"
+- `fit()`: the `datetime` column in `df_gt` is now optional. Only `user` and `item` columns
+  are required for fitting. The `gt_start_` and `gt_end_` attributes (which depended on
+  `df_gt`'s datetime column) have been removed.
 
 ## [0.4.3] - 2026-06-15
 
