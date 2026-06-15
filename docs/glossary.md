@@ -43,6 +43,15 @@
 | 1次元最適化モデル | 1D optimization model | `optimize(kind='mr')` または `optimize(kind='mf')` で構築する1次元の最適化モデル。`mr` は最新度のみを変数とするモデル（$R2Prob$ を目標）、`mf` は頻度のみを変数とするモデル（$F2Prob$ を目標）。結果は1次元 dict として保存される |
 | 2次元最適化モデル | 2D optimization model | `optimize(kind='mono'/'mrc'/'mfc'/'mcc')` で構築する2次元の最適化モデル。最新度と頻度の全ペア $(r, f) \in R \times F$ を変数とするモデル（$RF2Prob$ を目標）。結果は `RF2X`（dict）に格納される |
 
+> **表記ルール — "monotonic" と "monotonicity"**
+>
+> 本プロジェクトでは品詞の違いにより両語を使い分ける。
+>
+> - **`monotonic`**（形容詞）: `optimize(kind=...)` の引数値など、コード中のモード名・エイリアス（識別子）として使用する。例: `"monotonic"`, `"monotonic_recency"`
+> - **`monotonicity`**（名詞）: docstring・コメント・テストコードで単調性という数学的性質を説明する際に使用する。例: `monotonicity constraints`, `weak monotonicity`, `test_recency_monotonicity`
+>
+> 識別子には `monotonic`、説明文には `monotonicity` を使用する。この共存は表記ゆれではなく意図的な使い分けである。
+
 ## API
 
 | 用語 | 定義 |
