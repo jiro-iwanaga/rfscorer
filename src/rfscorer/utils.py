@@ -12,7 +12,7 @@ def split_by_date(
     gt_days=7,
     time_col="datetime",
 ):
-    """Split df into observation and ground truth logs at target_date.
+    """Split df into observation and ground truth datas at target_date.
 
     Parameters
     ----------
@@ -40,7 +40,7 @@ def split_by_date(
     Returns
     -------
     df_obs, df_gt : tuple[pd.DataFrame, pd.DataFrame]
-        Observation log and ground truth log. Both preserve the original
+        Observation log and ground truth data. Both preserve the original
         columns and dtypes of df. target_date is inclusive in df_obs and
         exclusive from df_gt.
 

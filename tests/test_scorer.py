@@ -49,7 +49,7 @@ def _make_df():
 
 
 def _split_by_period(df, obs_period, gt_period, time_col="datetime"):
-    """Filter df into observation and ground truth logs by string-date period tuples."""
+    """Filter df into observation and ground truth datas by string-date period tuples."""
     obs_mask = (df[time_col] >= obs_period[0]) & (df[time_col] <= obs_period[1])
     gt_mask = (df[time_col] >= gt_period[0]) & (df[time_col] <= gt_period[1])
     return df[obs_mask], df[gt_mask]

@@ -17,7 +17,7 @@ The package is designed for product recommendation, especially when you prefer i
 ## Features
 
 - **scikit-learn-style API** — familiar `fit()` / `transform()` interface makes it easy to integrate into existing data science workflows
-- **Minimal data requirements** — works with any interaction log with three columns: user, item, and timestamp; no ratings or explicit feedback required
+- **Minimal data requirements** — works with any behavior history with three columns: user, item, and timestamp; no ratings or explicit feedback required
 - **Explainable scoring** — probabilities are computed using optimization with Recency-Frequency monotonicity constraints, making every score fully traceable and auditable; 3D surface visualization further supports intuitive understanding
 - **Probabilistic output** — product-choice probabilities work as preference scores, enabling expected value calculations and probabilistic ranking of recommendations
 - **Extensible** — the probability matrix from `transform()` can be directly used as input to collaborative filtering or other downstream recommendation models
@@ -31,7 +31,7 @@ pip install rfscorer
 
 ## Usage
 
-Below is a minimal example of building a model and scoring recommendations from an interaction log.
+Below is a minimal example of building a model and scoring recommendations from an behavior history.
 For complete, working code with data loading and evaluation, see [examples/tutorial_beginner_en.ipynb](tutorial_beginner_en.ipynb).
 
 ### Minimal Example
@@ -40,7 +40,7 @@ For complete, working code with data loading and evaluation, see [examples/tutor
 import pandas as pd
 from rfscorer import RecencyFrequencyScorer, split_by_date
 
-# Load your interaction log
+# Load your behavior history
 df = ...  # columns: user, item, datetime
 
 # Split by target date
@@ -176,7 +176,7 @@ MIT License
 ## 特徴
 
 - **scikit-learn ライクの API** — 一般的な機械学習パッケージが提供する`fit()` / `transform()` によるインターフェースを提供します。
-- **最小限のデータ要件** — `user`、`item`、`datetime` の3列があればどんな閲覧ログでも動作します。明示的フィードバックも設定可能です。
+- **最小限のデータ要件** — `user`、`item`、`datetime` の3列があればどんな行動履歴でも動作します。明示的フィードバックも設定可能です。
 - **説明可能な推薦スコア** — 商品選択確率は Recency-Frequency 単調性制約のもとで最適化された値のため説明が容易です。さらに3Dサーフェスによる可視化により直感的な理解を支援します。
 - **確率的な出力** — 商品選択確率を推薦スコアとして利用でき、期待値計算や確率に基づく推薦順序付けが可能です。
 - **拡張性** — 各種モデルが予測する商品選択確率は、協調フィルタリングの評価値行列や機械学習モデルの特徴量として直接利用できます。
@@ -190,7 +190,7 @@ pip install rfscorer
 
 ## 使い方
 
-以下は、閲覧ログからモデル構築と推薦スコア（商品選択確率）の算出までを行う最小限の例です。
+以下は、行動履歴からモデル構築と推薦スコア（商品選択確率）の算出までを行う最小限の例です。
 データロードから評価までを含む動作コードについては、[examples/basic_usage.ipynb](examples/basic_usage.ipynb) を参照してください。
 
 ### 最小限の例
@@ -199,10 +199,10 @@ pip install rfscorer
 import pandas as pd
 from rfscorer import RecencyFrequencyScorer, split_by_date
 
-# 閲覧ログの読み込み
+# 行動履歴の読み込み
 df = ...  # カラム: user, item, datetime
 
-# 基準日で観測ログ・正解ログに分割
+# 基準日で観測データ・正解データに分割
 target_date = "2026-07-07"
 df_obs, df_gt = split_by_date(df, target_date)  # デフォルト：観測28日、正解7日
 

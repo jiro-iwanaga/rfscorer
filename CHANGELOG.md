@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Terminology unification: renamed all `eval`-prefixed names to `gt` (ground truth)
-  to align with the unified terminology in `docs/glossary.md` (正解ログ / ground truth log).
+  to align with the unified terminology in `docs/glossary.md` (正解データ / ground truth data).
   Breaking changes:
   - `fit(df_obs, df_eval, ...)` → `fit(df_obs, df_gt, ...)`
   - `evaluate(df_rec, df_eval, ...)` → `evaluate(df_rec, df_gt, ...)`
@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Tutorial notebooks: Created bilingual beginner tutorials
   - `examples/tutorial_beginner_en.ipynb`: English version translated from Japanese tutorial
-    using terminology from `docs/glossary.md` (interaction log, observation log, ground truth log, etc.)
+    using terminology from `docs/glossary.md` (behavior history, observation data, ground truth data, etc.)
   - Covers complete workflow: data loading, splitting, model building (emp/mono/mcc),
     probability visualization, scoring, and evaluation.
   - Updated README.md example references to point to the new tutorial notebooks
@@ -92,7 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `split_by_date(df, target_date, observation_days=28, evaluation_days=7, time_col="datetime")`:
   new top-level utility function (`from rfscorer import split_by_date`) that splits a single
-  interaction log into an observation/evaluation pair at `target_date`.
+  behavior history into an observation/evaluation pair at `target_date`.
   Returns `(df_obs, df_eval)`. Accepts the same datetime or integer `time_col` as the scorer.
 - `unit` parameter to `RecencyFrequencyScorer.__init__()`: controls recency bin granularity.
   `unit=7` gives weekly recency, `unit=30` approximate monthly.  Default `unit=1` preserves

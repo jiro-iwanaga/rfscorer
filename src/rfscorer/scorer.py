@@ -40,11 +40,11 @@ class RecencyFrequencyScorer(PlottingMixin):
         Parameters
         ----------
         user_col : str, default "user"
-            Column name for user IDs in the interaction log.
+            Column name for user IDs in the behavior history.
         item_col : str, default "item"
-            Column name for item IDs in the interaction log.
+            Column name for item IDs in the behavior history.
         time_col : str, default "datetime"
-            Column name for the time axis in the interaction log. Accepts
+            Column name for the time axis in the behavior history. Accepts
             datetime (datetime64, str) or integer columns. Datetime values are
             converted to ordinal integers internally; integer values are used
             as-is.
@@ -158,7 +158,7 @@ class RecencyFrequencyScorer(PlottingMixin):
         Parameters
         ----------
         df_obs : pd.DataFrame
-            Observation period interaction log. Must already be filtered to
+            Observation period behavior history. Must already be filtered to
             the observation period by the caller.
         df_gt : pd.DataFrame
             Ground truth period event log (revisits, purchases, conversions,
