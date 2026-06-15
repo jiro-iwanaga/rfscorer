@@ -185,9 +185,10 @@ class RecencyFrequencyScorer(PlottingMixin):
             If df_obs or df_gt is not a pandas DataFrame.
         ValueError
             If required columns (user, item, time_col) are missing from
-            df_obs or df_gt, if ref cannot be normalized, or if no events
-            are observed in the ground truth period (cannot determine
-            recency_limit or frequency_limit automatically).
+            df_obs, if required columns (user, item) are missing from df_gt,
+            if ref cannot be normalized, or if no events are observed in the
+            ground truth period (cannot determine recency_limit or
+            frequency_limit automatically).
 
         Notes
         -----
@@ -202,16 +203,22 @@ class RecencyFrequencyScorer(PlottingMixin):
         if not isinstance(df_gt, pd.DataFrame):
             raise TypeError("df_gt must be a pandas DataFrame.")
 
-        required_columns = [self.user_col, self.item_col, self.time_col]
-        missing_obs = [c for c in required_columns if c not in df_obs.columns]
+        missing_obs = [
+            c for c in [self.user_col, self.item_col, self.time_col] if c not in df_obs.columns
+        ]
         if missing_obs:
             raise ValueError(f"Missing required columns in df_obs: {missing_obs}")
-        missing_gt = [c for c in required_columns if c not in df_gt.columns]
+        missing_gt = [c for c in [self.user_col, self.item_col] if c not in df_gt.columns]
         if missing_gt:
             raise ValueError(f"Missing required columns in df_gt: {missing_gt}")
 
         obs_log = self._to_internal(df_obs)
-        gt_log = self._to_internal(df_gt)
+        gt_log = df_gt[[self.user_col, self.item_col]].copy()
+        gt_log.columns = [self._USER_COL, self._ITEM_COL]
+        if not is_string_dtype(gt_log[self._USER_COL]):
+            gt_log[self._USER_COL] = gt_log[self._USER_COL].astype(str)
+        if not is_string_dtype(gt_log[self._ITEM_COL]):
+            gt_log[self._ITEM_COL] = gt_log[self._ITEM_COL].astype(str)
 
         self.record_num = len(obs_log) + len(gt_log)
 
@@ -224,8 +231,6 @@ class RecencyFrequencyScorer(PlottingMixin):
             int(obs_log[self._SEQUENCE_COL].min()) if len(obs_log) > 0 else None
         )
         self.observation_end_ = ref_int
-        self.gt_start_ = int(gt_log[self._SEQUENCE_COL].min()) if len(gt_log) > 0 else None
-        self.gt_end_ = int(gt_log[self._SEQUENCE_COL].max()) if len(gt_log) > 0 else None
 
         self._fit_impl(obs_log, gt_log, ref_int, recency_limit, frequency_limit)
         return self
@@ -930,8 +935,6 @@ class RecencyFrequencyScorer(PlottingMixin):
 
         if self.observation_start_ and self.observation_end_:
             print("observation: {} -> {}".format(self.observation_start_, self.observation_end_))
-        if self.gt_start_ and self.gt_end_:
-            print("ground_truth: {} -> {}".format(self.gt_start_, self.gt_end_))
 
         if self.recency_limit:
             print("recency_limit:", self.recency_limit)

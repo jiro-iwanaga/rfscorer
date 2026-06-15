@@ -363,7 +363,7 @@ class TestFitResult:
         )
         assert s.observation_start_ == pd.Timestamp("2024-01-01").toordinal()
 
-    def test_gt_dates_from_data(self):
+    def test_gt_dates_always_none(self):
         s = RecencyFrequencyScorer()
         s.fit(
             self._make_obs(),
@@ -371,8 +371,8 @@ class TestFitResult:
             recency_limit=_RECENCY_LIMIT,
             frequency_limit=_FREQUENCY_LIMIT,
         )
-        assert s.gt_start_ == pd.Timestamp("2024-01-09").toordinal()
-        assert s.gt_end_ == pd.Timestamp("2024-01-10").toordinal()
+        assert s.gt_start_ is None
+        assert s.gt_end_ is None
 
     def test_emp_probability_dict_populated(self):
         s = RecencyFrequencyScorer()
@@ -1700,7 +1700,6 @@ class TestShow:
         scorer_fitted.show()
         out = capsys.readouterr().out
         assert "observation" in out
-        assert "ground_truth" in out
 
     def test_show_outputs_limits(self, scorer_fitted, capsys):
         scorer_fitted.show()
