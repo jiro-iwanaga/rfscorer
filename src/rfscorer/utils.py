@@ -9,10 +9,10 @@ def split_by_date(
     df,
     target_date,
     observation_days=28,
-    evaluation_days=7,
+    gt_days=7,
     time_col="datetime",
 ):
-    """Split df into observation and evaluation logs at target_date.
+    """Split df into observation and ground truth logs at target_date.
 
     Parameters
     ----------
@@ -20,7 +20,7 @@ def split_by_date(
         Interaction log containing the time_col column.
     target_date : str, datetime, or int
         Split point. The observation window ends at and includes
-        target_date; the evaluation window starts at the next time step.
+        target_date; the ground truth window starts at the next time step.
         Accepts the same types as time_col (datetime or integer).
     observation_days : int or None, default 28
         Number of time units in the observation window ending at target_date
@@ -29,9 +29,9 @@ def split_by_date(
         its earliest row. Note: this is in the same time units as time_col
         (days for datetime, integer steps for integer time_col), independent
         of any recency binning unit on the scorer.
-    evaluation_days : int or None, default 7
-        Number of time units in the evaluation window starting one step after
-        target_date. For example, ``evaluation_days=7`` covers
+    gt_days : int or None, default 7
+        Number of time units in the ground truth window starting one step after
+        target_date. For example, ``gt_days=7`` covers
         ``[target_date + 1, target_date + 7]`` (7 units). When None, uses df
         up to its latest row.
     time_col : str, default "datetime"
@@ -39,10 +39,10 @@ def split_by_date(
 
     Returns
     -------
-    df_obs, df_eval : tuple[pd.DataFrame, pd.DataFrame]
-        Observation log and evaluation log. Both preserve the original
+    df_obs, df_gt : tuple[pd.DataFrame, pd.DataFrame]
+        Observation log and ground truth log. Both preserve the original
         columns and dtypes of df. target_date is inclusive in df_obs and
-        exclusive from df_eval.
+        exclusive from df_gt.
 
     Raises
     ------
@@ -55,9 +55,9 @@ def split_by_date(
     Examples
     --------
     >>> from rfscorer import RecencyFrequencyScorer, split_by_date
-    >>> df_obs, df_eval = split_by_date(df, "2024-01-07")
+    >>> df_obs, df_gt = split_by_date(df, "2024-01-07")
     >>> scorer = RecencyFrequencyScorer()
-    >>> scorer.fit(df_obs, df_eval)
+    >>> scorer.fit(df_obs, df_gt)
     """
     if not isinstance(df, pd.DataFrame):
         raise TypeError("df must be a pandas DataFrame.")
@@ -75,10 +75,10 @@ def split_by_date(
     else:
         obs_start = max(df_min, target_int - observation_days + 1)
     obs_end = target_int
-    eval_start = target_int + 1
-    eval_end = df_max if evaluation_days is None else min(df_max, target_int + evaluation_days)
+    gt_start = target_int + 1
+    gt_end = df_max if gt_days is None else min(df_max, target_int + gt_days)
 
     obs_mask = (obs_start <= normalized) & (normalized <= obs_end)
-    eval_mask = (eval_start <= normalized) & (normalized <= eval_end)
+    gt_mask = (gt_start <= normalized) & (normalized <= gt_end)
 
-    return df[obs_mask], df[eval_mask]
+    return df[obs_mask], df[gt_mask]

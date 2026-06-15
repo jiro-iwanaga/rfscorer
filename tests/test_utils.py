@@ -101,59 +101,59 @@ def _make_df():
 class TestSplitByDate:
     def test_basic_split_with_string_date(self):
         df = _make_df()
-        df_obs, df_eval = split_by_date(df, "2024-01-07", observation_days=28, evaluation_days=7)
+        df_obs, df_gt = split_by_date(df, "2024-01-07", observation_days=28, gt_days=7)
         # obs: Jan01 - Jan07 (28日遡り→全て対象)、eval: Jan08 - Jan14
         assert set(df_obs["datetime"]) == {"2024-01-01", "2024-01-03", "2024-01-05", "2024-01-07"}
-        assert set(df_eval["datetime"]) == {"2024-01-09", "2024-01-12"}
+        assert set(df_gt["datetime"]) == {"2024-01-09", "2024-01-12"}
 
     def test_basic_split_with_int_target(self):
         df = _make_df().copy()
         df["seq"] = pd.to_datetime(df["datetime"]).map(lambda x: x.toordinal())
         df = df.drop(columns="datetime")
         target_ord = pd.Timestamp("2024-01-07").toordinal()
-        df_obs, df_eval = split_by_date(
-            df, target_ord, observation_days=28, evaluation_days=7, time_col="seq"
+        df_obs, df_gt = split_by_date(
+            df, target_ord, observation_days=28, gt_days=7, time_col="seq"
         )
         obs_dates = ["2024-01-01", "2024-01-03", "2024-01-05", "2024-01-07"]
-        eval_dates = ["2024-01-09", "2024-01-12"]
+        gt_dates = ["2024-01-09", "2024-01-12"]
         obs_expected = {pd.Timestamp(d).toordinal() for d in obs_dates}
-        eval_expected = {pd.Timestamp(d).toordinal() for d in eval_dates}
+        gt_expected = {pd.Timestamp(d).toordinal() for d in gt_dates}
         assert set(df_obs["seq"]) == obs_expected
-        assert set(df_eval["seq"]) == eval_expected
+        assert set(df_gt["seq"]) == gt_expected
 
     def test_observation_days_none_uses_df_start(self):
         df = _make_df()
-        df_obs, df_eval = split_by_date(df, "2024-01-07", observation_days=None, evaluation_days=7)
+        df_obs, df_gt = split_by_date(df, "2024-01-07", observation_days=None, gt_days=7)
         # observation_days=None で df 先頭まで使う
         assert "2024-01-01" in set(df_obs["datetime"])
 
-    def test_evaluation_days_none_uses_df_end(self):
+    def test_gt_days_none_uses_df_end(self):
         df = _make_df()
-        df_obs, df_eval = split_by_date(df, "2024-01-07", observation_days=7, evaluation_days=None)
-        # evaluation_days=None で df 末尾まで使う
-        assert "2024-01-15" in set(df_eval["datetime"])
+        df_obs, df_gt = split_by_date(df, "2024-01-07", observation_days=7, gt_days=None)
+        # gt_days=None で df 末尾まで使う
+        assert "2024-01-15" in set(df_gt["datetime"])
 
     def test_observation_days_caps_at_df_start(self):
         df = _make_df()
-        df_obs, _ = split_by_date(df, "2024-01-07", observation_days=2, evaluation_days=7)
+        df_obs, _ = split_by_date(df, "2024-01-07", observation_days=2, gt_days=7)
         # target - 2 + 1 = Jan06、観測期間: Jan06 - Jan07 (2日間)
         assert set(df_obs["datetime"]) == {"2024-01-07"}
 
-    def test_evaluation_days_caps_at_df_end(self):
+    def test_gt_days_caps_at_df_end(self):
         df = _make_df()
-        _, df_eval = split_by_date(df, "2024-01-07", observation_days=7, evaluation_days=3)
-        # target + 3 = Jan10、評価期間: Jan08 - Jan10
-        assert set(df_eval["datetime"]) == {"2024-01-09"}
+        _, df_gt = split_by_date(df, "2024-01-07", observation_days=7, gt_days=3)
+        # target + 3 = Jan10、正解期間: Jan08 - Jan10
+        assert set(df_gt["datetime"]) == {"2024-01-09"}
 
     def test_target_date_inclusive_in_obs(self):
         df = _make_df()
-        df_obs, _ = split_by_date(df, "2024-01-07", observation_days=7, evaluation_days=7)
+        df_obs, _ = split_by_date(df, "2024-01-07", observation_days=7, gt_days=7)
         assert "2024-01-07" in set(df_obs["datetime"])
 
     def test_target_date_exclusive_in_eval(self):
         df = _make_df()
-        _, df_eval = split_by_date(df, "2024-01-07", observation_days=7, evaluation_days=7)
-        assert "2024-01-07" not in set(df_eval["datetime"])
+        _, df_gt = split_by_date(df, "2024-01-07", observation_days=7, gt_days=7)
+        assert "2024-01-07" not in set(df_gt["datetime"])
 
     def test_returns_tuple_of_dataframes(self):
         df = _make_df()
@@ -171,9 +171,9 @@ class TestSplitByDate:
 
     def test_preserves_original_columns(self):
         df = _make_df()
-        df_obs, df_eval = split_by_date(df, "2024-01-07")
+        df_obs, df_gt = split_by_date(df, "2024-01-07")
         assert list(df_obs.columns) == list(df.columns)
-        assert list(df_eval.columns) == list(df.columns)
+        assert list(df_gt.columns) == list(df.columns)
 
     def test_preserves_original_time_col_type(self):
         df = _make_df()
@@ -192,7 +192,7 @@ class TestSplitByDate:
 
     def test_custom_time_col(self):
         df = _make_df().rename(columns={"datetime": "date"})
-        df_obs, df_eval = split_by_date(df, "2024-01-07", time_col="date")
+        df_obs, df_gt = split_by_date(df, "2024-01-07", time_col="date")
         assert "2024-01-07" in set(df_obs["date"])
 
     def test_integer_time_col(self):
@@ -200,9 +200,9 @@ class TestSplitByDate:
         df["seq"] = pd.to_datetime(df["datetime"]).map(lambda x: x.toordinal())
         df = df.drop(columns="datetime")
         target_ord = pd.Timestamp("2024-01-07").toordinal()
-        df_obs, df_eval = split_by_date(df, target_ord, time_col="seq")
+        df_obs, df_gt = split_by_date(df, target_ord, time_col="seq")
         assert (df_obs["seq"] <= target_ord).all()
-        assert (df_eval["seq"] > target_ord).all()
+        assert (df_gt["seq"] > target_ord).all()
 
     def test_invalid_target_date_raises(self):
         df = _make_df()
@@ -211,8 +211,8 @@ class TestSplitByDate:
 
     def test_chained_with_fit(self):
         df = _make_df()
-        df_obs, df_eval = split_by_date(df, "2024-01-07", observation_days=28, evaluation_days=7)
+        df_obs, df_gt = split_by_date(df, "2024-01-07", observation_days=28, gt_days=7)
         scorer = RecencyFrequencyScorer()
-        scorer.fit(df_obs, df_eval, recency_limit=7, frequency_limit=3)
+        scorer.fit(df_obs, df_gt, recency_limit=7, frequency_limit=3)
         # 例外なく fit が完了し、属性が設定されている
         assert scorer.emp_probability_dict_ is not None

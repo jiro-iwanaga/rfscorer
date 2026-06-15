@@ -45,11 +45,11 @@ df = ...  # columns: user, item, datetime
 
 # Split by target date
 target_date = "2026-07-07"
-df_obs, df_eval = split_by_date(df, target_date)  # default: obs=28 days, eval=7 days
+df_obs, df_gt = split_by_date(df, target_date)  # default: obs=28 days, gt=7 days
 
 # Fit and optimize
 scorer = RecencyFrequencyScorer()
-scorer.fit(df_obs, df_eval)
+scorer.fit(df_obs, df_gt)
 scorer.optimize(kind="mono")
 
 # Score recommendations (on test data)
@@ -102,7 +102,7 @@ Each surface reflects different assumptions about **recency** (time since a user
 
 ## Examples
 
-- [examples/basic_usage.ipynb](examples/basic_usage.ipynb) — end-to-end walkthrough: load data, fit, optimize, visualize, transform, and evaluate recommendation quality (precision, recall, F1 at each rank cutoff)
+- [examples/tutorial_beginner_en.ipynb](examples/tutorial_beginner_en.ipynb) — end-to-end walkthrough: load data, fit, optimize, visualize, transform, and evaluate recommendation quality (precision, recall, F1 at each rank cutoff)
 
 ## References
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
@@ -204,11 +204,11 @@ df = ...  # カラム: user, item, datetime
 
 # 基準日で観測ログ・正解ログに分割
 target_date = "2026-07-07"
-df_obs, df_eval = split_by_date(df, target_date)  # デフォルト：観測28日、正解7日
+df_obs, df_gt = split_by_date(df, target_date)  # デフォルト：観測28日、正解7日
 
 # モデル構築と最適化
 scorer = RecencyFrequencyScorer()
-scorer.fit(df_obs, df_eval)
+scorer.fit(df_obs, df_gt)
 scorer.optimize(kind="mono")
 
 # 推薦スコアを算出(テストデータ)

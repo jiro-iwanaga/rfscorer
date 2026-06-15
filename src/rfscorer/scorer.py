@@ -63,8 +63,8 @@ class RecencyFrequencyScorer(PlottingMixin):
 
         self.observation_start_ = None
         self.observation_end_ = None
-        self.evaluation_start_ = None
-        self.evaluation_end_ = None
+        self.gt_start_ = None
+        self.gt_end_ = None
         self.recency_limit = (
             None  # 最新度の上限値(デフォルトでは _RECENCY_LIMIT_RATE を用いて自動計算)
         )
@@ -130,7 +130,7 @@ class RecencyFrequencyScorer(PlottingMixin):
         # データ解析用
         self.record_num = None  # レコード数（fit() 後に設定）
         self.record_num_obs = None  # 観測期間レコード数
-        self.record_num_eval = None  # 正解期間レコード数
+        self.record_num_gt = None  # 正解期間レコード数
         self.record_num_target_org = None  # 分析対象フィルタリング前レコード数
         self.record_num_target = None  # 分析対象レコード数
         self.total_cv_org = None  # フィルタリング前 cv 数
@@ -143,16 +143,16 @@ class RecencyFrequencyScorer(PlottingMixin):
     def fit(
         self,
         df_obs,
-        df_eval,
+        df_gt,
         ref=None,
         recency_limit=None,
         frequency_limit=None,
     ):
         """Estimate empirical product-choice probabilities from pre-split interaction data.
 
-        Accepts observation and evaluation DataFrames that have already been
+        Accepts observation and ground truth DataFrames that have already been
         filtered to the respective periods by the caller. For convenience,
-        use ``rfscorer.split_by_date()`` to obtain a (df_obs, df_eval) pair
+        use ``rfscorer.split_by_date()`` to obtain a (df_obs, df_gt) pair
         from a single log and target_date.
 
         Parameters
@@ -160,9 +160,9 @@ class RecencyFrequencyScorer(PlottingMixin):
         df_obs : pd.DataFrame
             Observation period interaction log. Must already be filtered to
             the observation period by the caller.
-        df_eval : pd.DataFrame
-            Evaluation period event log (revisits, purchases, conversions,
-            etc.). Must already be filtered to the evaluation period by the caller.
+        df_gt : pd.DataFrame
+            Ground truth period event log (revisits, purchases, conversions,
+            etc.). Must already be filtered to the ground truth period by the caller.
         ref : str, datetime, or int, optional
             Reference value for recency computation. Recency of each
             user-item pair is ``(ref - value) // unit + 1``, where the
@@ -182,11 +182,11 @@ class RecencyFrequencyScorer(PlottingMixin):
         Raises
         ------
         TypeError
-            If df_obs or df_eval is not a pandas DataFrame.
+            If df_obs or df_gt is not a pandas DataFrame.
         ValueError
             If required columns (user, item, time_col) are missing from
-            df_obs or df_eval, if ref cannot be normalized, or if no events
-            are observed in the evaluation period (cannot determine
+            df_obs or df_gt, if ref cannot be normalized, or if no events
+            are observed in the ground truth period (cannot determine
             recency_limit or frequency_limit automatically).
 
         Notes
@@ -199,21 +199,21 @@ class RecencyFrequencyScorer(PlottingMixin):
         """
         if not isinstance(df_obs, pd.DataFrame):
             raise TypeError("df_obs must be a pandas DataFrame.")
-        if not isinstance(df_eval, pd.DataFrame):
-            raise TypeError("df_eval must be a pandas DataFrame.")
+        if not isinstance(df_gt, pd.DataFrame):
+            raise TypeError("df_gt must be a pandas DataFrame.")
 
         required_columns = [self.user_col, self.item_col, self.time_col]
         missing_obs = [c for c in required_columns if c not in df_obs.columns]
         if missing_obs:
             raise ValueError(f"Missing required columns in df_obs: {missing_obs}")
-        missing_eval = [c for c in required_columns if c not in df_eval.columns]
-        if missing_eval:
-            raise ValueError(f"Missing required columns in df_eval: {missing_eval}")
+        missing_gt = [c for c in required_columns if c not in df_gt.columns]
+        if missing_gt:
+            raise ValueError(f"Missing required columns in df_gt: {missing_gt}")
 
         obs_log = self._to_internal(df_obs)
-        eval_log = self._to_internal(df_eval)
+        gt_log = self._to_internal(df_gt)
 
-        self.record_num = len(obs_log) + len(eval_log)
+        self.record_num = len(obs_log) + len(gt_log)
 
         if ref is None:
             ref_int = int(obs_log[self._SEQUENCE_COL].max())
@@ -224,14 +224,10 @@ class RecencyFrequencyScorer(PlottingMixin):
             int(obs_log[self._SEQUENCE_COL].min()) if len(obs_log) > 0 else None
         )
         self.observation_end_ = ref_int
-        self.evaluation_start_ = (
-            int(eval_log[self._SEQUENCE_COL].min()) if len(eval_log) > 0 else None
-        )
-        self.evaluation_end_ = (
-            int(eval_log[self._SEQUENCE_COL].max()) if len(eval_log) > 0 else None
-        )
+        self.gt_start_ = int(gt_log[self._SEQUENCE_COL].min()) if len(gt_log) > 0 else None
+        self.gt_end_ = int(gt_log[self._SEQUENCE_COL].max()) if len(gt_log) > 0 else None
 
-        self._fit_impl(obs_log, eval_log, ref_int, recency_limit, frequency_limit)
+        self._fit_impl(obs_log, gt_log, ref_int, recency_limit, frequency_limit)
         return self
 
     def _to_internal(self, df):
@@ -245,12 +241,12 @@ class RecencyFrequencyScorer(PlottingMixin):
         result[self._SEQUENCE_COL] = normalize_sequence_col(result[self._SEQUENCE_COL])
         return result
 
-    def _fit_impl(self, obs_log, eval_log, ref_int, recency_limit, frequency_limit):
-        """Core fitting logic. obs_log and eval_log must use internal column names."""
+    def _fit_impl(self, obs_log, gt_log, ref_int, recency_limit, frequency_limit):
+        """Core fitting logic. obs_log and gt_log must use internal column names."""
         self.record_num_obs = len(obs_log)
-        self.record_num_eval = len(eval_log)
+        self.record_num_gt = len(gt_log)
 
-        UIcv = {(row.user, row.item) for row in eval_log.itertuples()}
+        UIcv = {(row.user, row.item) for row in gt_log.itertuples()}
 
         df_ui2frc = self._build_ui_rf_df(obs_log, ref_int)
         df_ui2frc["cv"] = (
@@ -269,7 +265,7 @@ class RecencyFrequencyScorer(PlottingMixin):
             total_cv = df_recency2cv.cv.sum()
             if total_cv == 0:
                 raise ValueError(
-                    "No events observed in evaluation period. "
+                    "No events observed in ground truth period. "
                     "Cannot determine recency_limit automatically."
                 )
             cv_sum = 0
@@ -288,7 +284,7 @@ class RecencyFrequencyScorer(PlottingMixin):
             total_cv = df_frequency2cv.cv.sum()
             if total_cv == 0:
                 raise ValueError(
-                    "No events observed in evaluation period. "
+                    "No events observed in ground truth period. "
                     "Cannot determine frequency_limit automatically."
                 )
             cv_sum = 0
@@ -699,24 +695,24 @@ class RecencyFrequencyScorer(PlottingMixin):
     # Evaluation (推薦精度評価)
     # ---------------------------------------------------------------------------
 
-    def evaluate(self, df_rec, df_eval, order=1, user_col=None, item_col=None):
+    def evaluate(self, df_rec, df_gt, order=1, user_col=None, item_col=None):
         """Evaluate recommendation quality at each order cutoff.
 
         Parameters
         ----------
         df_rec : pd.DataFrame
             Recommendation results from transform(). Must have an "order" column.
-        df_eval : pd.DataFrame
-            Evaluation period event log. Used to derive the ground truth
+        df_gt : pd.DataFrame
+            Ground truth period event log. Used to derive the ground truth
             set of (user, item) pairs that experienced the target event.
         order : int, default 1
             Maximum recommendation rank to evaluate. Results are computed for
             each rank from 1 to order, plus the maximum order in df_rec.
         user_col : str, optional
-            Column name for user in df_rec and df_eval. Defaults to the value
+            Column name for user in df_rec and df_gt. Defaults to the value
             set in __init__.
         item_col : str, optional
-            Column name for item in df_rec and df_eval. Defaults to the value
+            Column name for item in df_rec and df_gt. Defaults to the value
             set in __init__.
 
         Returns
@@ -730,21 +726,21 @@ class RecencyFrequencyScorer(PlottingMixin):
         Raises
         ------
         TypeError
-            If df_eval is not a pandas DataFrame.
+            If df_gt is not a pandas DataFrame.
         ValueError
-            If user_col or item_col are missing from df_eval, or if the user
+            If user_col or item_col are missing from df_gt, or if the user
             or item column in df_rec cannot be cast to str.
         """
         user_col = user_col or self.user_col
         item_col = item_col or self.item_col
 
-        if not isinstance(df_eval, pd.DataFrame):
-            raise TypeError("df_eval must be a pandas DataFrame.")
-        missing = [c for c in [user_col, item_col] if c not in df_eval.columns]
+        if not isinstance(df_gt, pd.DataFrame):
+            raise TypeError("df_gt must be a pandas DataFrame.")
+        missing = [c for c in [user_col, item_col] if c not in df_gt.columns]
         if missing:
-            raise ValueError(f"Missing required columns in df_eval: {missing}")
+            raise ValueError(f"Missing required columns in df_gt: {missing}")
 
-        UIevent = set(zip(df_eval[user_col].astype(str), df_eval[item_col].astype(str)))
+        UIevent = set(zip(df_gt[user_col].astype(str), df_gt[item_col].astype(str)))
 
         df_rec = df_rec.copy()
         try:
@@ -929,13 +925,13 @@ class RecencyFrequencyScorer(PlottingMixin):
 
         if self.record_num_obs:
             print("record_num_obs:", self.record_num_obs)
-        if self.record_num_eval:
-            print("record_num_eval:", self.record_num_eval)
+        if self.record_num_gt:
+            print("record_num_gt:", self.record_num_gt)
 
         if self.observation_start_ and self.observation_end_:
             print("observation: {} -> {}".format(self.observation_start_, self.observation_end_))
-        if self.evaluation_start_ and self.evaluation_end_:
-            print("evaluation: {} -> {}".format(self.evaluation_start_, self.evaluation_end_))
+        if self.gt_start_ and self.gt_end_:
+            print("ground_truth: {} -> {}".format(self.gt_start_, self.gt_end_))
 
         if self.recency_limit:
             print("recency_limit:", self.recency_limit)
@@ -1015,8 +1011,8 @@ if __name__ == "__main__":
 
     # 観測期間・正解期間に分割してから fit
     df_train_obs = df_train[df_train.datetime <= target_date]
-    df_train_eval = df_train[df_train.datetime > target_date]
-    scorer.fit(df_train_obs, df_train_eval)
+    df_train_gt = df_train[df_train.datetime > target_date]
+    scorer.fit(df_train_obs, df_train_gt)
 
     scorer.plot_probability_surface("empirical").savefig("surface_emp_probability.png")
     scorer.plot_marginal_probability("recency").savefig("marginal_recency_probability.png")
@@ -1049,10 +1045,10 @@ if __name__ == "__main__":
     scorer.export_probability_csv("all")
 
     df_test_obs = df_test[df_test.datetime <= target_date]
-    df_test_eval = df_test[df_test.datetime > target_date]
+    df_test_gt = df_test[df_test.datetime > target_date]
 
     for kind in ("emp", "er", "ef", "mr", "mf", "mono", "mrc", "mfc", "mcc"):
         print(f"--- {kind} ---")
         df_rec = scorer.transform(df_test_obs, kind=kind)
         df_rec.to_csv(f"df_recommend_{kind}.csv", index=False)
-        print(scorer.evaluate(df_rec, df_test_eval, order=10))
+        print(scorer.evaluate(df_rec, df_test_gt, order=10))

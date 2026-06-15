@@ -17,9 +17,9 @@
 | ユーザー | user | 閲覧ログの主体。`user` カラムで識別する |
 | 商品 | item | 閲覧対象。`item` カラムで識別する |
 | 観測期間 | observation period | 最新度・頻度を算出するために使用する期間。`fit()` に `df_obs` として渡す。`split_by_date()` を使えば単一の DataFrame から `target_date` を基準に自動分割できる |
-| 正解期間 | ground truth period | 対象イベント（閲覧・購買・CV など）の発生を観測するために使用する期間。観測期間の直後に設定する。`fit()` に `df_eval` として渡す |
+| 正解期間 | ground truth period | 対象イベント（閲覧・購買・CV など）の発生を観測するために使用する期間。観測期間の直後に設定する。`fit()` に `df_gt` として渡す |
 | 観測ログ | observation log | 観測期間に該当する閲覧ログ DataFrame。`fit(df_obs, ...)` に `df_obs` として渡す。最新度・頻度を計算する基となる閲覧履歴 |
-| 正解ログ | ground truth log | 正解期間に該当するイベント履歴 DataFrame。`fit(..., df_eval)` に `df_eval` として渡す。対象イベント（再閲覧・購買・CV など）の発生を記録 |
+| 正解ログ | ground truth log | 正解期間に該当するイベント履歴 DataFrame。`fit(..., df_gt)` に `df_gt` として渡す。対象イベント（再閲覧・購買・CV など）の発生を記録 |
 
 ## アルゴリズム
 
@@ -49,11 +49,11 @@
 |------|------|
 | `RecencyFrequencyScorer` | RF スコアリングの主クラス。コンストラクタでカラム名・`unit` を受け取る |
 | `unit` | 最新度の粒度を指定する正の整数（デフォルト `1`）。最新度は `(ref - 値) // unit + 1` で算出される。`unit=1` で日単位、`unit=7` で週単位、`unit=30` で月単位（近似）になる |
-| `fit(df_obs, df_eval, ref=None, recency_limit=None, frequency_limit=None)` | 観測ログ `df_obs` と正解ログ `df_eval` を直接受け取り、経験的商品選択確率を推定するメソッド。scikit-learn スタイルの主要 fit メソッド。`ref` は最新度計算の基準値（日付または整数。`None` の場合は `df_obs` の最大値を使用） |
-| `split_by_date(df, target_date, observation_days=28, evaluation_days=7, time_col='datetime')` | 単一の閲覧ログ DataFrame を `target_date` を基準に観測ログと正解ログに分割するユーティリティ関数。`from rfscorer import split_by_date` でインポート可能。戻り値は `(df_obs, df_eval)` のタプル。`target_date` は日付・整数いずれも可 |
+| `fit(df_obs, df_gt, ref=None, recency_limit=None, frequency_limit=None)` | 観測ログ `df_obs` と正解ログ `df_gt` を直接受け取り、経験的商品選択確率を推定するメソッド。scikit-learn スタイルの主要 fit メソッド。`ref` は最新度計算の基準値（日付または整数。`None` の場合は `df_obs` の最大値を使用） |
+| `split_by_date(df, target_date, observation_days=28, gt_days=7, time_col='datetime')` | 単一の閲覧ログ DataFrame を `target_date` を基準に観測ログと正解ログに分割するユーティリティ関数。`from rfscorer import split_by_date` でインポート可能。戻り値は `(df_obs, df_gt)` のタプル。`target_date` は日付・整数いずれも可 |
 | `predict(r, f, kind='emp')` | 指定した最新度 `r`・頻度 `f` の商品選択確率を返すメソッド。`r` は1が最も直近（数値が大きいほど古い）、`f` は観測期間の閲覧回数。1次元モデルでは片方の引数のみ参照される（`kind='mr'/'er'` は `r` のみ、`kind='mf'/'ef'` は `f` のみ）。`r` が `recency_limit` を超える場合・`f` が `frequency_limit` を超える場合は上限にクランプされる。`fit()` 後に利用可能 |
 | `transform(df, ref=None, kind='emp', ...)` | 入力 DataFrame の各 user×item ペアに最新度・頻度・商品選択確率・順位を付与して返すメソッド。`ref` は最新度計算の基準値（`None` の場合は `df` の最大値を使用）。`recency_limit`・`frequency_limit` を超える値は確率参照時に上限にクランプされる（出力カラム `recency`・`frequency` は元値を保持）。`user_col`・`item_col`・`time_col` は省略すると `__init__` の設定値を使用する。`fit()` 後に利用可能 |
-| `evaluate(df_rec, df_eval, order=1, ...)` | 推薦結果と正解期間のイベント履歴 `df_eval` を比較し評価指標を返すメソッド。戻り値カラムは `order`, `n_recommended`, `n_hit`, `precision`, `recall`, `f1`, `recall_norm`（df_rec 内で達成可能な最大ヒット数で正規化した recall）, `f1_norm`（recall_norm を用いた f1）。`user_col`・`item_col` は省略すると `__init__` の設定値を使用する |
+| `evaluate(df_rec, df_gt, order=1, ...)` | 推薦結果と正解期間のイベント履歴 `df_gt` を比較し評価指標を返すメソッド。戻り値カラムは `order`, `n_recommended`, `n_hit`, `precision`, `recall`, `f1`, `recall_norm`（df_rec 内で達成可能な最大ヒット数で正規化した recall）, `f1_norm`（recall_norm を用いた f1）。`user_col`・`item_col` は省略すると `__init__` の設定値を使用する |
 | `plot_probability_surface(kind='emp', title=None, figsize=(6, 5), fontsize=12, recency_label='recency', frequency_label='frequency', probability_label='probability')` | 商品選択確率を3次元ワイヤーフレームで可視化し `matplotlib.figure.Figure` を返すメソッド。軸ラベル・タイトル・図サイズ・フォントサイズを指定可能。日本語ラベルには `rfscorer[ja]` が必要。`fit()` 後（`kind='mono'/'mrc'/'mfc'/'mcc'` の場合は `optimize()` 後）に利用可能。`kind='mr'`・`'mf'`・`'er'`・`'ef'` は1次元モデルのため `ValueError` を送出する（折れ線表示には `plot_marginal_probability()` を使用する） |
 | `plot_marginal_probability(axis='recency', kind='emp', title=None, figsize=(5, 4), fontsize=12, recency_label='recency', frequency_label='frequency', probability_label='probability')` | 最新度または頻度の一方向の商品選択確率を折れ線グラフで可視化し `matplotlib.figure.Figure` を返すメソッド。`kind='emp'/'er'/'ef'` で1次元経験的確率のみ、`kind='mr'/'mf'` で1次元最適化確率のみ、`kind='all'` で両者を重ねて表示する。単調性確認や最適化前後の比較に使用する。日本語ラベルには `rfscorer[ja]` が必要。`fit()` 後に利用可能（`kind='mr'/'mf'/'all'` の場合は `optimize()` 後も必要） |
 | `optimize(kind='mono', eps=0.0)` | `fit()` の結果を用いて、RF 制約付きの最適化商品選択確率を推定するメソッド。`kind='mono'`（単調性のみ）・`'mrc'`（単調性 + Recency 凸性）・`'mfc'`（単調性 + Frequency 凹性）・`'mcc'`（単調性 + 両凹凸性）・`'mr'`（1次元 Recency）・`'mf'`（1次元 Frequency）を指定する（長名エイリアスも使用可）。`eps > 0` で狭義単調性を適用する |

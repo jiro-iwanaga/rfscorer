@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Terminology unification: renamed all `eval`-prefixed names to `gt` (ground truth)
+  to align with the unified terminology in `docs/glossary.md` (正解ログ / ground truth log).
+  Breaking changes:
+  - `fit(df_obs, df_eval, ...)` → `fit(df_obs, df_gt, ...)`
+  - `evaluate(df_rec, df_eval, ...)` → `evaluate(df_rec, df_gt, ...)`
+  - `split_by_date(..., evaluation_days=7, ...)` → `split_by_date(..., gt_days=7, ...)`;
+    return value documented as `(df_obs, df_gt)` instead of `(df_obs, df_eval)`.
+  - Attribute `record_num_eval` → `record_num_gt`
+  - Attribute `evaluation_start_` → `gt_start_`
+  - Attribute `evaluation_end_` → `gt_end_`
+  - `show()` output label `evaluation:` → `ground_truth:`
+  - Error message "No events observed in evaluation period" → "No events observed in ground truth period"
+
+## [0.4.3] - 2026-06-15
+
 ### Added
 
 - Tutorial notebooks: Created bilingual beginner tutorials
