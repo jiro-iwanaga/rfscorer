@@ -6,7 +6,7 @@
 |-----------|--------|------|
 | `scorer.py` | `RecencyFrequencyScorer` | 公開 API。fit・predict・transform・optimize・evaluate・plot・export の各メソッドを提供する |
 | `optimizer.py` | `RecencyFrequencyOptimizer` | 内部モジュール。`optimize()` から委譲された凸2次計画問題を cvxpy で求解する |
-| `utils.py` | `split_by_date()` | 公開ユーティリティ。観測ログと評価ログを target_date で自動分割する |
+| `utils.py` | `split_by_date()` | 公開ユーティリティ。観測ログと正解ログを target_date で自動分割する |
 | `_plotting.py` | `PlottingMixin` | 内部モジュール。`RecencyFrequencyScorer` に Mixin として継承され、`plot_probability_surface()` / `plot_marginal_probability()` を提供する |
 | `_time_utils.py` | `normalize_ref()`, `normalize_sequence_col()` | 内部用。時間軸の正規化・変換（プライベート） |
 | `__init__.py` | — | `RecencyFrequencyScorer` と `split_by_date` を公開 API としてエクスポートする |

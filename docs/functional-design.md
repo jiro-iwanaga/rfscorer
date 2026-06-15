@@ -2,10 +2,10 @@
 
 ## 概要
 
-`rfscorer` は、ユーザー × 商品の閲覧履歴から商品の商品選択確率を推定する。  
+`rfscorer` は、ユーザー × 商品の閲覧ログから商品の商品選択確率を推定する。  
 推定には2段階のアプローチをとる。
 
-1. **経験的商品選択確率の推定**: 観測期間に最新度 $r$、頻度 $f$ の商品が、評価期間で対象イベント（再閲覧・購買・CV など）を発生させる割合とする
+1. **経験的商品選択確率の推定**: 観測期間に最新度 $r$、頻度 $f$ の商品が、正解期間で対象イベント（再閲覧・購買・CV など）を発生させる割合とする
 2. **最適化商品選択確率の推定**: 経験的商品選択確率を用いて、RF 制約と最小二乗誤差を目的関数にもつ凸2次計画問題を解いて推定する
 
 ## 数理モデル
@@ -18,16 +18,16 @@
 | $I$ | 商品のリスト。$i$は商品を表す。 |
 | $R$ | 観測期間の最新度のリスト(1以上の連続自然数の集合)。$r$は最新度を表す。 |
 | $F$ | 観測期間の頻度のリスト(1以上の連続自然数の集合)。$f$は頻度を表す。 |
-| $n_{r,f}$ | 観測期間で最新度 $r$、頻度 $f$ の商品が評価期間で対象イベントを発生させた回数の合計 |
+| $n_{r,f}$ | 観測期間で最新度 $r$、頻度 $f$ の商品が正解期間で対象イベントを発生させた回数の合計 |
 | $N_{r,f}$ | 観測期間で最新度 $r$、頻度 $f$ であった (user, item) ペアの数（=サンプル数） |
-| $p_{r,f}$ | 観測期間で最新度 $r$、頻度 $f$ の商品の評価期間における経験的商品選択確率（2次元） |
+| $p_{r,f}$ | 観測期間で最新度 $r$、頻度 $f$ の商品の正解期間における経験的商品選択確率（2次元） |
 | $p_r$ | 最新度 $r$ の1次元経験的商品選択確率（$f$ 方向に集約） |
 | $p_f$ | 頻度 $f$ の1次元経験的商品選択確率（$r$ 方向に集約） |
-| $x_{r,f}$ | 観測期間で最新度 $r$、頻度 $f$ の商品の評価期間における最適化商品選択確率 |
+| $x_{r,f}$ | 観測期間で最新度 $r$、頻度 $f$ の商品の正解期間における最適化商品選択確率 |
 
 ### 経験的商品選択確率の推定（`emp`）
 
-「観測期間で最新度 $r$、頻度 $f$ の商品が評価期間で対象イベントを発生させた回数の合計」を
+「観測期間で最新度 $r$、頻度 $f$ の商品が正解期間で対象イベントを発生させた回数の合計」を
 「観測期間で最新度 $r$、頻度 $f$ であった (user, item) ペアの数」で割った値を経験的商品選択確率とする。
 
 $$p_{r,f} := \frac{n_{r,f}}{N_{r,f}}\ \ \  (r\in R, f\in F)$$
@@ -116,12 +116,12 @@ RecencyFrequencyScorer(user_col="user", item_col="item", time_col="datetime", un
 
 ##### `fit(df_obs, df_eval, ref=None, recency_limit=None, frequency_limit=None)`
 
-観測ログ DataFrame と評価ログ DataFrame を直接受け取り、$(r, f)$ 別の経験的商品選択確率を推定する。scikit-learn スタイルの主要 fit メソッド。
+観測ログ DataFrame と正解ログ DataFrame を直接受け取り、$(r, f)$ 別の経験的商品選択確率を推定する。scikit-learn スタイルの主要 fit メソッド。
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
-| `df_obs` | `pd.DataFrame` | — | 観測期間の閲覧履歴 |
-| `df_eval` | `pd.DataFrame` | — | 評価期間のイベント履歴（閲覧・購買・CV など推定対象のイベント） |
+| `df_obs` | `pd.DataFrame` | — | 観測期間の閲覧ログ |
+| `df_eval` | `pd.DataFrame` | — | 正解期間のイベント履歴（閲覧・購買・CV など推定対象のイベント） |
 | `ref` | `str \| datetime \| int \| None` | `None` | 最新度計算の基準値（日付または整数）。`None` の場合は `df_obs[time_col].max()` を使用 |
 | `recency_limit` | `int \| None` | `None` | 最大最新度。`None` の場合、累積対象イベント発生数の分布から `RECENCY_LIMIT_RATE` に基づいて自動決定 |
 | `frequency_limit` | `int \| None` | `None` | 最大頻度。`None` の場合、累積対象イベント発生数の分布から `FREQUENCY_LIMIT_RATE` に基づいて自動決定 |
@@ -146,7 +146,7 @@ RecencyFrequencyScorer(user_col="user", item_col="item", time_col="datetime", un
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
-| `df` | `pd.DataFrame` | — | スコアリング対象の閲覧履歴（観測期間でフィルタ済みを想定） |
+| `df` | `pd.DataFrame` | — | スコアリング対象の閲覧ログ（観測期間でフィルタ済みを想定） |
 | `ref` | `str \| datetime \| int \| None` | `None` | 最新度・頻度の計算基準値（日付または整数）。`None` の場合は `df[time_col].max()` を使用 |
 | `kind` | `str` | `"emp"` | `"emp"`・`"er"`・`"ef"`・`"mono"`・`"mr"`・`"mf"`・`"mrc"`・`"mfc"`・`"mcc"` のいずれか（長名エイリアスも使用可） |
 | `user_col` | `str \| None` | `None` | ユーザーカラム名。省略時は `__init__` で設定した値を使用 |
@@ -157,13 +157,13 @@ RecencyFrequencyScorer(user_col="user", item_col="item", time_col="datetime", un
 
 ##### `evaluate(df_rec, df_eval, order=1, user_col=None, item_col=None)`
 
-推薦結果と評価期間のイベント履歴を比較し、各順位カットオフでの評価指標を返す。
+推薦結果と正解期間のイベント履歴を比較し、各順位カットオフでの評価指標を返す。
 `df_rec` の user/item 列と `df_eval` の user/item 列は内部で `str` にキャストして比較する。
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
 | `df_rec` | `pd.DataFrame` | — | `transform()` の出力 |
-| `df_eval` | `pd.DataFrame` | — | 評価期間のイベント履歴（閲覧・購買・CV など）。`fit()` に渡したものと同じ DataFrame を渡すことを想定 |
+| `df_eval` | `pd.DataFrame` | — | 正解期間のイベント履歴（閲覧・購買・CV など）。`fit()` に渡したものと同じ DataFrame を渡すことを想定 |
 | `order` | `int` | `1` | 評価する最大推薦順位 |
 | `user_col` | `str \| None` | `None` | ユーザーカラム名。省略時は `__init__` で設定した値を使用 |
 | `item_col` | `str \| None` | `None` | 商品カラム名。省略時は `__init__` で設定した値を使用 |
@@ -286,9 +286,9 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 | `mcc_probability_` | `pd.DataFrame` | mcc モデル最適化商品選択確率（カラム: `recency`, `frequency`, `probability`） | `optimize(kind="mcc")` 後 |
 | `mcc_probability_table_` | `pd.DataFrame` | mcc モデル最適化商品選択確率（横持ち） | `optimize(kind="mcc")` 後 |
 | `mcc_probability_dict_` | `dict` | mcc モデル最適化商品選択確率（キー: `(r, f)`、値: `probability`） | `optimize(kind="mcc")` 後 |
-| `record_num` | `int` | 全閲覧履歴のレコード数 | `fit()` 後 |
+| `record_num` | `int` | 全閲覧ログのレコード数 | `fit()` 後 |
 | `record_num_obs` | `int` | 観測期間のレコード数 | `fit()` 後 |
-| `record_num_eval` | `int` | 評価期間のレコード数 | `fit()` 後 |
+| `record_num_eval` | `int` | 正解期間のレコード数 | `fit()` 後 |
 | `record_num_target_org` | `int` | フィルタリング前の分析対象レコード数 | `fit()` 後 |
 | `record_num_target` | `int` | フィルタリング後の分析対象レコード数 | `fit()` 後 |
 | `total_cv_org` | `int` | フィルタリング前の cv 数 | `fit()` 後 |
@@ -298,15 +298,15 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 
 ### `split_by_date(df, target_date, observation_days=28, evaluation_days=7, time_col="datetime")`
 
-`from rfscorer import split_by_date` で利用可能。`target_date` を基準に単一の DataFrame を観測ログ・評価ログに分割するスタンドアロン関数。`RecencyFrequencyScorer` に依存せず、ローリング workflow など複数 `target_date` を渡す研究的用途にも利用できる。
+`from rfscorer import split_by_date` で利用可能。`target_date` を基準に単一の DataFrame を観測ログ・正解ログに分割するスタンドアロン関数。`RecencyFrequencyScorer` に依存せず、ローリング workflow など複数 `target_date` を渡す研究的用途にも利用できる。
 
 - 観測期間: `max(df の time_col 最小値, target_date - observation_days + 1 時間単位)` 〜 `target_date`（含む。`observation_days=N` で N 時間単位の窓）
-- 評価期間: `target_date の翌時点` 〜 `min(df の time_col 最大値, target_date + evaluation_days 時間単位)`（`evaluation_days=N` で N 時間単位の窓）
+- 正解期間: `target_date の翌時点` 〜 `min(df の time_col 最大値, target_date + evaluation_days 時間単位)`（`evaluation_days=N` で N 時間単位の窓）
 
 | パラメータ | 型 | デフォルト | 説明 |
 |-----------|-----|-----------|------|
 | `df` | `pd.DataFrame` | — | 分割対象の DataFrame |
-| `target_date` | `str \| datetime \| int` | — | 観測期間と評価期間の分割点（日付または整数） |
+| `target_date` | `str \| datetime \| int` | — | 観測期間と正解期間の分割点（日付または整数） |
 | `observation_days` | `int \| None` | `28` | `target_date` から遡る最大時間単位数。`None` の場合は df の先頭まで |
 | `evaluation_days` | `int \| None` | `7` | `target_date` から進む最大時間単位数。`None` の場合は df の末尾まで |
 | `time_col` | `str` | `"datetime"` | 時点カラム名 |
@@ -316,7 +316,7 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 ## データフロー
 
 ```
-観測ログ (df_obs)    評価ログ (df_eval)
+観測ログ (df_obs)    正解ログ (df_eval)
         │                    │
         └──────────┬──────────┘
                    ▼
@@ -324,7 +324,7 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
         （df_obs, df_eval = split_by_date(df, target_date) でユーティリティ分割も可能）
                    │
 user / item / time_col に正規化（datetime64・文字列は ordinal 整数に変換）
-観測期間・評価期間でフィルタ
+観測期間・正解期間でフィルタ
 r（最新度）・f（頻度）を算出
 (r, f) 別に n_{r,f}・N_{r,f} を集計
 p_{r,f} = n_{r,f} / N_{r,f}（2次元）、p_r・p_f も同時に計算
@@ -371,7 +371,7 @@ df = pd.read_csv(url)
 
 scorer = RecencyFrequencyScorer(user_col="user_id", item_col="item_id", time_col="date")
 
-# split_by_date() で観測ログと評価ログを自動分割（推奨）
+# split_by_date() で観測ログと正解ログを自動分割（推奨）
 target_date = "2015-07-06"
 df_obs, df_eval = split_by_date(df, target_date=target_date)
 scorer.fit(df_obs, df_eval)

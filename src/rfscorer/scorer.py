@@ -130,7 +130,7 @@ class RecencyFrequencyScorer(PlottingMixin):
         # データ解析用
         self.record_num = None  # レコード数（fit() 後に設定）
         self.record_num_obs = None  # 観測期間レコード数
-        self.record_num_eval = None  # 評価期間レコード数
+        self.record_num_eval = None  # 正解期間レコード数
         self.record_num_target_org = None  # 分析対象フィルタリング前レコード数
         self.record_num_target = None  # 分析対象レコード数
         self.total_cv_org = None  # フィルタリング前 cv 数
@@ -1013,7 +1013,7 @@ if __name__ == "__main__":
 
     target_date = "2015-07-07"
 
-    # 観測期間・評価期間に分割してから fit
+    # 観測期間・正解期間に分割してから fit
     df_train_obs = df_train[df_train.datetime <= target_date]
     df_train_eval = df_train[df_train.datetime > target_date]
     scorer.fit(df_train_obs, df_train_eval)
