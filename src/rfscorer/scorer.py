@@ -1001,6 +1001,11 @@ class RecencyFrequencyScorer(PlottingMixin):
 
 
 if __name__ == "__main__":
+    try:
+        from rfscorer import split_by_date
+    except ImportError:
+        from .utils import split_by_date
+
     # データの読み込み（オーム社『Pythonではじめる数理最適化』サポートデータより引用）
     url = "https://raw.githubusercontent.com/ohmsha/PyOptBook/main/7.recommendation/access_log.csv"
     df = pd.read_csv(url)
@@ -1012,9 +1017,8 @@ if __name__ == "__main__":
 
     target_date = "2015-07-07"
 
-    # 観測期間・正解期間に分割してから fit
-    df_train_obs = df_train[df_train.datetime <= target_date]
-    df_train_gt = df_train[df_train.datetime > target_date]
+    # split_by_date を使用して観測期間・正解期間に分割
+    df_train_obs, df_train_gt = split_by_date(df_train, target_date)
     scorer.fit(df_train_obs, df_train_gt)
 
     scorer.plot_probability_surface("empirical").savefig("surface_emp_probability.png")
@@ -1047,11 +1051,13 @@ if __name__ == "__main__":
     scorer.plot_probability_surface("mcc").savefig("surface_mcc_probability.png")
     scorer.export_probability_csv("all")
 
-    df_test_obs = df_test[df_test.datetime <= target_date]
-    df_test_gt = df_test[df_test.datetime > target_date]
+    df_test_obs, df_test_gt = split_by_date(df_test, target_date)
 
     for kind in ("emp", "er", "ef", "mr", "mf", "mono", "mrc", "mfc", "mcc"):
         print(f"--- {kind} ---")
         df_rec = scorer.transform(df_test_obs, kind=kind)
         df_rec.to_csv(f"df_recommend_{kind}.csv", index=False)
-        print(scorer.evaluate(df_rec, df_test_gt, order=10))
+
+        df_eval = scorer.evaluate(df_rec, df_test_gt, order=10)
+        print(df_eval)
+        df_eval.to_csv(f"df_evaluate_{kind}.csv", index=False)
