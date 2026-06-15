@@ -143,7 +143,7 @@ class TestSaveZipLoadZip:
         with zipfile.ZipFile(path, "r") as zf:
             names = set(zf.namelist())
             assert "metadata.json" in names
-            assert "scorer.pkl" in names
+            assert "rfscorer.pkl" in names
             for kind in ("emp", "er", "ef"):
                 assert f"probabilities/{kind}_probability.csv" in names
             assert "plots/emp_surface.png" in names
@@ -171,7 +171,7 @@ class TestSaveZipLoadZip:
         fitted_scorer.save_zip(path)
 
         with zipfile.ZipFile(path, "r") as zf_r:
-            original_pkl = zf_r.read("scorer.pkl")
+            original_pkl = zf_r.read("rfscorer.pkl")
             names = zf_r.namelist()
             contents = {name: zf_r.read(name) for name in names}
 
@@ -179,7 +179,7 @@ class TestSaveZipLoadZip:
         payload["rfscorer_version"] = "99.99.0"
         modified_pkl = io.BytesIO()
         pickle.dump(payload, modified_pkl)
-        contents["scorer.pkl"] = modified_pkl.getvalue()
+        contents["rfscorer.pkl"] = modified_pkl.getvalue()
 
         modified_path = tmp_path / "modified.zip"
         with zipfile.ZipFile(modified_path, "w") as zf_w:

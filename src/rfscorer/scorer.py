@@ -999,7 +999,7 @@ class RecencyFrequencyScorer(PlottingMixin):
 
         The archive contains:
 
-        - ``scorer.pkl`` — the model for :meth:`load_zip`
+        - ``rfscorer.pkl`` — the model for :meth:`load_zip`
         - ``metadata.json`` — version, parameters, and fit statistics
         - ``probabilities/`` — one CSV per computed probability kind
         - ``plots/`` — one PNG per computed probability kind
@@ -1057,7 +1057,7 @@ class RecencyFrequencyScorer(PlottingMixin):
 
             pkl_buf = io.BytesIO()
             pickle.dump({"rfscorer_version": current_ver, "scorer": self}, pkl_buf)
-            zf.writestr("scorer.pkl", pkl_buf.getvalue())
+            zf.writestr("rfscorer.pkl", pkl_buf.getvalue())
 
             if self.emp_probability_ is not None:
                 for kind, df in [
@@ -1124,7 +1124,7 @@ class RecencyFrequencyScorer(PlottingMixin):
         from pathlib import Path
 
         with zipfile.ZipFile(Path(path), "r") as zf:
-            with zf.open("scorer.pkl") as f:
+            with zf.open("rfscorer.pkl") as f:
                 payload = pickle.load(io.BytesIO(f.read()))  # noqa: S301
 
         saved_ver = payload.get("rfscorer_version", "unknown")
