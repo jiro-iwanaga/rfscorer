@@ -1660,10 +1660,19 @@ class TestShow:
         out = capsys.readouterr().out
         assert "RecencyFrequencyScorer" in out
 
+    def test_show_outputs_sections(self, scorer_fitted, capsys):
+        scorer_fitted.show()
+        out = capsys.readouterr().out
+        assert "Data" in out
+        assert "Model" in out
+        assert "Correlation" in out
+        assert "Empirical Probability Table" in out
+
     def test_show_outputs_period_info(self, scorer_fitted, capsys):
         scorer_fitted.show()
         out = capsys.readouterr().out
         assert "observation" in out
+        assert "2024-01-01" in out  # ordinal が日付文字列に変換されている
 
     def test_show_outputs_limits(self, scorer_fitted, capsys):
         scorer_fitted.show()
@@ -1674,8 +1683,17 @@ class TestShow:
     def test_show_outputs_corr(self, scorer_fitted, capsys):
         scorer_fitted.show()
         out = capsys.readouterr().out
-        assert "recency_corr" in out
-        assert "frequency_corr" in out
+        assert "recency" in out
+        assert "frequency" in out
+        assert "p=" in out
+        assert "weighted" in out
+
+    def test_show_outputs_slice_corr(self, scorer_fitted, capsys):
+        scorer_fitted.show()
+        out = capsys.readouterr().out
+        assert "Slice" in out
+        assert "r=" in out
+        assert "f=" in out
 
 
 # ---------------------------------------------------------------------------

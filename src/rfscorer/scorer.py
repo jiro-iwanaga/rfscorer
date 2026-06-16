@@ -1201,44 +1201,97 @@ class RecencyFrequencyScorer(PlottingMixin):
     # ---------------------------------------------------------------------------
 
     def show(self):
-        """Print a summary of fit() results to stdout."""
+        """Print a diagnostic summary of fit() results."""
+
+        def sec(title=""):
+            pad = max(0, 54 - len(title) - 4)
+            return f"── {title} " + "─" * pad if title else "─" * 54
+
         print("=== RecencyFrequencyScorer ===")
         if self.emp_probability_ is None:
             print("  [not fitted]")
             return
+
+        import math
+
+        print()
+        print(sec("Data"))
         print(
-            f"  records        : {self.record_num}"
-            f" (obs={self.record_num_obs}, gt={self.record_num_gt})"
-        )
-        print(f"  observation    : {self.observation_start_} → {self.observation_end_}")
-        print(f"  recency_limit  : {self.recency_limit}")
-        print(f"  frequency_limit: {self.frequency_limit}")
-        print(f"  target_records : {self.record_num_target_org} → {self.record_num_target}")
-        print(f"  total_cv       : {self.total_cv_org} → {self.total_cv}")
-        print(
-            f"  recency_corr   : {self.recency_corr_:.4f}"
-            f" (p={self.recency_corr_pvalue_:.4f}, weighted: {self.recency_corr_weighted_:.4f})"
+            f"  rows (obs + gt)  : {self.record_num}"
+            f"  (obs: {self.record_num_obs},  gt: {self.record_num_gt})"
         )
         print(
-            f"  frequency_corr : {self.frequency_corr_:.4f}"
-            f" (p={self.frequency_corr_pvalue_:.4f}, weighted: {self.frequency_corr_weighted_:.4f})"
+            f"  observation      : {self._fmt_ordinal(self.observation_start_)}"
+            f" → {self._fmt_ordinal(self.observation_end_)}"
         )
-        print(f"  recency_slice_corr : {self._fmt_slice_corr(self.recency_slice_corr_)}")
-        print(f"  frequency_slice_corr: {self._fmt_slice_corr(self.frequency_slice_corr_)}")
-        print("  emp_probability_table_:")
+        print(
+            f"  user×item pairs  : {self.record_num_target_org}"
+            f" → {self.record_num_target}"
+            f"  (before → after applying limits)"
+        )
+        print(
+            f"  target events    : {self.total_cv_org}"
+            f" → {self.total_cv}"
+            f"  (before → after applying limits)"
+        )
+
+        print()
+        print(sec("Model"))
+        print(f"  recency_limit    : {self.recency_limit}")
+        print(f"  frequency_limit  : {self.frequency_limit}")
+
+        print()
+        print(sec("Correlation"))
+        print("  [expected: recency ρ < 0  (more recent → higher prob),")
+        print("             frequency ρ > 0  (more frequent → higher prob)]")
+        n_r = sum(1 for v in self._R2N.values() if v > 0)
+        n_f = sum(1 for v in self._F2N.values() if v > 0)
+
+        def _fmt_rho(v):
+            return f"{v: .4f}" if not math.isnan(v) else " nan"
+
+        def _fmt_p(v):
+            return f"{v:.4f}" if not math.isnan(v) else "nan"
+
+        rho_r = _fmt_rho(self.recency_corr_)
+        p_r = _fmt_p(self.recency_corr_pvalue_)
+        wrho_r = _fmt_rho(self.recency_corr_weighted_)
+        rho_f = _fmt_rho(self.frequency_corr_)
+        p_f = _fmt_p(self.frequency_corr_pvalue_)
+        wrho_f = _fmt_rho(self.frequency_corr_weighted_)
+        print(f"  recency  ρ       : {rho_r}  (p={p_r},  n={n_r},  weighted ρ: {wrho_r})")
+        print(f"  frequency ρ      : {rho_f}  (p={p_f},  n={n_f},  weighted ρ: {wrho_f})")
+        print()
+        print("  Slice ρ by r  [corr(f, P(r,f)),  expected > 0]")
+        print(f"    {self._fmt_slice_row(self.recency_slice_corr_, 'r')}")
+        print("  Slice ρ by f  [corr(r, P(r,f)),  expected < 0]")
+        print(f"    {self._fmt_slice_row(self.frequency_slice_corr_, 'f')}")
+
+        print()
+        print(sec("Empirical Probability Table"))
         print(self.emp_probability_table_.round(3).to_string())
 
     # ---------------------------------------------------------------------------
     # Internal helpers
     # ---------------------------------------------------------------------------
 
-    def _fmt_slice_corr(self, d):
+    def _fmt_ordinal(self, v):
+        try:
+            ts = pd.Timestamp.fromordinal(int(v))
+            if 1900 <= ts.year <= 2200:
+                return str(ts.date())
+        except (ValueError, OverflowError, AttributeError):
+            pass
+        return str(int(v))
+
+    def _fmt_slice_row(self, d, prefix):
         import math
 
         parts = [
-            f"{k}: {v:.4f}" if not math.isnan(v) else f"{k}: nan" for k, v in sorted(d.items())
+            f"{prefix}={k}: {v:.4f}" if not math.isnan(v) else f"{prefix}={k}: nan"
+            for k, v in sorted(d.items())
         ]
-        return "{" + ", ".join(parts) + "}"
+        return "    ".join(parts)
 
     def _marginal_spearman(self, x_vals, y_vals, weights=None):
         """Spearman ρ between x_vals and y_vals, optionally N-weighted.
