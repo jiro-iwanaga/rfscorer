@@ -1212,13 +1212,15 @@ class TestPlotProbabilitySurface:
 
     def test_title_shown_when_set(self, scorer_fitted):
         fig = scorer_fitted.plot_probability_surface(title="My Title")
-        ax = fig.axes[0]
-        assert ax.get_title() == "My Title"
+        assert fig.axes[0].get_title() == "My Title"
 
-    def test_title_empty_when_none(self, scorer_fitted):
+    def test_title_default_when_none(self, scorer_fitted):
         fig = scorer_fitted.plot_probability_surface(title=None)
-        ax = fig.axes[0]
-        assert ax.get_title() == ""
+        assert fig.axes[0].get_title() == "Empirical"
+
+    def test_title_suppressed_when_empty_string(self, scorer_fitted):
+        fig = scorer_fitted.plot_probability_surface(title="")
+        assert fig.axes[0].get_title() == ""
 
     def test_fontsize_applied_to_labels(self, scorer_fitted):
         fig = scorer_fitted.plot_probability_surface(fontsize=16)
@@ -1331,21 +1333,91 @@ class TestPlotMarginalProbability:
         with pytest.raises(RuntimeError, match="fit"):
             scorer.plot_marginal_probability()
 
-    def test_invalid_axis_raises(self, scorer_fitted):
-        with pytest.raises(ValueError, match="axis"):
-            scorer_fitted.plot_marginal_probability(axis="invalid")
+    def test_invalid_kind_raises(self, scorer_fitted):
+        with pytest.raises(ValueError, match="kind"):
+            scorer_fitted.plot_marginal_probability(kind="invalid")
 
-    def test_returns_figure_recency(self, scorer_fitted):
+    def test_mr_before_optimize_raises(self, scorer_fitted):
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer_fitted.plot_marginal_probability(kind="mr")
+
+    def test_mf_before_optimize_raises(self, scorer_fitted):
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer_fitted.plot_marginal_probability(kind="mf")
+
+    def test_rboth_before_optimize_raises(self, scorer_fitted):
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer_fitted.plot_marginal_probability(kind="rboth")
+
+    def test_fboth_before_optimize_raises(self, scorer_fitted):
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer_fitted.plot_marginal_probability(kind="fboth")
+
+    def test_returns_figure_er(self, scorer_fitted):
         import matplotlib.figure
 
-        fig = scorer_fitted.plot_marginal_probability(axis="recency")
+        fig = scorer_fitted.plot_marginal_probability(kind="er")
         assert isinstance(fig, matplotlib.figure.Figure)
 
-    def test_returns_figure_frequency(self, scorer_fitted):
+    def test_returns_figure_ef(self, scorer_fitted):
         import matplotlib.figure
 
-        fig = scorer_fitted.plot_marginal_probability(axis="frequency")
+        fig = scorer_fitted.plot_marginal_probability(kind="ef")
         assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_returns_figure_mr(self, scorer_optimized_mr):
+        import matplotlib.figure
+
+        fig = scorer_optimized_mr.plot_marginal_probability(kind="mr")
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_returns_figure_mf(self, scorer_optimized_mf):
+        import matplotlib.figure
+
+        fig = scorer_optimized_mf.plot_marginal_probability(kind="mf")
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+    def test_rboth_returns_figure_with_legend(self, scorer_optimized_mr):
+        import matplotlib.figure
+
+        fig = scorer_optimized_mr.plot_marginal_probability(kind="rboth")
+        assert isinstance(fig, matplotlib.figure.Figure)
+        assert fig.axes[0].get_legend() is not None
+
+    def test_rboth_draws_er_and_mr_lines(self, scorer_optimized_mr):
+        fig = scorer_optimized_mr.plot_marginal_probability(kind="rboth")
+        ax = fig.axes[0]
+        assert len(ax.lines) == 2
+        assert {line.get_label() for line in ax.lines} == {"er", "mr"}
+
+    def test_fboth_returns_figure_with_legend(self, scorer_optimized_mf):
+        import matplotlib.figure
+
+        fig = scorer_optimized_mf.plot_marginal_probability(kind="fboth")
+        assert isinstance(fig, matplotlib.figure.Figure)
+        assert fig.axes[0].get_legend() is not None
+
+    def test_fboth_draws_ef_and_mf_lines(self, scorer_optimized_mf):
+        fig = scorer_optimized_mf.plot_marginal_probability(kind="fboth")
+        ax = fig.axes[0]
+        assert len(ax.lines) == 2
+        assert {line.get_label() for line in ax.lines} == {"ef", "mf"}
+
+    def test_er_has_no_legend(self, scorer_fitted):
+        fig = scorer_fitted.plot_marginal_probability(kind="er")
+        assert fig.axes[0].get_legend() is None
+
+    def test_ef_has_no_legend(self, scorer_fitted):
+        fig = scorer_fitted.plot_marginal_probability(kind="ef")
+        assert fig.axes[0].get_legend() is None
+
+    def test_mr_has_no_legend(self, scorer_optimized_mr):
+        fig = scorer_optimized_mr.plot_marginal_probability(kind="mr")
+        assert fig.axes[0].get_legend() is None
+
+    def test_mf_has_no_legend(self, scorer_optimized_mf):
+        fig = scorer_optimized_mf.plot_marginal_probability(kind="mf")
+        assert fig.axes[0].get_legend() is None
 
     def test_figsize_applied(self, scorer_fitted):
         fig = scorer_fitted.plot_marginal_probability(figsize=(4, 3))
@@ -1353,13 +1425,15 @@ class TestPlotMarginalProbability:
 
     def test_title_shown_when_set(self, scorer_fitted):
         fig = scorer_fitted.plot_marginal_probability(title="My Title")
-        ax = fig.axes[0]
-        assert ax.get_title() == "My Title"
+        assert fig.axes[0].get_title() == "My Title"
 
-    def test_title_empty_when_none(self, scorer_fitted):
-        fig = scorer_fitted.plot_marginal_probability(title=None)
-        ax = fig.axes[0]
-        assert ax.get_title() == ""
+    def test_title_default_when_none(self, scorer_fitted):
+        fig = scorer_fitted.plot_marginal_probability(kind="er", title=None)
+        assert fig.axes[0].get_title() == "Empirical Recency"
+
+    def test_title_suppressed_when_empty_string(self, scorer_fitted):
+        fig = scorer_fitted.plot_marginal_probability(title="")
+        assert fig.axes[0].get_title() == ""
 
     def test_fontsize_applied_to_labels(self, scorer_fitted):
         fig = scorer_fitted.plot_marginal_probability(fontsize=16)
@@ -1367,109 +1441,21 @@ class TestPlotMarginalProbability:
         assert ax.xaxis.label.get_size() == 16
         assert ax.yaxis.label.get_size() == 16
 
-    def test_recency_label_applied(self, scorer_fitted):
-        fig = scorer_fitted.plot_marginal_probability(axis="recency", recency_label="custom_r")
-        assert fig.axes[0].get_xlabel() == "custom_r"
+    def test_default_axis_label_recency(self, scorer_fitted):
+        fig = scorer_fitted.plot_marginal_probability(kind="er")
+        assert fig.axes[0].get_xlabel() == "recency"
 
-    def test_frequency_label_applied(self, scorer_fitted):
-        fig = scorer_fitted.plot_marginal_probability(axis="frequency", frequency_label="custom_f")
-        assert fig.axes[0].get_xlabel() == "custom_f"
+    def test_default_axis_label_frequency(self, scorer_fitted):
+        fig = scorer_fitted.plot_marginal_probability(kind="ef")
+        assert fig.axes[0].get_xlabel() == "frequency"
+
+    def test_axis_label_applied(self, scorer_fitted):
+        fig = scorer_fitted.plot_marginal_probability(kind="er", axis_label="custom")
+        assert fig.axes[0].get_xlabel() == "custom"
 
     def test_probability_label_applied(self, scorer_fitted):
         fig = scorer_fitted.plot_marginal_probability(probability_label="custom_p")
         assert fig.axes[0].get_ylabel() == "custom_p"
-
-    def test_invalid_kind_raises(self, scorer_fitted):
-        with pytest.raises(ValueError, match="kind"):
-            scorer_fitted.plot_marginal_probability(axis="recency", kind="invalid")
-
-    def test_mf_on_recency_axis_raises(self, scorer_fitted):
-        with pytest.raises(ValueError, match="kind='mf'"):
-            scorer_fitted.plot_marginal_probability(axis="recency", kind="mf")
-
-    def test_mr_on_frequency_axis_raises(self, scorer_fitted):
-        with pytest.raises(ValueError, match="kind='mr'"):
-            scorer_fitted.plot_marginal_probability(axis="frequency", kind="mr")
-
-    def test_mr_before_optimize_raises(self, scorer_fitted):
-        with pytest.raises(RuntimeError, match="optimize"):
-            scorer_fitted.plot_marginal_probability(axis="recency", kind="mr")
-
-    def test_mf_before_optimize_raises(self, scorer_fitted):
-        with pytest.raises(RuntimeError, match="optimize"):
-            scorer_fitted.plot_marginal_probability(axis="frequency", kind="mf")
-
-    def test_mr_returns_figure(self, scorer_optimized_mr):
-        import matplotlib.figure
-
-        fig = scorer_optimized_mr.plot_marginal_probability(axis="recency", kind="mr")
-        assert isinstance(fig, matplotlib.figure.Figure)
-
-    def test_mf_returns_figure(self, scorer_optimized_mf):
-        import matplotlib.figure
-
-        fig = scorer_optimized_mf.plot_marginal_probability(axis="frequency", kind="mf")
-        assert isinstance(fig, matplotlib.figure.Figure)
-
-    def test_all_recency_returns_figure_with_legend(self, scorer_optimized_mr):
-        import matplotlib.figure
-
-        fig = scorer_optimized_mr.plot_marginal_probability(axis="recency", kind="all")
-        assert isinstance(fig, matplotlib.figure.Figure)
-        ax = fig.axes[0]
-        assert ax.get_legend() is not None
-
-    def test_all_recency_draws_emp_and_mr_lines(self, scorer_optimized_mr):
-        fig = scorer_optimized_mr.plot_marginal_probability(axis="recency", kind="all")
-        ax = fig.axes[0]
-        assert len(ax.lines) == 2
-        labels = {line.get_label() for line in ax.lines}
-        assert labels == {"emp", "mr"}
-
-    def test_all_frequency_returns_figure_with_legend(self, scorer_optimized_mf):
-        import matplotlib.figure
-
-        fig = scorer_optimized_mf.plot_marginal_probability(axis="frequency", kind="all")
-        assert isinstance(fig, matplotlib.figure.Figure)
-        ax = fig.axes[0]
-        assert ax.get_legend() is not None
-
-    def test_all_frequency_draws_emp_and_mf_lines(self, scorer_optimized_mf):
-        fig = scorer_optimized_mf.plot_marginal_probability(axis="frequency", kind="all")
-        ax = fig.axes[0]
-        assert len(ax.lines) == 2
-        labels = {line.get_label() for line in ax.lines}
-        assert labels == {"emp", "mf"}
-
-    def test_emp_has_no_legend(self, scorer_fitted):
-        fig = scorer_fitted.plot_marginal_probability(axis="recency", kind="emp")
-        ax = fig.axes[0]
-        assert ax.get_legend() is None
-
-    def test_returns_figure_er_recency(self, scorer_fitted):
-        import matplotlib.figure
-
-        fig = scorer_fitted.plot_marginal_probability(axis="recency", kind="er")
-        assert isinstance(fig, matplotlib.figure.Figure)
-
-    def test_returns_figure_ef_frequency(self, scorer_fitted):
-        import matplotlib.figure
-
-        fig = scorer_fitted.plot_marginal_probability(axis="frequency", kind="ef")
-        assert isinstance(fig, matplotlib.figure.Figure)
-
-    def test_ef_on_recency_axis_raises(self, scorer_fitted):
-        with pytest.raises(ValueError, match="kind='ef'"):
-            scorer_fitted.plot_marginal_probability(axis="recency", kind="ef")
-
-    def test_er_on_frequency_axis_raises(self, scorer_fitted):
-        with pytest.raises(ValueError, match="kind='er'"):
-            scorer_fitted.plot_marginal_probability(axis="frequency", kind="er")
-
-    def test_er_has_no_legend(self, scorer_fitted):
-        fig = scorer_fitted.plot_marginal_probability(axis="recency", kind="er")
-        ax = fig.axes[0]
-        assert ax.get_legend() is None
 
 
 # ---------------------------------------------------------------------------

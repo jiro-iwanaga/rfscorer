@@ -272,3 +272,6 @@ df_evaluate_mrc.csv
 /surface_mcc_probability.png
 rfscorer.pkl
 scorer.zip
+
+/*.csv
+/*.png

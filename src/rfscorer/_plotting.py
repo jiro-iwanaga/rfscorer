@@ -18,6 +18,23 @@ class PlottingMixin:
         mr_probability_, mf_probability_.
     """
 
+    _SURFACE_TITLES = {
+        "emp": "Empirical",
+        "mono": "Monotonic",
+        "mrc": "Monotonic (Recency Convex)",
+        "mfc": "Monotonic (Frequency Concave)",
+        "mcc": "Monotonic (Convex-Concave)",
+    }
+
+    _MARGINAL_TITLES = {
+        "er": "Empirical Recency",
+        "ef": "Empirical Frequency",
+        "mr": "Monotonic Recency (Convex)",
+        "mf": "Monotonic Frequency (Concave)",
+        "rboth": "Recency: Empirical & Monotonic",
+        "fboth": "Frequency: Empirical & Monotonic",
+    }
+
     # ---------------------------------------------------------------------------
     # Surface (2D)
     # ---------------------------------------------------------------------------
@@ -31,6 +48,7 @@ class PlottingMixin:
         recency_label="recency",
         frequency_label="frequency",
         probability_label="probability",
+        path=None,
     ):
         """Plot product-choice probabilities as a 3D surface.
 
@@ -48,7 +66,9 @@ class PlottingMixin:
             Note: "mr", "mf", "er", and "ef" are 1D marginal models and cannot
             be visualized as a surface; use plot_marginal_probability() instead.
         title : str or None, default None
-            Figure title. If None, no title is shown.
+            Figure title. When None, a default title based on kind is shown
+            (e.g. "Empirical", "Monotonic (Recency Convex)"). Pass ``""`` to
+            suppress the title entirely.
         figsize : tuple[float, float], default (6, 5)
             Figure size in inches as (width, height). For publication, set this
             to the final printed size (e.g., (3.5, 3.0) for a single-column
@@ -63,6 +83,10 @@ class PlottingMixin:
             Label for the y-axis (frequency dimension).
         probability_label : str, default "probability"
             Label for the z-axis (probability dimension).
+        path : str or None, default None
+            Save destination. When None, the figure is not saved.
+            When a directory path, saves as ``surface_{kind}_probability.png``
+            in that directory. When a file path, saves with that name.
 
         Returns
         -------
@@ -133,8 +157,15 @@ class PlottingMixin:
         ax.tick_params(labelsize=fontsize)
         for pane in (ax.xaxis.pane, ax.yaxis.pane, ax.zaxis.pane):
             pane.fill = False
-        if title is not None:
-            ax.set_title(title, fontsize=fontsize)
+        effective_title = self._SURFACE_TITLES[kind] if title is None else title
+        if effective_title:
+            ax.set_title(effective_title, fontsize=fontsize)
+        if path is not None:
+            import os
+
+            default_name = f"surface_{kind}_probability.png"
+            filepath = os.path.join(path, default_name) if os.path.isdir(path) else path
+            fig.savefig(filepath)
         return fig
 
     # ---------------------------------------------------------------------------
@@ -143,58 +174,49 @@ class PlottingMixin:
 
     def plot_marginal_probability(
         self,
-        axis="recency",
-        kind="emp",
+        kind="er",
         title=None,
         figsize=(5, 4),
         fontsize=12,
-        recency_label="recency",
-        frequency_label="frequency",
+        axis_label=None,
         probability_label="probability",
+        path=None,
     ):
-        """Plot product-choice probability aggregated along one RF dimension.
+        """Plot product-choice probability along one RF dimension as a line chart.
 
-        When axis='recency', plots the empirical recency-marginal probability
-        (aggregated over all frequency levels) and optionally the mr-optimized
-        probability against recency rank.  When axis='frequency', plots the
-        empirical frequency-marginal probability and optionally the mf-optimized
-        probability against frequency.  Both are shown as line charts with markers.
+        The axis (recency or frequency) is inferred from ``kind``:
+        "er"/"mr"/"r" plot against recency; "ef"/"mf"/"f" plot against frequency.
 
         In Jupyter Lab / Colab the returned figure renders inline automatically.
-        To save to a file, call ``fig.savefig("output.png")`` on the returned figure.
 
         Parameters
         ----------
-        axis : {"recency", "frequency"}, default "recency"
-            Which dimension to aggregate and plot.
-            "recency" plots probability vs recency rank (expected: decreasing).
-            "frequency" plots probability vs frequency (expected: increasing).
-        kind : {"emp", "er", "ef", "mr", "mf", "all"}, default "emp"
+        kind : {"er", "ef", "mr", "mf", "rboth", "fboth"}, default "er"
             Which probability series to draw.
-            "emp" draws the empirical marginal (R2Prob or F2Prob).
-            "er" draws the empirical recency marginal (valid only when
-            axis="recency"). Equivalent to "emp" on the recency axis.
-            "ef" draws the empirical frequency marginal (valid only when
-            axis="frequency"). Equivalent to "emp" on the frequency axis.
-            "mr" draws the mr-optimized series (valid only when axis="recency").
-            "mf" draws the mf-optimized series (valid only when axis="frequency").
-            "all" draws both the empirical and the optimized series together.
+            "er"    draws the empirical recency marginal only.
+            "ef"    draws the empirical frequency marginal only.
+            "mr"    draws the monotonic recency series only (monotonicity + convexity).
+            "mf"    draws the monotonic frequency series only (monotonicity + concavity).
+            "rboth" overlays "er" and "mr" on the recency axis (requires optimize(kind='mr')).
+            "fboth" overlays "ef" and "mf" on the frequency axis (requires optimize(kind='mf')).
         title : str or None, default None
-            Figure title. If None, no title is shown.
+            Figure title. When None, a default title based on kind is shown
+            (e.g. "Empirical Recency", "Monotonic Recency (Convex)"). Pass
+            ``""`` to suppress the title entirely.
         figsize : tuple[float, float], default (5, 4)
-            Figure size in inches as (width, height). For publication, set this
-            to the final printed size (e.g., (3.5, 2.8) for a single-column
-            figure in a two-column journal).
+            Figure size in inches as (width, height).
         fontsize : int, default 12
-            Font size for axis labels and tick labels. For publication, match
-            this to the body text size of the target journal (typically 8–10 pt)
-            and set figsize to the final printed size so the font is not scaled.
-        recency_label : str, default "recency"
-            Label for the x-axis when axis="recency".
-        frequency_label : str, default "frequency"
-            Label for the x-axis when axis="frequency".
+            Font size for axis labels and tick labels.
+        axis_label : str or None, default None
+            Label for the x-axis. When None, defaults to "recency" for recency
+            plots (kind in "er"/"mr"/"r") and "frequency" for frequency plots
+            (kind in "ef"/"mf"/"f").
         probability_label : str, default "probability"
-            Label for the y-axis (probability dimension).
+            Label for the y-axis.
+        path : str or None, default None
+            Save destination. When None, the figure is not saved.
+            When a directory path, saves as ``marginal_{kind}_probability.png``
+            in that directory. When a file path, saves with that name.
 
         Returns
         -------
@@ -203,51 +225,48 @@ class PlottingMixin:
         Raises
         ------
         ValueError
-            If axis is not "recency" or "frequency", if kind is not one of the
-            accepted values, or if the axis/kind combination is invalid (e.g.,
-            kind="mf" or "ef" with axis="recency").
+            If kind is not one of the accepted values.
         RuntimeError
-            If fit() has not been called, or if
-            optimize(kind='mr') / optimize(kind='mf') has not been called when
-            kind is "mr", "mf", or "all".
+            If fit() has not been called, or if optimize(kind='mr') /
+            optimize(kind='mf') has not been called when kind is "mr", "mf",
+            "r", or "f".
         """
         import matplotlib.pyplot as plt
 
         kind = self._normalize_kind(kind)
-        if axis not in ("recency", "frequency"):
-            raise ValueError(f"axis must be 'recency' or 'frequency', got {axis!r}.")
-        valid_kinds = ("emp", "er", "ef", "mr", "mf", "all")
+        valid_kinds = ("er", "ef", "mr", "mf", "rboth", "fboth")
         if kind not in valid_kinds:
             raise ValueError(f"kind must be one of {valid_kinds}, got {kind!r}.")
-        if axis == "recency" and kind in ("mf", "ef"):
-            raise ValueError(f"kind={kind!r} is not valid when axis='recency'. Use 'mr' or 'er'.")
-        if axis == "frequency" and kind in ("mr", "er"):
-            raise ValueError(f"kind={kind!r} is not valid when axis='frequency'. Use 'mf' or 'ef'.")
         if self.recency_probability_ is None:
             raise RuntimeError("fit() must be called before plot_marginal_probability().")
-        opt_kind = "mr" if axis == "recency" else "mf"
-        if kind in (opt_kind, "all"):
-            opt_attr = f"{opt_kind}_probability_"
-            if getattr(self, opt_attr) is None:
-                raise RuntimeError(
-                    f"optimize(kind='{opt_kind}') must be called before"
-                    f" plot_marginal_probability(kind='{kind}')."
-                )
-
-        x_col = axis
-        x_label = recency_label if axis == "recency" else frequency_label
-        if axis == "recency":
-            df_emp = self.recency_probability_
-        else:
-            df_emp = self.frequency_probability_
-
-        if kind in (opt_kind, "all"):
-            df_opt = getattr(self, f"{opt_kind}_probability_")[[x_col, "probability"]].reset_index(
-                drop=True
+        if kind in ("mr", "rboth") and self.mr_probability_ is None:
+            raise RuntimeError(
+                "optimize(kind='mr') must be called before"
+                " plot_marginal_probability(kind='mr'/'rboth')."
+            )
+        if kind in ("mf", "fboth") and self.mf_probability_ is None:
+            raise RuntimeError(
+                "optimize(kind='mf') must be called before"
+                " plot_marginal_probability(kind='mf'/'fboth')."
             )
 
+        if kind in ("er", "mr", "rboth"):
+            x_col = "recency"
+            x_label = axis_label if axis_label is not None else "recency"
+            df_emp = self.recency_probability_
+        else:
+            x_col = "frequency"
+            x_label = axis_label if axis_label is not None else "frequency"
+            df_emp = self.frequency_probability_
+
+        if kind in ("mr", "rboth"):
+            df_opt = self.mr_probability_[[x_col, "probability"]].reset_index(drop=True)
+        elif kind in ("mf", "fboth"):
+            df_opt = self.mf_probability_[[x_col, "probability"]].reset_index(drop=True)
+
         fig, ax = plt.subplots(figsize=figsize)
-        if kind in ("emp", "er", "ef", "all"):
+        if kind in ("er", "ef", "rboth", "fboth"):
+            emp_label = "er" if kind in ("er", "rboth") else "ef"
             ax.plot(
                 df_emp[x_col],
                 df_emp["probability"],
@@ -256,25 +275,33 @@ class PlottingMixin:
                 marker="o",
                 linewidth=1.5,
                 markersize=6,
-                label="emp" if kind == "all" else kind,
+                label=emp_label,
             )
-        if kind in (opt_kind, "all"):
+        if kind in ("mr", "mf", "rboth", "fboth"):
+            opt_label = "mr" if kind in ("mr", "rboth") else "mf"
             ax.plot(
                 df_opt[x_col],
                 df_opt["probability"],
                 color="black",
-                linestyle="--" if kind == "all" else "-",
+                linestyle="--" if kind in ("rboth", "fboth") else "-",
                 marker="s",
                 linewidth=1.5,
                 markersize=6,
-                label=opt_kind,
+                label=opt_label,
             )
-        if kind == "all":
+        if kind in ("rboth", "fboth"):
             ax.legend(fontsize=fontsize)
         ax.set_xlabel(x_label, fontsize=fontsize)
         ax.set_ylabel(probability_label, fontsize=fontsize)
         ax.tick_params(labelsize=fontsize)
-        if title is not None:
-            ax.set_title(title, fontsize=fontsize)
+        effective_title = self._MARGINAL_TITLES[kind] if title is None else title
+        if effective_title:
+            ax.set_title(effective_title, fontsize=fontsize)
         fig.tight_layout()
+        if path is not None:
+            import os
+
+            default_name = f"marginal_{kind}_probability.png"
+            filepath = os.path.join(path, default_name) if os.path.isdir(path) else path
+            fig.savefig(filepath)
         return fig

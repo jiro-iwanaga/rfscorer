@@ -1084,16 +1084,16 @@ class RecencyFrequencyScorer(PlottingMixin):
                     zf.writestr(f"plots/{kind}_surface.png", buf.getvalue())
                     plt.close(fig)
 
-                for name, axis, kind in [("er", "recency", "er"), ("ef", "frequency", "ef")]:
-                    fig = self.plot_marginal_probability(axis=axis, kind=kind)
+                for kind in ("er", "ef"):
+                    fig = self.plot_marginal_probability(kind=kind)
                     buf = io.BytesIO()
                     fig.savefig(buf, format="png", bbox_inches="tight")
-                    zf.writestr(f"plots/{name}_marginal.png", buf.getvalue())
+                    zf.writestr(f"plots/{kind}_marginal.png", buf.getvalue())
                     plt.close(fig)
 
-            for name, axis in [("mr", "recency"), ("mf", "frequency")]:
+            for name in ("mr", "mf"):
                 if name in optimized_kinds:
-                    fig = self.plot_marginal_probability(axis=axis, kind=name)
+                    fig = self.plot_marginal_probability(kind=name)
                     buf = io.BytesIO()
                     fig.savefig(buf, format="png", bbox_inches="tight")
                     zf.writestr(f"plots/{name}_marginal.png", buf.getvalue())
@@ -1248,34 +1248,27 @@ if __name__ == "__main__":
     df_train_obs, df_train_gt = split_by_date(df_train, target_date)
     scorer.fit(df_train_obs, df_train_gt)
 
-    scorer.plot_probability_surface("empirical").savefig("surface_emp_probability.png")
-    scorer.plot_marginal_probability("recency").savefig("marginal_recency_probability.png")
-    scorer.plot_marginal_probability("frequency").savefig("marginal_frequency_probability.png")
+    scorer.plot_probability_surface("empirical").savefig("surf_emp_prob.png")
+    scorer.plot_marginal_probability(kind="er").savefig("marg_emp_recen_prob.png")
+    scorer.plot_marginal_probability(kind="ef").savefig("marg_emp_freq_prob.png")
 
     scorer.optimize(kind="mr")
-    scorer.plot_marginal_probability("recency", kind="mr").savefig(
-        "marginal_mono_recency_probability.png"
-    )
-    scorer.plot_marginal_probability("recency", kind="all").savefig(
-        "marginal_all_recency_probability.png"
-    )
+    scorer.plot_marginal_probability(kind="mr").savefig("marg_mono_recen_prob.png")
+    scorer.plot_marginal_probability(kind="rboth").savefig("marg_recens_prob.png")
 
     scorer.optimize(kind="mf")
-    scorer.plot_marginal_probability("frequency", kind="mf").savefig(
-        "marginal_mono_frequency_probability.png"
-    )
-    scorer.plot_marginal_probability("frequency", kind="all").savefig(
-        "marginal_all_frequency_probability.png"
-    )
+    scorer.plot_marginal_probability(kind="mf").savefig("marg_mono_freq_prob.png")
+    scorer.plot_marginal_probability(kind="fboth").savefig("marg_freqs_prob.png")
 
     scorer.optimize(kind="mono")
-    scorer.plot_probability_surface("mono").savefig("surface_mono_probability.png")
+    scorer.plot_probability_surface("mono").savefig("surf_mono_prob.png")
     scorer.optimize(kind="mrc")
-    scorer.plot_probability_surface("mrc").savefig("surface_mrc_probability.png")
+    scorer.plot_probability_surface("mrc").savefig("surf_mrc_prob.png")
     scorer.optimize(kind="mfc")
-    scorer.plot_probability_surface("mfc").savefig("surface_mfc_probability.png")
+    scorer.plot_probability_surface("mfc").savefig("surf_mfc_prob.png")
     scorer.optimize(kind="mcc")
-    scorer.plot_probability_surface("mcc").savefig("surface_mcc_probability.png")
+    scorer.plot_probability_surface("mcc").savefig("surf_mcc_prob.png")
+
     scorer.export_probability_csv("all")
 
     scorer.save("rfscorer.pkl")
@@ -1291,8 +1284,8 @@ if __name__ == "__main__":
     for kind in ("emp", "er", "ef", "mr", "mf", "mono", "mrc", "mfc", "mcc"):
         print(f"--- {kind} ---")
         df_rec = scorer.transform(df_test_obs, kind=kind)
-        df_rec.to_csv(f"df_recommend_{kind}.csv", index=False)
+        df_rec.to_csv(f"df_rec_{kind}.csv", index=False)
 
         df_eval = scorer.evaluate(df_rec, df_test_gt, order=10)
         print(df_eval)
-        df_eval.to_csv(f"df_evaluate_{kind}.csv", index=False)
+        df_eval.to_csv(f"df_eval_{kind}.csv", index=False)
