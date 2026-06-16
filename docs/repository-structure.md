@@ -35,7 +35,8 @@ rfscorer/
 │   └── test_save_load.py
 ├── examples/
 │   ├── tutorial_beginner_en.ipynb        # 初級チュートリアル（英語）
-│   └── tutorial_beginner_ja.ipynb        # 初級チュートリアル（日本語）
+│   ├── tutorial_beginner_ja.ipynb        # 初級チュートリアル（日本語）
+│   └── tutorial_practical_ja.ipynb       # 実践チュートリアル（日本語）
 ├── img/                              # README 向け画像
 └── docs/                             # 永続的ドキュメント
     ├── product-requirements.md       # プロダクト要求定義書
@@ -95,6 +96,7 @@ rfscorer/
 |------|------|
 | `tutorial_beginner_en.ipynb` | 初級チュートリアル（英語）。fit・optimize・transform・evaluate・save・load の基本ワークフローを解説 |
 | `tutorial_beginner_ja.ipynb` | 初級チュートリアル（日本語）。同上 |
+| `tutorial_practical_ja.ipynb` | 実践チュートリアル（日本語）。実データを使った応用的なワークフローを解説 |
 
 
 ### `img/`

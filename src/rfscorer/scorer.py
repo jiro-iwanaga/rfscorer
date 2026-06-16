@@ -906,7 +906,7 @@ class RecencyFrequencyScorer(PlottingMixin):
 
         from pathlib import Path
 
-        default_filename = f"{kind}_probability.csv"
+        default_filename = f"probability_{kind}.csv"
         if path is None:
             output_path = Path(default_filename)
         else:
@@ -949,6 +949,8 @@ class RecencyFrequencyScorer(PlottingMixin):
                     on="frequency",
                 )
             )
+            _prob_order = ["er", "ef", "mr", "mf", "emp", "mono", "mrc", "mfc", "mcc"]
+            df = df[["recency", "frequency", "N", "cv"] + [f"{k}_probability" for k in _prob_order]]
         elif kind == "emp":
             df = self.emp_probability_
         elif kind == "er":

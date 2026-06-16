@@ -40,8 +40,8 @@
 | 広義単調性 | weak monotonicity | $\varepsilon = 0$ のときの単調性制約。隣接する確率値が同値になることを許す（$\geq$ または $\leq$） |
 | 狭義単調性 | strict monotonicity | $\varepsilon > 0$ のときの単調性制約。隣接する最新度・頻度の確率値が必ず $\varepsilon$ 以上離れることを保証する |
 | $\varepsilon$（eps） | eps | `optimize(eps=ε)` で指定する単調性制約の最小ギャップ。デフォルト `0.0`（広義単調性）。2次元モデル（mono/mrc/mfc/mcc）の上限は $\min(\max(p_{r,f}) / (\lvert R\rvert - 1),\ \max(p_{r,f}) / (\lvert F\rvert - 1))$、`mr` の上限は $\max(p_r) / (\lvert R\rvert - 1)$、`mf` の上限は $\max(p_f) / (\lvert F\rvert - 1)$ で自動計算される |
-| 1次元最適化モデル | 1D optimization model | `optimize(kind='mr')` または `optimize(kind='mf')` で構築する1次元の最適化モデル。`mr` は最新度のみを変数とするモデル（$R2Prob$ を目標）、`mf` は頻度のみを変数とするモデル（$F2Prob$ を目標）。結果は1次元 dict として保存される |
-| 2次元最適化モデル | 2D optimization model | `optimize(kind='mono'/'mrc'/'mfc'/'mcc')` で構築する2次元の最適化モデル。最新度と頻度の全ペア $(r, f) \in R \times F$ を変数とするモデル（$RF2Prob$ を目標）。結果は `RF2X`（dict）に格納される |
+| 1次元最適化モデル | 1D optimization model | `optimize(kind='mr')` または `optimize(kind='mf')` で構築する1次元の最適化モデル。`mr` は最新度のみを変数とするモデル（最新度別経験的確率 $p_r$ を目標）、`mf` は頻度のみを変数とするモデル（頻度別経験的確率 $p_f$ を目標）。結果は1次元 dict として保存される |
+| 2次元最適化モデル | 2D optimization model | `optimize(kind='mono'/'mrc'/'mfc'/'mcc')` で構築する2次元の最適化モデル。最新度と頻度の全ペア $(r, f) \in R \times F$ を変数とするモデル（経験的商品選択確率 $p_{r,f}$ を目標）。結果は `{kind}_probability_dict_`（dict）に格納される |
 
 > **表記ルール — "monotonic" と "monotonicity"**
 >
@@ -71,7 +71,7 @@
 | `load(path)` | `save()` で保存した pickle ファイルからモデルを復元するクラスメソッド。保存時と現在のバージョンの major または minor が異なる場合は `UserWarning` を発行してロードを続行する。戻り値は `RecencyFrequencyScorer` インスタンス |
 | `save_zip(path=None)` | フィット済みモデルを zip アーカイブとして保存するメソッド。アーカイブには `rfscorer.pkl`・`metadata.json`・`probabilities/`（確率テーブル CSV）・`plots/`（確率曲面 PNG）が含まれる。`path=None` でカレントディレクトリに `scorer.zip` を生成。`fit()` 後に利用可能 |
 | `load_zip(path)` | `save_zip()` で保存した zip アーカイブからモデルを復元するクラスメソッド。バージョン不一致の扱いは `load()` と同じ。戻り値は `RecencyFrequencyScorer` インスタンス |
-| `show()` | `fit()` 後の集計情報（レコード数・cv 数・期間・上限値・相関係数）を標準出力に表示するデバッグ用メソッド |
+| `show()` | `fit()` 後の状態を構造化された診断レポートとして標準出力に表示するメソッド。Data・Model・Correlation・Empirical Probability Table の4セクションで構成される |
 | `recency_corr_` | `fit()` 後に参照できる最新度と経験的確率のスピアマン ρ（等重み）。r 値と P(r) のピアソン相関係数 on ranks。理論上は負（r=1 が最直近・最高確率）。`float`（要素数 < 2 または確率値が定数の場合は `nan`） |
 | `recency_corr_pvalue_` | `recency_corr_` に対応する p 値。n = 観測された r 値の数。`float`（`recency_corr_` が `nan` の場合は `nan`） |
 | `frequency_corr_` | `fit()` 後に参照できる頻度と経験的確率のスピアマン ρ（等重み）。f 値と P(f) の相関。理論上は正（高頻度ほど高確率）。`float`（確率値が定数の場合は `nan`） |

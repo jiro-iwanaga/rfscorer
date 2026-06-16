@@ -32,7 +32,7 @@ pip install rfscorer
 ## Usage
 
 Below is a minimal example of building a model and scoring recommendations from an behavior history.
-For complete, working code with data loading and evaluation, see [examples/tutorial_beginner_en.ipynb](tutorial_beginner_en.ipynb).
+For complete, working code with data loading and evaluation, see [examples/tutorial_beginner_en.ipynb](examples/tutorial_beginner_en.ipynb).
 
 ### Minimal Example
 
@@ -191,7 +191,7 @@ pip install rfscorer
 ## 使い方
 
 以下は、行動履歴からモデル構築と推薦スコア（商品選択確率）の算出までを行う最小限の例です。
-データロードから評価までを含む動作コードについては、[examples/basic_usage.ipynb](examples/basic_usage.ipynb) を参照してください。
+データロードから評価までを含む動作コードについては、[examples/tutorial_beginner_ja.ipynb](examples/tutorial_beginner_ja.ipynb) を参照してください。
 
 ### 最小限の例
 

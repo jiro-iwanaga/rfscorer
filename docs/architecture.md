@@ -28,7 +28,8 @@
 |-----------|------|
 | `pandas` | データ操作・集計・出力形式 |
 | `cvxpy` | 凸2次計画問題のソルバー |
-| `numpy` | 型判定（`normalize_ref()`）・`plot_probability_surface()` 内のグリッド生成 |
+| `numpy` | 型判定（`normalize_ref()`）・`plot_probability_surface()` 内のグリッド生成・相関係数計算の重み付き演算 |
+| `scipy` | `fit()` 内のスピアマン相関係数計算（`scipy.stats.spearmanr`・`scipy.stats.rankdata`） |
 | `matplotlib` | `plot_probability_surface()` / `plot_marginal_probability()` 内の描画・`Figure` 返却（遅延インポート） |
 
 オプション依存 (`pip install rfscorer[ja]`):
