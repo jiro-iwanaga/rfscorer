@@ -1688,6 +1688,12 @@ class TestCorrelation:
     def test_frequency_corr_none_before_fit(self, scorer):
         assert scorer.frequency_corr_ is None
 
+    def test_recency_corr_pvalue_none_before_fit(self, scorer):
+        assert scorer.recency_corr_pvalue_ is None
+
+    def test_frequency_corr_pvalue_none_before_fit(self, scorer):
+        assert scorer.frequency_corr_pvalue_ is None
+
     def test_recency_corr_weighted_none_before_fit(self, scorer):
         assert scorer.recency_corr_weighted_ is None
 
@@ -1699,6 +1705,18 @@ class TestCorrelation:
 
     def test_frequency_corr_is_float(self, scorer_fitted):
         assert isinstance(scorer_fitted.frequency_corr_, float)
+
+    def test_recency_corr_pvalue_is_float(self, scorer_fitted):
+        assert isinstance(scorer_fitted.recency_corr_pvalue_, float)
+
+    def test_frequency_corr_pvalue_is_float(self, scorer_fitted):
+        assert isinstance(scorer_fitted.frequency_corr_pvalue_, float)
+
+    def test_recency_corr_pvalue_in_range(self, scorer_fitted):
+        assert 0.0 <= scorer_fitted.recency_corr_pvalue_ <= 1.0
+
+    def test_frequency_corr_pvalue_in_range(self, scorer_fitted):
+        assert 0.0 <= scorer_fitted.frequency_corr_pvalue_ <= 1.0
 
     def test_recency_corr_weighted_is_float(self, scorer_fitted):
         assert isinstance(scorer_fitted.recency_corr_weighted_, float)

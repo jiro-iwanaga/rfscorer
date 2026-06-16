@@ -124,7 +124,9 @@ class RecencyFrequencyScorer(PlottingMixin):
 
         # データ解析用
         self.recency_corr_ = None  # スピアマン ρ（r 値と P(r) の等重み相関）
+        self.recency_corr_pvalue_ = None  # recency_corr_ の p 値
         self.frequency_corr_ = None  # スピアマン ρ（f 値と P(f) の等重み相関）
+        self.frequency_corr_pvalue_ = None  # frequency_corr_ の p 値
         self.recency_corr_weighted_ = None  # スピアマン ρ（N_r 重み付き）
         self.frequency_corr_weighted_ = None  # スピアマン ρ（N_f 重み付き）
         self.recency_slice_corr_ = None  # dict[r, float] r 固定スライスの重み付きスピアマン ρ
@@ -368,8 +370,22 @@ class RecencyFrequencyScorer(PlottingMixin):
         f_vals = sorted(f for f in self._F2Prob if self._F2N[f] > 0)
         f_probs = [self._F2Prob[f] for f in f_vals]
         f_weights = [self._F2N[f] for f in f_vals]
-        self.recency_corr_ = self._marginal_spearman(r_vals, r_probs)
-        self.frequency_corr_ = self._marginal_spearman(f_vals, f_probs)
+        from scipy.stats import spearmanr
+
+        if len(r_vals) >= 2 and len(set(r_probs)) >= 2:
+            _res = spearmanr(r_vals, r_probs)
+            self.recency_corr_ = float(_res.statistic)
+            self.recency_corr_pvalue_ = float(_res.pvalue)
+        else:
+            self.recency_corr_ = float("nan")
+            self.recency_corr_pvalue_ = float("nan")
+        if len(f_vals) >= 2 and len(set(f_probs)) >= 2:
+            _res = spearmanr(f_vals, f_probs)
+            self.frequency_corr_ = float(_res.statistic)
+            self.frequency_corr_pvalue_ = float(_res.pvalue)
+        else:
+            self.frequency_corr_ = float("nan")
+            self.frequency_corr_pvalue_ = float("nan")
         self.recency_corr_weighted_ = self._marginal_spearman(r_vals, r_probs, r_weights)
         self.frequency_corr_weighted_ = self._marginal_spearman(f_vals, f_probs, f_weights)
 
@@ -1201,11 +1217,11 @@ class RecencyFrequencyScorer(PlottingMixin):
         print(f"  total_cv       : {self.total_cv_org} → {self.total_cv}")
         print(
             f"  recency_corr   : {self.recency_corr_:.4f}"
-            f" (weighted: {self.recency_corr_weighted_:.4f})"
+            f" (p={self.recency_corr_pvalue_:.4f}, weighted: {self.recency_corr_weighted_:.4f})"
         )
         print(
             f"  frequency_corr : {self.frequency_corr_:.4f}"
-            f" (weighted: {self.frequency_corr_weighted_:.4f})"
+            f" (p={self.frequency_corr_pvalue_:.4f}, weighted: {self.frequency_corr_weighted_:.4f})"
         )
         print(f"  recency_slice_corr : {self._fmt_slice_corr(self.recency_slice_corr_)}")
         print(f"  frequency_slice_corr: {self._fmt_slice_corr(self.frequency_slice_corr_)}")

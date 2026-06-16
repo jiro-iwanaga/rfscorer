@@ -72,8 +72,10 @@
 | `save_zip(path=None)` | フィット済みモデルを zip アーカイブとして保存するメソッド。アーカイブには `rfscorer.pkl`・`metadata.json`・`probabilities/`（確率テーブル CSV）・`plots/`（確率曲面 PNG）が含まれる。`path=None` でカレントディレクトリに `scorer.zip` を生成。`fit()` 後に利用可能 |
 | `load_zip(path)` | `save_zip()` で保存した zip アーカイブからモデルを復元するクラスメソッド。バージョン不一致の扱いは `load()` と同じ。戻り値は `RecencyFrequencyScorer` インスタンス |
 | `show()` | `fit()` 後の集計情報（レコード数・cv 数・期間・上限値・相関係数）を標準出力に表示するデバッグ用メソッド |
-| `recency_corr_` | `fit()` 後に参照できる最新度と経験的確率のスピアマン ρ（等重み）。r 値と P(r) のピアソン相関係数 on ranks。理論上は負（r=1 が最直近・最高確率）。`float`（要素数 < 2 または全順位一致の場合は `nan`） |
-| `frequency_corr_` | `fit()` 後に参照できる頻度と経験的確率のスピアマン ρ（等重み）。f 値と P(f) の相関。理論上は正（高頻度ほど高確率）。`float` |
+| `recency_corr_` | `fit()` 後に参照できる最新度と経験的確率のスピアマン ρ（等重み）。r 値と P(r) のピアソン相関係数 on ranks。理論上は負（r=1 が最直近・最高確率）。`float`（要素数 < 2 または確率値が定数の場合は `nan`） |
+| `recency_corr_pvalue_` | `recency_corr_` に対応する p 値。n = 観測された r 値の数。`float`（`recency_corr_` が `nan` の場合は `nan`） |
+| `frequency_corr_` | `fit()` 後に参照できる頻度と経験的確率のスピアマン ρ（等重み）。f 値と P(f) の相関。理論上は正（高頻度ほど高確率）。`float`（確率値が定数の場合は `nan`） |
+| `frequency_corr_pvalue_` | `frequency_corr_` に対応する p 値。n = 観測された f 値の数。`float`（`frequency_corr_` が `nan` の場合は `nan`） |
 | `recency_corr_weighted_` | `fit()` 後に参照できる最新度と経験的確率のスピアマン ρ（N_r 重み付き）。各 r のサンプルサイズで重み付けした順位相関。`float` |
 | `frequency_corr_weighted_` | `fit()` 後に参照できる頻度と経験的確率のスピアマン ρ（N_f 重み付き）。各 f のサンプルサイズで重み付けした順位相関。`float` |
 | `recency_slice_corr_` | `fit()` 後に参照できる r 固定スライスごとのスピアマン ρ。`dict[int, float]`（キー: r）。各 r について `weighted_spearman(f, P(r,f), weights=N(r,f))` を計算。N(r,f)=0 のセルは除外。有効セルが2未満のスライスは `nan` |
