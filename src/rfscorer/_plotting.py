@@ -13,9 +13,8 @@ class PlottingMixin:
 
     Required attributes (provided by RecencyFrequencyScorer):
         _normalize_kind, emp_probability_table_, mono_probability_table_,
-        mrc_probability_table_, mfc_probability_table_,
-        mcc_probability_table_, recency_probability_, frequency_probability_,
-        mr_probability_, mf_probability_.
+        mrc_probability_table_, mfc_probability_table_, mcc_probability_table_,
+        er_probability_, ef_probability_, mr_probability_, mf_probability_.
     """
 
     _SURFACE_TITLES = {
@@ -237,7 +236,7 @@ class PlottingMixin:
         valid_kinds = ("er", "ef", "mr", "mf", "rboth", "fboth")
         if kind not in valid_kinds:
             raise ValueError(f"kind must be one of {valid_kinds}, got {kind!r}.")
-        if self.recency_probability_ is None:
+        if self.er_probability_ is None:
             raise RuntimeError("fit() must be called before plot_marginal_probability().")
         if kind in ("mr", "rboth") and self.mr_probability_ is None:
             raise RuntimeError(
@@ -253,11 +252,11 @@ class PlottingMixin:
         if kind in ("er", "mr", "rboth"):
             x_col = "recency"
             x_label = axis_label if axis_label is not None else "recency"
-            df_emp = self.recency_probability_
+            df_emp = self.er_probability_
         else:
             x_col = "frequency"
             x_label = axis_label if axis_label is not None else "frequency"
-            df_emp = self.frequency_probability_
+            df_emp = self.ef_probability_
 
         if kind in ("mr", "rboth"):
             df_opt = self.mr_probability_[[x_col, "probability"]].reset_index(drop=True)

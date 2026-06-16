@@ -72,8 +72,6 @@
 | `save_zip(path=None)` | フィット済みモデルを zip アーカイブとして保存するメソッド。アーカイブには `rfscorer.pkl`・`metadata.json`・`probabilities/`（確率テーブル CSV）・`plots/`（確率曲面 PNG）が含まれる。`path=None` でカレントディレクトリに `scorer.zip` を生成。`fit()` 後に利用可能 |
 | `load_zip(path)` | `save_zip()` で保存した zip アーカイブからモデルを復元するクラスメソッド。バージョン不一致の扱いは `load()` と同じ。戻り値は `RecencyFrequencyScorer` インスタンス |
 | `show()` | `fit()` 後の集計情報（レコード数・cv 数・期間・上限値）を標準出力に表示するデバッグ用メソッド |
-| `R` | `fit()` 後に参照できる最新度のリスト |
-| `F` | `fit()` 後に参照できる頻度のリスト |
 | `recency_limit` | `fit()` 後に参照できる最新度の上限値。これを超える最新度は `recency_limit` にクランプされてスコアリングされる。`None` の場合は累積対象イベント発生数の 95% をカバーする最新度に自動設定される |
 | `frequency_limit` | `fit()` 後に参照できる頻度の上限値。これを超える頻度は `frequency_limit` にクランプされてスコアリングされる。`None` の場合は累積対象イベント発生数の 95% をカバーする頻度に自動設定される |
 | `emp_probability_` | `fit()` 後に参照できる経験的商品選択確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `N`, `cv`, `probability`） |

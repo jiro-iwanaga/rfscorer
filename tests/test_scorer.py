@@ -190,9 +190,9 @@ class TestInit:
         assert s.time_col == "ts"
 
     def test_initial_state(self, scorer):
-        assert scorer.R == []
-        assert scorer.F == []
-        assert scorer.RF2N == {}
+        assert scorer._R == []
+        assert scorer._F == []
+        assert scorer._RF2N == {}
         assert scorer.emp_probability_ is None
         assert scorer.emp_probability_dict_ is None
         assert scorer.record_num is None
@@ -363,17 +363,6 @@ class TestFitResult:
         )
         assert s.observation_start_ == pd.Timestamp("2024-01-01").toordinal()
 
-    def test_gt_dates_always_none(self):
-        s = RecencyFrequencyScorer()
-        s.fit(
-            self._make_obs(),
-            self._make_gt(),
-            recency_limit=_RECENCY_LIMIT,
-            frequency_limit=_FREQUENCY_LIMIT,
-        )
-        assert s.gt_start_ is None
-        assert s.gt_end_ is None
-
     def test_emp_probability_dict_populated(self):
         s = RecencyFrequencyScorer()
         s.fit(
@@ -433,7 +422,7 @@ class TestOptimize:
     def test_mono_sets_probability_dict(self, scorer_optimized_mono):
         d = scorer_optimized_mono.mono_probability_dict_
         assert d is not None
-        expected = {(r, f) for r in scorer_optimized_mono.R for f in scorer_optimized_mono.F}
+        expected = {(r, f) for r in scorer_optimized_mono._R for f in scorer_optimized_mono._F}
         assert set(d.keys()) == expected
 
     def test_mono_sets_probability_table(self, scorer_optimized_mono):
@@ -469,7 +458,7 @@ class TestOptimize:
     def test_mr_sets_probability_dict(self, scorer_optimized_mr):
         d = scorer_optimized_mr.mr_probability_dict_
         assert d is not None
-        expected = set(scorer_optimized_mr.R)
+        expected = set(scorer_optimized_mr._R)
         assert set(d.keys()) == expected
 
     def test_mr_probability_values_in_bounds(self, scorer_optimized_mr):
@@ -485,7 +474,7 @@ class TestOptimize:
     def test_mf_sets_probability_dict(self, scorer_optimized_mf):
         d = scorer_optimized_mf.mf_probability_dict_
         assert d is not None
-        expected = set(scorer_optimized_mf.F)
+        expected = set(scorer_optimized_mf._F)
         assert set(d.keys()) == expected
 
     def test_mf_probability_values_in_bounds(self, scorer_optimized_mf):
@@ -505,7 +494,7 @@ class TestOptimize:
     def test_mrc_sets_probability_dict(self, scorer_optimized_mrc):
         d = scorer_optimized_mrc.mrc_probability_dict_
         assert d is not None
-        expected = {(r, f) for r in scorer_optimized_mrc.R for f in scorer_optimized_mrc.F}
+        expected = {(r, f) for r in scorer_optimized_mrc._R for f in scorer_optimized_mrc._F}
         assert set(d.keys()) == expected
 
     def test_mrc_probability_values_in_bounds(self, scorer_optimized_mrc):
@@ -525,7 +514,7 @@ class TestOptimize:
     def test_mfc_sets_probability_dict(self, scorer_optimized_mfc):
         d = scorer_optimized_mfc.mfc_probability_dict_
         assert d is not None
-        expected = {(r, f) for r in scorer_optimized_mfc.R for f in scorer_optimized_mfc.F}
+        expected = {(r, f) for r in scorer_optimized_mfc._R for f in scorer_optimized_mfc._F}
         assert set(d.keys()) == expected
 
     def test_mfc_probability_values_in_bounds(self, scorer_optimized_mfc):
@@ -545,7 +534,7 @@ class TestOptimize:
     def test_mcc_sets_probability_dict(self, scorer_optimized_mcc):
         d = scorer_optimized_mcc.mcc_probability_dict_
         assert d is not None
-        expected = {(r, f) for r in scorer_optimized_mcc.R for f in scorer_optimized_mcc.F}
+        expected = {(r, f) for r in scorer_optimized_mcc._R for f in scorer_optimized_mcc._F}
         assert set(d.keys()) == expected
 
     def test_mcc_probability_values_in_bounds(self, scorer_optimized_mcc):
@@ -758,14 +747,14 @@ class TestPredict:
         # dict と直接比較してクランプが機能していることを検証
         # (predict同士の比較だと両辺 0.0 で vacuous になるため)
         r_over = _RECENCY_LIMIT + 10
-        for f in scorer_fitted.F:
+        for f in scorer_fitted._F:
             expected = scorer_fitted.emp_probability_dict_[_RECENCY_LIMIT, f]
             assert scorer_fitted.predict(r_over, f) == pytest.approx(expected)
 
     def test_clamps_f_to_frequency_limit(self, scorer_fitted):
         # dict と直接比較してクランプが機能していることを検証
         f_over = _FREQUENCY_LIMIT + 10
-        for r in scorer_fitted.R:
+        for r in scorer_fitted._R:
             expected = scorer_fitted.emp_probability_dict_[r, _FREQUENCY_LIMIT]
             assert scorer_fitted.predict(r, f_over) == pytest.approx(expected)
 
@@ -1257,65 +1246,49 @@ class TestPlotProbabilitySurface:
 # ---------------------------------------------------------------------------
 class TestMarginalProbabilityAttributes:
     def test_r2n_known_values(self, scorer_fitted):
-        assert scorer_fitted.R2N[1] == pytest.approx(1.0)
-        assert scorer_fitted.R2N[3] == pytest.approx(1.0)
-        assert scorer_fitted.R2N[4] == pytest.approx(1.0)
-        assert scorer_fitted.R2N[6] == pytest.approx(1.0)
-        assert scorer_fitted.R2N[2] == pytest.approx(0.0)
+        assert scorer_fitted._R2N[1] == pytest.approx(1.0)
+        assert scorer_fitted._R2N[3] == pytest.approx(1.0)
+        assert scorer_fitted._R2N[4] == pytest.approx(1.0)
+        assert scorer_fitted._R2N[6] == pytest.approx(1.0)
+        assert scorer_fitted._R2N[2] == pytest.approx(0.0)
 
     def test_r2cv_known_values(self, scorer_fitted):
-        assert scorer_fitted.R2CV[1] == pytest.approx(1.0)
-        assert scorer_fitted.R2CV[3] == pytest.approx(1.0)
-        assert scorer_fitted.R2CV[4] == pytest.approx(0.0)
-        assert scorer_fitted.R2CV[6] == pytest.approx(0.0)
+        assert scorer_fitted._R2CV[1] == pytest.approx(1.0)
+        assert scorer_fitted._R2CV[3] == pytest.approx(1.0)
+        assert scorer_fitted._R2CV[4] == pytest.approx(0.0)
+        assert scorer_fitted._R2CV[6] == pytest.approx(0.0)
 
     def test_r2prob_known_values(self, scorer_fitted):
-        assert scorer_fitted.R2Prob[1] == pytest.approx(1.0)
-        assert scorer_fitted.R2Prob[3] == pytest.approx(1.0)
-        assert scorer_fitted.R2Prob[4] == pytest.approx(0.0)
-        assert scorer_fitted.R2Prob[6] == pytest.approx(0.0)
+        assert scorer_fitted._R2Prob[1] == pytest.approx(1.0)
+        assert scorer_fitted._R2Prob[3] == pytest.approx(1.0)
+        assert scorer_fitted._R2Prob[4] == pytest.approx(0.0)
+        assert scorer_fitted._R2Prob[6] == pytest.approx(0.0)
 
     def test_r2n_keys_match_r(self, scorer_fitted):
-        assert set(scorer_fitted.R2N.keys()) == set(scorer_fitted.R)
+        assert set(scorer_fitted._R2N.keys()) == set(scorer_fitted._R)
 
     def test_f2n_known_values(self, scorer_fitted):
-        assert scorer_fitted.F2N[1] == pytest.approx(2.0)
-        assert scorer_fitted.F2N[2] == pytest.approx(1.0)
-        assert scorer_fitted.F2N[3] == pytest.approx(1.0)
+        assert scorer_fitted._F2N[1] == pytest.approx(2.0)
+        assert scorer_fitted._F2N[2] == pytest.approx(1.0)
+        assert scorer_fitted._F2N[3] == pytest.approx(1.0)
 
     def test_f2cv_known_values(self, scorer_fitted):
-        assert scorer_fitted.F2CV[1] == pytest.approx(0.0)
-        assert scorer_fitted.F2CV[2] == pytest.approx(1.0)
-        assert scorer_fitted.F2CV[3] == pytest.approx(1.0)
+        assert scorer_fitted._F2CV[1] == pytest.approx(0.0)
+        assert scorer_fitted._F2CV[2] == pytest.approx(1.0)
+        assert scorer_fitted._F2CV[3] == pytest.approx(1.0)
 
     def test_f2prob_known_values(self, scorer_fitted):
-        assert scorer_fitted.F2Prob[1] == pytest.approx(0.0)
-        assert scorer_fitted.F2Prob[2] == pytest.approx(1.0)
-        assert scorer_fitted.F2Prob[3] == pytest.approx(1.0)
+        assert scorer_fitted._F2Prob[1] == pytest.approx(0.0)
+        assert scorer_fitted._F2Prob[2] == pytest.approx(1.0)
+        assert scorer_fitted._F2Prob[3] == pytest.approx(1.0)
 
     def test_f2n_keys_match_f(self, scorer_fitted):
-        assert set(scorer_fitted.F2N.keys()) == set(scorer_fitted.F)
-
-    def test_recency_probability_is_dataframe(self, scorer_fitted):
-        df = scorer_fitted.recency_probability_
-        assert isinstance(df, pd.DataFrame)
-        assert set(df.columns) == {"recency", "N", "cv", "probability"}
-
-    def test_recency_probability_row_count(self, scorer_fitted):
-        assert len(scorer_fitted.recency_probability_) == _RECENCY_LIMIT
-
-    def test_frequency_probability_is_dataframe(self, scorer_fitted):
-        df = scorer_fitted.frequency_probability_
-        assert isinstance(df, pd.DataFrame)
-        assert set(df.columns) == {"frequency", "N", "cv", "probability"}
-
-    def test_frequency_probability_row_count(self, scorer_fitted):
-        assert len(scorer_fitted.frequency_probability_) == _FREQUENCY_LIMIT
+        assert set(scorer_fitted._F2N.keys()) == set(scorer_fitted._F)
 
     def test_r2n_f2n_sum_equals_record_num_target(self, scorer_fitted):
         # R2N の合計 == F2N の合計 == 分析対象レコード数
-        assert sum(scorer_fitted.R2N.values()) == pytest.approx(scorer_fitted.record_num_target)
-        assert sum(scorer_fitted.F2N.values()) == pytest.approx(scorer_fitted.record_num_target)
+        assert sum(scorer_fitted._R2N.values()) == pytest.approx(scorer_fitted.record_num_target)
+        assert sum(scorer_fitted._F2N.values()) == pytest.approx(scorer_fitted.record_num_target)
 
 
 # ---------------------------------------------------------------------------
@@ -1677,10 +1650,15 @@ class TestShow:
     def test_show_does_not_raise(self, scorer_fitted, capsys):
         scorer_fitted.show()
 
-    def test_show_outputs_profiling(self, scorer_fitted, capsys):
+    def test_show_not_fitted(self, scorer, capsys):
+        scorer.show()
+        out = capsys.readouterr().out
+        assert "not fitted" in out
+
+    def test_show_outputs_header(self, scorer_fitted, capsys):
         scorer_fitted.show()
         out = capsys.readouterr().out
-        assert "profiling" in out
+        assert "RecencyFrequencyScorer" in out
 
     def test_show_outputs_period_info(self, scorer_fitted, capsys):
         scorer_fitted.show()
