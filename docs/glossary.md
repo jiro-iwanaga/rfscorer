@@ -71,7 +71,11 @@
 | `load(path)` | `save()` で保存した pickle ファイルからモデルを復元するクラスメソッド。保存時と現在のバージョンの major または minor が異なる場合は `UserWarning` を発行してロードを続行する。戻り値は `RecencyFrequencyScorer` インスタンス |
 | `save_zip(path=None)` | フィット済みモデルを zip アーカイブとして保存するメソッド。アーカイブには `rfscorer.pkl`・`metadata.json`・`probabilities/`（確率テーブル CSV）・`plots/`（確率曲面 PNG）が含まれる。`path=None` でカレントディレクトリに `scorer.zip` を生成。`fit()` 後に利用可能 |
 | `load_zip(path)` | `save_zip()` で保存した zip アーカイブからモデルを復元するクラスメソッド。バージョン不一致の扱いは `load()` と同じ。戻り値は `RecencyFrequencyScorer` インスタンス |
-| `show()` | `fit()` 後の集計情報（レコード数・cv 数・期間・上限値）を標準出力に表示するデバッグ用メソッド |
+| `show()` | `fit()` 後の集計情報（レコード数・cv 数・期間・上限値・相関係数）を標準出力に表示するデバッグ用メソッド |
+| `recency_corr_` | `fit()` 後に参照できる最新度と経験的確率のスピアマン ρ（等重み）。r 値と P(r) のピアソン相関係数 on ranks。理論上は負（r=1 が最直近・最高確率）。`float`（要素数 < 2 または全順位一致の場合は `nan`） |
+| `frequency_corr_` | `fit()` 後に参照できる頻度と経験的確率のスピアマン ρ（等重み）。f 値と P(f) の相関。理論上は正（高頻度ほど高確率）。`float` |
+| `recency_corr_weighted_` | `fit()` 後に参照できる最新度と経験的確率のスピアマン ρ（N_r 重み付き）。各 r のサンプルサイズで重み付けした順位相関。`float` |
+| `frequency_corr_weighted_` | `fit()` 後に参照できる頻度と経験的確率のスピアマン ρ（N_f 重み付き）。各 f のサンプルサイズで重み付けした順位相関。`float` |
 | `recency_limit` | `fit()` 後に参照できる最新度の上限値。これを超える最新度は `recency_limit` にクランプされてスコアリングされる。`None` の場合は累積対象イベント発生数の 95% をカバーする最新度に自動設定される |
 | `frequency_limit` | `fit()` 後に参照できる頻度の上限値。これを超える頻度は `frequency_limit` にクランプされてスコアリングされる。`None` の場合は累積対象イベント発生数の 95% をカバーする頻度に自動設定される |
 | `emp_probability_` | `fit()` 後に参照できる経験的商品選択確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `N`, `cv`, `probability`） |

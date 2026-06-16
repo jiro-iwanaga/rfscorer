@@ -123,6 +123,10 @@ class RecencyFrequencyScorer(PlottingMixin):
         self.mcc_probability_dict_ = None
 
         # データ解析用
+        self.recency_corr_ = None  # スピアマン ρ（r 値と P(r) の等重み相関）
+        self.frequency_corr_ = None  # スピアマン ρ（f 値と P(f) の等重み相関）
+        self.recency_corr_weighted_ = None  # スピアマン ρ（N_r 重み付き）
+        self.frequency_corr_weighted_ = None  # スピアマン ρ（N_f 重み付き）
         self.record_num = None  # レコード数（fit() 後に設定）
         self.record_num_obs = None  # 観測期間レコード数
         self.record_num_gt = None  # 正解期間レコード数
@@ -355,6 +359,17 @@ class RecencyFrequencyScorer(PlottingMixin):
             .sort_values("frequency")
             .reset_index(drop=True)
         )
+
+        r_vals = sorted(r for r in self._R2Prob if self._R2N[r] > 0)
+        r_probs = [self._R2Prob[r] for r in r_vals]
+        r_weights = [self._R2N[r] for r in r_vals]
+        f_vals = sorted(f for f in self._F2Prob if self._F2N[f] > 0)
+        f_probs = [self._F2Prob[f] for f in f_vals]
+        f_weights = [self._F2N[f] for f in f_vals]
+        self.recency_corr_ = self._marginal_spearman(r_vals, r_probs)
+        self.frequency_corr_ = self._marginal_spearman(f_vals, f_probs)
+        self.recency_corr_weighted_ = self._marginal_spearman(r_vals, r_probs, r_weights)
+        self.frequency_corr_weighted_ = self._marginal_spearman(f_vals, f_probs, f_weights)
 
     # ---------------------------------------------------------------------------
     # Optimization (単調性制約付き再推定)
@@ -1156,12 +1171,52 @@ class RecencyFrequencyScorer(PlottingMixin):
         print(f"  frequency_limit: {self.frequency_limit}")
         print(f"  target_records : {self.record_num_target_org} → {self.record_num_target}")
         print(f"  total_cv       : {self.total_cv_org} → {self.total_cv}")
+        print(
+            f"  recency_corr   : {self.recency_corr_:.4f}"
+            f" (weighted: {self.recency_corr_weighted_:.4f})"
+        )
+        print(
+            f"  frequency_corr : {self.frequency_corr_:.4f}"
+            f" (weighted: {self.frequency_corr_weighted_:.4f})"
+        )
         print("  emp_probability_table_:")
         print(self.emp_probability_table_.round(3).to_string())
 
     # ---------------------------------------------------------------------------
     # Internal helpers
     # ---------------------------------------------------------------------------
+
+    def _marginal_spearman(self, x_vals, y_vals, weights=None):
+        """Spearman ρ between x_vals and y_vals, optionally N-weighted.
+
+        When weights is None, equal weights are used (standard Spearman ρ).
+        When weights is provided, computes weighted Pearson on ranks (weighted
+        Spearman). Returns float("nan") when n < 2 or all ranks are tied.
+        """
+        import numpy as np
+        from scipy.stats import rankdata
+
+        n = len(x_vals)
+        if n < 2:
+            return float("nan")
+        rx = rankdata(x_vals).astype(float)
+        ry = rankdata(y_vals).astype(float)
+        if weights is None:
+            w = np.ones(n) / n
+        else:
+            w = np.array(weights, dtype=float)
+            total = w.sum()
+            if total == 0:
+                return float("nan")
+            w = w / total
+        mx = np.dot(w, rx)
+        my = np.dot(w, ry)
+        cov = np.dot(w, (rx - mx) * (ry - my))
+        sx = np.sqrt(np.dot(w, (rx - mx) ** 2))
+        sy = np.sqrt(np.dot(w, (ry - my) ** 2))
+        if sx == 0.0 or sy == 0.0:
+            return float("nan")
+        return float(cov / (sx * sy))
 
     def _build_ui_rf_df(self, df, ref_int):
         """Compute recency and frequency for each (user, item) pair.

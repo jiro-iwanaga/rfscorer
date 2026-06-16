@@ -1670,3 +1670,70 @@ class TestShow:
         out = capsys.readouterr().out
         assert "recency_limit" in out
         assert "frequency_limit" in out
+
+    def test_show_outputs_corr(self, scorer_fitted, capsys):
+        scorer_fitted.show()
+        out = capsys.readouterr().out
+        assert "recency_corr" in out
+        assert "frequency_corr" in out
+
+
+# ---------------------------------------------------------------------------
+# Spearman correlations
+# ---------------------------------------------------------------------------
+class TestCorrelation:
+    def test_recency_corr_none_before_fit(self, scorer):
+        assert scorer.recency_corr_ is None
+
+    def test_frequency_corr_none_before_fit(self, scorer):
+        assert scorer.frequency_corr_ is None
+
+    def test_recency_corr_weighted_none_before_fit(self, scorer):
+        assert scorer.recency_corr_weighted_ is None
+
+    def test_frequency_corr_weighted_none_before_fit(self, scorer):
+        assert scorer.frequency_corr_weighted_ is None
+
+    def test_recency_corr_is_float(self, scorer_fitted):
+        assert isinstance(scorer_fitted.recency_corr_, float)
+
+    def test_frequency_corr_is_float(self, scorer_fitted):
+        assert isinstance(scorer_fitted.frequency_corr_, float)
+
+    def test_recency_corr_weighted_is_float(self, scorer_fitted):
+        assert isinstance(scorer_fitted.recency_corr_weighted_, float)
+
+    def test_frequency_corr_weighted_is_float(self, scorer_fitted):
+        assert isinstance(scorer_fitted.frequency_corr_weighted_, float)
+
+    def test_recency_corr_in_range(self, scorer_fitted):
+        assert -1.0 <= scorer_fitted.recency_corr_ <= 1.0
+
+    def test_frequency_corr_in_range(self, scorer_fitted):
+        assert -1.0 <= scorer_fitted.frequency_corr_ <= 1.0
+
+    def test_recency_corr_weighted_in_range(self, scorer_fitted):
+        assert -1.0 <= scorer_fitted.recency_corr_weighted_ <= 1.0
+
+    def test_frequency_corr_weighted_in_range(self, scorer_fitted):
+        assert -1.0 <= scorer_fitted.frequency_corr_weighted_ <= 1.0
+
+    def test_recency_corr_is_negative(self, scorer_fitted):
+        # r=1 が最直近・最高確率なので、r と P(r) は負の相関
+        assert scorer_fitted.recency_corr_ < 0
+
+    def test_frequency_corr_is_positive(self, scorer_fitted):
+        # 高頻度ほど高確率なので、f と P(f) は正の相関
+        assert scorer_fitted.frequency_corr_ > 0
+
+    def test_recency_corr_weighted_is_negative(self, scorer_fitted):
+        assert scorer_fitted.recency_corr_weighted_ < 0
+
+    def test_frequency_corr_weighted_is_positive(self, scorer_fitted):
+        assert scorer_fitted.frequency_corr_weighted_ > 0
+
+    def test_equal_n_gives_same_weighted_unweighted(self, scorer_fitted):
+        # テストデータは各 r の N_r がすべて 1 なので等重み＝重み付き
+        assert scorer_fitted.recency_corr_ == pytest.approx(
+            scorer_fitted.recency_corr_weighted_, abs=1e-9
+        )
