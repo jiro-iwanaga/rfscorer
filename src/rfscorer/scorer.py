@@ -127,6 +127,8 @@ class RecencyFrequencyScorer(PlottingMixin):
         self.frequency_corr_ = None  # スピアマン ρ（f 値と P(f) の等重み相関）
         self.recency_corr_weighted_ = None  # スピアマン ρ（N_r 重み付き）
         self.frequency_corr_weighted_ = None  # スピアマン ρ（N_f 重み付き）
+        self.recency_slice_corr_ = None  # dict[r, float] r 固定スライスの重み付きスピアマン ρ
+        self.frequency_slice_corr_ = None  # dict[f, float] f 固定スライスの重み付きスピアマン ρ
         self.record_num = None  # レコード数（fit() 後に設定）
         self.record_num_obs = None  # 観測期間レコード数
         self.record_num_gt = None  # 正解期間レコード数
@@ -370,6 +372,32 @@ class RecencyFrequencyScorer(PlottingMixin):
         self.frequency_corr_ = self._marginal_spearman(f_vals, f_probs)
         self.recency_corr_weighted_ = self._marginal_spearman(r_vals, r_probs, r_weights)
         self.frequency_corr_weighted_ = self._marginal_spearman(f_vals, f_probs, f_weights)
+
+        rec_slice = {}
+        for r in sorted(r for r in self._R if self._R2N.get(r, 0) > 0):
+            fs = sorted(f for f in self._F if self._RF2N.get((r, f), 0) > 0)
+            if len(fs) < 2:
+                rec_slice[r] = float("nan")
+            else:
+                rec_slice[r] = self._marginal_spearman(
+                    fs,
+                    [self._RF2Prob[(r, f)] for f in fs],
+                    [self._RF2N[(r, f)] for f in fs],
+                )
+        self.recency_slice_corr_ = rec_slice
+
+        freq_slice = {}
+        for f in sorted(f for f in self._F if self._F2N.get(f, 0) > 0):
+            rs = sorted(r for r in self._R if self._RF2N.get((r, f), 0) > 0)
+            if len(rs) < 2:
+                freq_slice[f] = float("nan")
+            else:
+                freq_slice[f] = self._marginal_spearman(
+                    rs,
+                    [self._RF2Prob[(r, f)] for r in rs],
+                    [self._RF2N[(r, f)] for r in rs],
+                )
+        self.frequency_slice_corr_ = freq_slice
 
     # ---------------------------------------------------------------------------
     # Optimization (単調性制約付き再推定)
@@ -1179,12 +1207,22 @@ class RecencyFrequencyScorer(PlottingMixin):
             f"  frequency_corr : {self.frequency_corr_:.4f}"
             f" (weighted: {self.frequency_corr_weighted_:.4f})"
         )
+        print(f"  recency_slice_corr : {self._fmt_slice_corr(self.recency_slice_corr_)}")
+        print(f"  frequency_slice_corr: {self._fmt_slice_corr(self.frequency_slice_corr_)}")
         print("  emp_probability_table_:")
         print(self.emp_probability_table_.round(3).to_string())
 
     # ---------------------------------------------------------------------------
     # Internal helpers
     # ---------------------------------------------------------------------------
+
+    def _fmt_slice_corr(self, d):
+        import math
+
+        parts = [
+            f"{k}: {v:.4f}" if not math.isnan(v) else f"{k}: nan" for k, v in sorted(d.items())
+        ]
+        return "{" + ", ".join(parts) + "}"
 
     def _marginal_spearman(self, x_vals, y_vals, weights=None):
         """Spearman ρ between x_vals and y_vals, optionally N-weighted.

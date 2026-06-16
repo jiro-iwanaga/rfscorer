@@ -76,6 +76,8 @@
 | `frequency_corr_` | `fit()` 後に参照できる頻度と経験的確率のスピアマン ρ（等重み）。f 値と P(f) の相関。理論上は正（高頻度ほど高確率）。`float` |
 | `recency_corr_weighted_` | `fit()` 後に参照できる最新度と経験的確率のスピアマン ρ（N_r 重み付き）。各 r のサンプルサイズで重み付けした順位相関。`float` |
 | `frequency_corr_weighted_` | `fit()` 後に参照できる頻度と経験的確率のスピアマン ρ（N_f 重み付き）。各 f のサンプルサイズで重み付けした順位相関。`float` |
+| `recency_slice_corr_` | `fit()` 後に参照できる r 固定スライスごとのスピアマン ρ。`dict[int, float]`（キー: r）。各 r について `weighted_spearman(f, P(r,f), weights=N(r,f))` を計算。N(r,f)=0 のセルは除外。有効セルが2未満のスライスは `nan` |
+| `frequency_slice_corr_` | `fit()` 後に参照できる f 固定スライスごとのスピアマン ρ。`dict[int, float]`（キー: f）。各 f について `weighted_spearman(r, P(r,f), weights=N(r,f))` を計算。理論上は負（高 r ほど低確率）。有効セルが2未満のスライスは `nan` |
 | `recency_limit` | `fit()` 後に参照できる最新度の上限値。これを超える最新度は `recency_limit` にクランプされてスコアリングされる。`None` の場合は累積対象イベント発生数の 95% をカバーする最新度に自動設定される |
 | `frequency_limit` | `fit()` 後に参照できる頻度の上限値。これを超える頻度は `frequency_limit` にクランプされてスコアリングされる。`None` の場合は累積対象イベント発生数の 95% をカバーする頻度に自動設定される |
 | `emp_probability_` | `fit()` 後に参照できる経験的商品選択確率。`pd.DataFrame`（カラム: `recency`, `frequency`, `N`, `cv`, `probability`） |

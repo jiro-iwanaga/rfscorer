@@ -1737,3 +1737,94 @@ class TestCorrelation:
         assert scorer_fitted.recency_corr_ == pytest.approx(
             scorer_fitted.recency_corr_weighted_, abs=1e-9
         )
+
+
+# ---------------------------------------------------------------------------
+# Slice-wise Spearman correlations
+# ---------------------------------------------------------------------------
+class TestSliceCorrelation:
+    """Tests for recency_slice_corr_ and frequency_slice_corr_."""
+
+    @pytest.fixture(scope="class")
+    def scorer_slice(self):
+        """Denser dataset with ≥2 non-zero cells per slice for both r and f."""
+        # r=1,f=1: cv=0  r=1,f=2: cv=1  → recency_slice_corr_[1] > 0
+        # r=2,f=1: cv=0  r=2,f=2: cv=1  → recency_slice_corr_[2] > 0
+        # f=1: r=1 cv=0, r=2 cv=0       → frequency_slice_corr_[1] = nan (all prob=0 → tied)
+        # f=2: r=1 cv=1, r=2 cv=1       → frequency_slice_corr_[2] = nan (all prob=1 → tied)
+        # Richer dataset where f=1 and f=2 have clear r-vs-prob slope:
+        rows = [
+            # r=1, f=1 (最直近・低頻度): cv=0
+            ("u1", "itemA", "2024-01-07"),
+            # r=1, f=2 (最直近・高頻度): cv=1
+            ("u2", "itemB", "2024-01-06"),
+            ("u2", "itemB", "2024-01-07"),
+            # r=2, f=1 (やや古・低頻度): cv=0
+            ("u3", "itemC", "2024-01-06"),
+            # r=2, f=2 (やや古・高頻度): cv=1
+            ("u4", "itemD", "2024-01-05"),
+            ("u4", "itemD", "2024-01-06"),
+            # r=3, f=1 (古・低頻度): cv=0
+            ("u5", "itemE", "2024-01-05"),
+            # r=3, f=2 (古・高頻度): cv=0
+            ("u6", "itemF", "2024-01-04"),
+            ("u6", "itemF", "2024-01-05"),
+            # ground truth
+            ("u2", "itemB", "2024-01-09"),
+            ("u4", "itemD", "2024-01-09"),
+        ]
+        df = pd.DataFrame(rows, columns=["user", "item", "datetime"])
+        df_obs = df[df["datetime"] <= "2024-01-07"]
+        df_gt = df[df["datetime"] >= "2024-01-08"]
+        s = RecencyFrequencyScorer()
+        s.fit(df_obs, df_gt, recency_limit=3, frequency_limit=2)
+        return s
+
+    def test_recency_slice_corr_none_before_fit(self, scorer):
+        assert scorer.recency_slice_corr_ is None
+
+    def test_frequency_slice_corr_none_before_fit(self, scorer):
+        assert scorer.frequency_slice_corr_ is None
+
+    def test_recency_slice_corr_is_dict(self, scorer_fitted):
+        assert isinstance(scorer_fitted.recency_slice_corr_, dict)
+
+    def test_frequency_slice_corr_is_dict(self, scorer_fitted):
+        assert isinstance(scorer_fitted.frequency_slice_corr_, dict)
+
+    def test_recency_slice_corr_keys_are_observed_r(self, scorer_fitted):
+        # キーは N_r > 0 の r 値のみ（r=1,3,4,6）
+        assert set(scorer_fitted.recency_slice_corr_.keys()) == {1, 3, 4, 6}
+
+    def test_frequency_slice_corr_keys_are_observed_f(self, scorer_fitted):
+        assert set(scorer_fitted.frequency_slice_corr_.keys()) == {1, 2, 3}
+
+    def test_recency_slice_corr_values_are_float(self, scorer_fitted):
+        for v in scorer_fitted.recency_slice_corr_.values():
+            assert isinstance(v, float)
+
+    def test_frequency_slice_corr_values_are_float(self, scorer_fitted):
+        for v in scorer_fitted.frequency_slice_corr_.values():
+            assert isinstance(v, float)
+
+    def test_recency_slice_corr_sparse_data_all_nan(self, scorer_fitted):
+        # デフォルトテストデータは各 r スライスに有効セルが1つ以下 → 全 NaN
+        import math
+
+        assert all(math.isnan(v) for v in scorer_fitted.recency_slice_corr_.values())
+
+    def test_recency_slice_corr_positive_for_dense_data(self, scorer_slice):
+        # r=1,2: f=1 → cv=0, f=2 → cv=1 → f と P(r,f) は正の相関
+        import math
+
+        non_nan = {k: v for k, v in scorer_slice.recency_slice_corr_.items() if not math.isnan(v)}
+        assert len(non_nan) > 0
+        assert all(v > 0 for v in non_nan.values())
+
+    def test_frequency_slice_corr_negative_for_dense_data(self, scorer_slice):
+        # f=2: r=1 cv=1, r=2 cv=1, r=3 cv=0 → r と P(r,f) は負の相関
+        import math
+
+        non_nan = {k: v for k, v in scorer_slice.frequency_slice_corr_.items() if not math.isnan(v)}
+        assert len(non_nan) > 0
+        assert all(v < 0 for v in non_nan.values())
