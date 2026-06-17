@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-06-17
+
+### Added
+
+- Spearman correlation diagnostic attributes, populated automatically by `fit()`:
+  - `recency_corr_` / `frequency_corr_`: equal-weight Spearman correlation between the RF rank
+    and the empirical probability. Negative recency / positive frequency correlation indicates
+    the expected monotonic relationship.
+  - `recency_corr_weighted_` / `frequency_corr_weighted_`: sample-size weighted variants.
+  - `recency_corr_pvalue_` / `frequency_corr_pvalue_`: two-sided p-values for the equal-weight
+    correlations.
+  - `recency_slice_corr_` / `frequency_slice_corr_`: dicts of per-slice correlations for
+    diagnosing 2D monotonicity (e.g. recency-vs-probability within each frequency level).
+- `verbose` parameter to `optimize()` (default `False`): when `True`, prints solver progress and
+  result summary.
+- `path` parameter to `plot_probability_surface()` and `plot_marginal_probability()`: save the
+  figure directly. A directory path writes a default filename
+  (`surface_{kind}_probability.png` / `marginal_{kind}_probability.png`); a file path writes that
+  name. Both methods now also show a default title based on `kind` when `title=None`.
+- Practical tutorial notebooks (`examples/tutorial_practical_ja.ipynb` /
+  `tutorial_practical_en.ipynb`): user-level train/test split, building all nine models,
+  accuracy comparison, and model save/load (pickle and zip archive).
+
+### Changed
+
+- `show()` redesigned as a structured diagnostic report (data statistics, fit parameters,
+  Spearman correlations, and the empirical probability table) instead of the previous
+  profiling-style output.
+- `plot_marginal_probability()` API redesign. **Breaking changes:**
+  - `kind` values changed from `("emp", "er", "ef", "mr", "mf", "all")` to
+    `("er", "ef", "mr", "mf", "rboth", "fboth")`. The `"all"` overlay is split into `"rboth"`
+    (empirical + monotonic recency) and `"fboth"` (empirical + monotonic frequency); `"emp"` is
+    removed.
+  - The `axis` parameter is removed (the axis is now inferred from `kind`).
+  - The separate `recency_label` / `frequency_label` parameters are consolidated into a single
+    `axis_label=None`.
+- `export_probability_csv()`: the default output filename changed from `{kind}_probability.csv`
+  to `probability_{kind}.csv` (e.g. `probability_emp.csv`). **Breaking** only for callers relying
+  on the auto-generated name when passing `path=None` or a directory; explicit file paths are
+  unaffected. (The CSV names *inside* the `save_zip()` archive are unchanged.)
+- Internal aggregation dicts renamed to private:
+  `R/F/RF2N/RF2CV/RF2Prob/R2N/R2CV/R2Prob/F2N/F2CV/F2Prob` → `_R/_F/_RF2N/…`. These were
+  implementation details, not public API; the public probability attributes
+  (`emp_probability_dict_`, `er_probability_dict_`, etc.) are unchanged.
+- Documentation overhaul across `docs/`: document titles renamed (アーキテクチャ構成書 /
+  機能仕様書 / リポジトリ構成 / 用語集), `glossary.md` restructured (基本概念・期間とデータ分割・
+  アルゴリズム・API 簡潔版) with terminology unification (推薦スコア＝商品選択確率, 対象イベント,
+  behavior history), and a release procedure added to `development-guidelines.md`.
+- Beginner tutorial notebooks (`tutorial_beginner_ja.ipynb` / `tutorial_beginner_en.ipynb`)
+  updated for the revised API and terminology.
+- Test suite expanded (+30 cases; 439 passing) covering transform with 2D optimized kinds,
+  plot `path` saving, objective-function fit quality (analytic optima), datetime64 splits, and
+  version-mismatch semantics for `load()` / `load_zip()`.
+
+### Removed
+
+- `recency_probability_` and `frequency_probability_` attributes; consolidated into
+  `er_probability_` / `ef_probability_`.
+- `axis` parameter, and the `"emp"` / `"all"` kind values, from `plot_marginal_probability()`.
+
+### Fixed
+
+- Dependency floor: `cvxpy>=1.3` → `cvxpy>=1.5`. The optimizer explicitly solves with the
+  CLARABEL solver, which is bundled with cvxpy since 1.4 and the default since 1.5; the previous
+  `>=1.3` floor could resolve an environment without CLARABEL available.
+
 ## [0.4.4] - 2026-06-15
 
 ### Added
