@@ -56,7 +56,9 @@ class PlottingMixin:
 
         In Jupyter Lab / Colab the returned figure renders inline automatically.
         To save to a file, call ``fig.savefig("output.png")`` on the returned
-        figure.
+        figure or use the ``path`` parameter.
+        Japanese axis labels require ``pip install rfscorer[ja]``
+        (installs ``japanize-matplotlib``).
 
         Parameters
         ----------
@@ -184,9 +186,12 @@ class PlottingMixin:
         """Plot product-choice probability along one RF dimension as a line chart.
 
         The axis (recency or frequency) is inferred from ``kind``:
-        "er"/"mr"/"r" plot against recency; "ef"/"mf"/"f" plot against frequency.
+        "er"/"mr"/"rboth" plot against recency; "ef"/"mf"/"fboth" plot against
+        frequency.
 
         In Jupyter Lab / Colab the returned figure renders inline automatically.
+        Japanese axis labels require ``pip install rfscorer[ja]``
+        (installs ``japanize-matplotlib``).
 
         Parameters
         ----------
@@ -208,8 +213,8 @@ class PlottingMixin:
             Font size for axis labels and tick labels.
         axis_label : str or None, default None
             Label for the x-axis. When None, defaults to "recency" for recency
-            plots (kind in "er"/"mr"/"r") and "frequency" for frequency plots
-            (kind in "ef"/"mf"/"f").
+            plots (kind in "er"/"mr"/"rboth") and "frequency" for frequency plots
+            (kind in "ef"/"mf"/"fboth").
         probability_label : str, default "probability"
             Label for the y-axis.
         path : str or None, default None
@@ -226,9 +231,14 @@ class PlottingMixin:
         ValueError
             If kind is not one of the accepted values.
         RuntimeError
-            If fit() has not been called, or if optimize(kind='mr') /
-            optimize(kind='mf') has not been called when kind is "mr", "mf",
-            "r", or "f".
+            If fit() has not been called, or if optimize(kind='mr') has not
+            been called when kind is "mr" or "rboth", or if optimize(kind='mf')
+            has not been called when kind is "mf" or "fboth".
+
+        Notes
+        -----
+        Line styles: for "rboth"/"fboth" the empirical series is solid and the
+        optimized series is dashed; single-series plots are solid. All black.
         """
         import matplotlib.pyplot as plt
 

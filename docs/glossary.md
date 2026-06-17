@@ -23,7 +23,7 @@
 | 用語 | 英語 / 記号 | 定義 |
 |------|------------|------|
 | 観測期間 | observation period | 最新度・頻度を計算する期間。`split_by_date()` で `observation_days` パラメータで指定 |
-| 正解期間 | ground truth period | ターゲットイベントを観測する期間。観測期間の直後に設定。`split_by_date()` で `gt_days` パラメータで指定 |
+| 正解期間 | ground truth period | 対象イベントを観測する期間。観測期間の直後に設定。`split_by_date()` で `gt_days` パラメータで指定 |
 | 観測データ | observation data | 観測期間に該当する行動履歴 DataFrame。`fit()` に `df_obs` として渡す |
 | 正解データ | ground truth data | 正解期間に該当するイベント履歴 DataFrame。`fit()` に `df_gt` として渡す |
 
@@ -42,11 +42,11 @@
 
 | 用語 | 英語 / 記号 | 定義 |
 |------|------------|------|
-| 商品選択確率 | product-choice probability | 観測期間の (r,f) が正解期間でターゲットイベントを発生させる確率 |
+| 商品選択確率 | product-choice probability | 観測期間の (r,f) が正解期間で対象イベントを発生させる確率 |
 | 推薦スコア | recommendation score | 商品選択確率の別称。推薦の根拠となるスコア |
 | 経験的商品選択確率 | empirical product-choice probability / $p_{r,f}$ | $p_{r,f} = n_{r,f} / N_{r,f}$。観測データから直接算出。ノイズを含む |
 | 最適化商品選択確率 | optimized product-choice probability / $x_{r,f}$ | RF 制約を満たすよう最適化した商品選択確率 |
-| $n_{r,f}$ | — | 観測期間で (r,f) であった商品が正解期間でターゲットイベントを発生させた回数の合計 |
+| $n_{r,f}$ | — | 観測期間で (r,f) であった商品が正解期間で対象イベントを発生させた回数の合計 |
 | $N_{r,f}$ | — | 観測期間で (r,f) であった (user, item) ペアの数 |
 
 ### 最適化と制約
@@ -90,7 +90,7 @@
 | `predict(r, f, kind)` | 指定した最新度・頻度の商品選択確率を返す |
 | `evaluate(df_rec, df_gt, order)` | 推薦結果と正解データを比較し precision・recall・F1 を返す |
 | `show()` | `fit()` 後の状態をデータ統計・相関係数・確率テーブルで表示 |
-| `export_probability_csv(kind, path)` | 商品選択確率テーブルを CSV に出力 |
+| `export_probability_csv(kind, path)` | 商品選択確率テーブルを CSV (`probability_{kind}.csv`) に出力 |
 | `plot_probability_surface(kind, ...)` | 商品選択確率を3次元ワイヤーフレームで可視化 |
 | `plot_marginal_probability(kind, ...)` | 最新度または頻度の一方向の確率を折れ線グラフで可視化 |
 | `save(path)` / `load(path)` | モデルの pickle 形式での保存・ロード |

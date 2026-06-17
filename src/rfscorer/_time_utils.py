@@ -1,7 +1,7 @@
 """Internal helpers for normalizing time values and time-column series.
 
 Used by RecencyFrequencyScorer and the split_by_date() utility to support
-both datetime and integer time inputs through a single ordinal-integer
+datetime, string, and integer time inputs through a single ordinal-integer
 internal representation.
 """
 
@@ -23,7 +23,7 @@ _ORDINAL_ORIGIN = pd.Timestamp("0001-01-01")
 
 
 def normalize_ref(value) -> int:
-    """Normalize a single time reference value (date or integer) to int."""
+    """Normalize a single time reference value (datetime, date string, or integer) to int."""
     if isinstance(value, (pd.Timestamp, datetime.datetime)):
         return value.toordinal()
     elif isinstance(value, str):
@@ -41,7 +41,7 @@ def normalize_ref(value) -> int:
 
 
 def normalize_sequence_col(series: pd.Series) -> pd.Series:
-    """Normalize a time column (datetime or integer) to an integer Series."""
+    """Normalize a time column (datetime, string, or integer) to an integer Series."""
     if is_datetime64_any_dtype(series):
         return (series - _ORDINAL_ORIGIN).dt.days + 1
     elif is_string_dtype(series):

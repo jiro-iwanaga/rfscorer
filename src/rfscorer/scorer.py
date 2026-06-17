@@ -8,7 +8,7 @@ from ._time_utils import normalize_ref, normalize_sequence_col
 class RecencyFrequencyScorer(PlottingMixin):
     """Recency-Frequency based recommendation scorer.
 
-    Estimates product-choice probabilities from user-item interaction histories
+    Estimates product-choice probabilities from user-item behavior histories
     using recency and frequency as behavioral signals.
     """
 
@@ -151,7 +151,7 @@ class RecencyFrequencyScorer(PlottingMixin):
         recency_limit=None,
         frequency_limit=None,
     ):
-        """Estimate empirical product-choice probabilities from pre-split interaction data.
+        """Estimate empirical product-choice probabilities from pre-split behavior data.
 
         Accepts observation and ground truth DataFrames that have already been
         filtered to the respective periods by the caller. For convenience,
@@ -169,7 +169,7 @@ class RecencyFrequencyScorer(PlottingMixin):
         ref : str, datetime, or int, optional
             Reference value for recency computation. Recency of each
             user-item pair is ``(ref - value) // unit + 1``, where the
-            minimum across interactions is taken. When None, defaults to the
+            minimum across behavior records is taken. When None, defaults to the
             maximum value in df_obs time_col.
         recency_limit : int, optional
             Maximum recency rank to include. If None, automatically set to
@@ -544,10 +544,10 @@ class RecencyFrequencyScorer(PlottingMixin):
         r : int
             Recency rank (1 = most recently interacted, higher = older).
         f : int
-            Frequency (number of interactions in the observation period).
+            Frequency (number of behavior records in the observation period).
         kind : {"emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc"}, default "emp"
-            Which probability to use. "emp", "er", and "ef" use fit(),
-            fit() results; others use optimize() results.
+            Which probability to use. "emp", "er", and "ef" use fit()
+            results; others use optimize() results.
             For 1D marginal models, only the relevant dimension is used:
             "mr" and "er" use r only; "mf" and "ef" use f only.
 
@@ -640,14 +640,14 @@ class RecencyFrequencyScorer(PlottingMixin):
         Parameters
         ----------
         df : pd.DataFrame
-            User-item interaction history to score. Pre-filter to the desired
+            User-item behavior history to score. Pre-filter to the desired
             observation window before calling.
         ref : str, datetime, or int, optional
             Reference value for computing recency. When None, defaults to the
             maximum value in df time_col.
         kind : {"emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc"}, default "emp"
-            Which probability to use. "emp", "er", and "ef" use fit(),
-            fit() results; others use optimize() results.
+            Which probability to use. "emp", "er", and "ef" use fit()
+            results; others use optimize() results.
             For 1D marginal models ("mr", "er", "mf", "ef"), probability is
             looked up by recency or frequency alone.
         user_col : str, optional
@@ -850,16 +850,17 @@ class RecencyFrequencyScorer(PlottingMixin):
         Parameters
         ----------
         kind : {"emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc", "all"}, default "emp"
-            Which probability to export. "emp", "er", and "ef" use fit(),
-            fit() results; others use optimize() results;
+            Which probability to export. "emp", "er", and "ef" use fit()
+            results; others use optimize() results;
             "all" merges all nine models into a single file. For 2D models the
             merge key is (recency, frequency); for 1D models mr merges on
             recency and mf merges on frequency, so their probability columns
             are constant along the other axis.
         path : str or None, default None
             Output file path for the CSV. If None, saves as
-            "{kind}_probability.csv" in the current directory.
-            If a directory, saves "{kind}_probability.csv" inside it.
+            "probability_{kind}.csv" in the current directory.
+            If a directory, saves "probability_{kind}.csv" inside it.
+            If a file path, saves directly to that path.
 
         Returns
         -------
@@ -1336,7 +1337,7 @@ class RecencyFrequencyScorer(PlottingMixin):
         """Compute recency and frequency for each (user, item) pair.
 
         Recency is ``(ref_int - value) // unit + 1`` (1-indexed; most recent
-        interaction at ref_int has recency 1). Frequency is the interaction
+        behavior at ref_int has recency 1). Frequency is the behavior
         count. Uses pandas groupby.
         """
         tmp = df[[self._USER_COL, self._ITEM_COL]].copy()

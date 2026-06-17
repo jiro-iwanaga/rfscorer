@@ -12,12 +12,12 @@ def split_by_date(
     gt_days=7,
     time_col="datetime",
 ):
-    """Split df into observation and ground truth datas at target_date.
+    """Split df into observation and ground truth data at target_date.
 
     Parameters
     ----------
     df : pd.DataFrame
-        Interaction log containing the time_col column.
+        Behavior history containing the time_col column.
     target_date : str, datetime, or int
         Split point. The observation window ends at and includes
         target_date; the ground truth window starts at the next time step.
@@ -40,7 +40,7 @@ def split_by_date(
     Returns
     -------
     df_obs, df_gt : tuple[pd.DataFrame, pd.DataFrame]
-        Observation log and ground truth data. Both preserve the original
+        Observation data and ground truth data. Both preserve the original
         columns and dtypes of df. target_date is inclusive in df_obs and
         exclusive from df_gt.
 
@@ -54,10 +54,13 @@ def split_by_date(
 
     Examples
     --------
-    >>> from rfscorer import RecencyFrequencyScorer, split_by_date
-    >>> df_obs, df_gt = split_by_date(df, "2024-01-07")
-    >>> scorer = RecencyFrequencyScorer()
-    >>> scorer.fit(df_obs, df_gt)
+    ::
+
+        from rfscorer import RecencyFrequencyScorer, split_by_date
+
+        df_obs, df_gt = split_by_date(df, "2024-01-07")
+        scorer = RecencyFrequencyScorer()
+        scorer.fit(df_obs, df_gt)
     """
     if not isinstance(df, pd.DataFrame):
         raise TypeError("df must be a pandas DataFrame.")
