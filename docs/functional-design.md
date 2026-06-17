@@ -366,101 +366,25 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 
 ## データフロー
 
+`df_obs` / `df_gt` は `split_by_date(df, target_date)` で分割することもできる。
+
+```mermaid
+flowchart TD
+    OBS[df_obs 観測データ]
+    GT[df_gt 正解データ]
+    OBS & GT --> FIT["fit(df_obs, df_gt)<br/>正規化・期間フィルタ・r/f 算出・集計"]
+
+    FIT --> EMP[経験的確率<br/>emp / er / ef + 相関診断]
+
+    EMP --> PRED["predict(r, f, kind)"]
+    EMP --> TRANS["transform(df, ref, kind)"]
+    EMP --> PLOT["plot_probability_surface / plot_marginal_probability"]
+    EMP --> EXP["export_probability_csv(kind)"]
+    EMP --> SAVE["save / save_zip"]
+
+    EMP --> OPT["optimize(kind)<br/>凸2次計画を求解"]
+    OPT --> OPTRES[最適化確率<br/>mr / mf / mono / mrc / mfc / mcc]
+    OPTRES --> EXP
+    OPTRES --> PLOT
+    OPTRES --> SAVE
 ```
-観測データ (df_obs)    正解データ (df_gt)
-        │                    │
-        └──────────┬──────────┘
-                   ▼
-        fit(df_obs, df_gt)
-        （df_obs, df_gt = split_by_date(df, target_date) でユーティリティ分割も可能）
-                   │
-user / item / time_col に正規化（datetime64・文字列は ordinal 整数に変換）
-観測期間・正解期間でフィルタ
-r（最新度）・f（頻度）を算出
-(r, f) 別に n_{r,f}・N_{r,f} を集計
-p_{r,f} = n_{r,f} / N_{r,f}（2次元）、p_r・p_f も同時に計算
-        ▼
-emp_probability_ / _table_ / _dict_   ← 2次元経験的商品選択確率（emp）
-er_probability_ / _dict_                    ← 最新度方向の1次元経験的確率（er）
-ef_probability_ / _dict_                    ← 頻度方向の1次元経験的確率（ef）
-recency_corr_ / recency_corr_pvalue_ / recency_corr_weighted_    ← 最新度相関診断
-frequency_corr_ / frequency_corr_pvalue_ / frequency_corr_weighted_  ← 頻度相関診断
-recency_slice_corr_ / frequency_slice_corr_                      ← スライス別相関診断
-        │
-        ├─  predict(r, f, kind)  ─→ 特定 (r, f) の商品選択確率を返す
-        │
-        ├─  transform(df, ref, kind)  ─→ user×item に r・f・確率・順位を付与
-        │   （df の事前フィルタはユーザー側で行う）
-        │
-        ├─  plot_probability_surface(kind)  ─→ 3次元ワイヤーフレームで可視化
-        │
-        ├─  plot_marginal_probability(kind)  ─→ 1次元折れ線グラフで可視化（軸は kind から自動推定）
-        │
-        ├─  export_probability_csv(kind, path)  ─→ 確率テーブルを CSV に書き出す
-        │
-        ├─  save(path)  ─→ インスタンスを pickle 形式でファイルに保存
-        │
-        ├─  save_zip(path)  ─→ pickle + metadata.json + CSV + PNG を zip アーカイブに保存
-        │
-        ├─  optimize(kind='mr'|'mf')  ← RecencyFrequencyOptimizer (optimizer.py) に委譲（1次元最適化）
-        │   1次元経験的確率を目標とした1次元凸2次計画問題を求解し、結果を1次元 dict に格納（ブロードキャストなし）
-        │       ▼
-        │   {mr|mf}_probability_ / _dict_
-        │
-        └─  optimize(kind='mono'|'mrc'|'mfc'|'mcc')  ← RecencyFrequencyOptimizer に委譲（2次元最適化）
-            RF 制約付き凸2次計画問題を求解（kind に応じた追加制約を適用）
-                ▼
-            {mono|mrc|mfc|mcc}_probability_ / _table_ / _dict_
-                │
-                └─  export_probability_csv(kind='all', path)
-                    ─→ emp + er + ef + mr + mf + mono + mrc + mfc + mcc を併記した CSV を書き出す
-
-RecencyFrequencyScorer.load(path)     ─→ pickle ファイルからインスタンスを復元
-RecencyFrequencyScorer.load_zip(path) ─→ zip アーカイブからインスタンスを復元
-```
-
-## 入出力例
-
-```python
-import pandas as pd
-from rfscorer import RecencyFrequencyScorer, split_by_date
-
-# サンプルデータ: ohmsha/PyOptBook (MIT License) — カラム: user_id, item_id, date
-url = "https://raw.githubusercontent.com/ohmsha/PyOptBook/main/7.recommendation/access_log.csv"
-df = pd.read_csv(url)
-
-scorer = RecencyFrequencyScorer(user_col="user_id", item_col="item_id", time_col="date")
-
-# split_by_date() で観測データと正解データを自動分割（推奨）
-target_date = "2015-07-06"
-df_obs, df_gt = split_by_date(df, target_date=target_date)
-scorer.fit(df_obs, df_gt)
-scorer.emp_probability_
-
-df_rec = scorer.transform(df_obs, ref=target_date)
-prob = scorer.predict(r=1, f=3)
-scorer.evaluate(df_rec, df_gt)
-
-# 最適化商品選択確率の推定
-scorer.optimize(kind="mono")           # 2次元: 単調性のみ
-scorer.optimize(kind="mcc")            # 2次元: 単調性 + Recency 凸性 + Frequency 凹性
-scorer.optimize(kind="mr")             # 1次元: Recency 単調性 + 凸性
-df_mono = scorer.mono_probability_
-df_mcc  = scorer.mcc_probability_
-
-# すべてのモデルを CSV に書き出す
-scorer.optimize(kind="mf")
-scorer.optimize(kind="mrc")
-scorer.optimize(kind="mfc")
-scorer.export_probability_csv(kind="all", path="output/probabilities.csv")
-
-# split_by_date() で期間をカスタマイズする場合
-df_obs, df_gt = split_by_date(df, target_date="2015-07-06", observation_days=4, gt_days=2)
-scorer.fit(df_obs, df_gt)
-
-# 期間を明示的に指定する場合（標準 pandas フィルタ）
-mask_obs = (df["date"] >= "2015-07-02") & (df["date"] <= "2015-07-06")
-mask_eval = (df["date"] >= "2015-07-07") & (df["date"] <= "2015-07-08")
-scorer.fit(df[mask_obs], df[mask_eval])
-```
-
