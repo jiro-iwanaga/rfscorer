@@ -37,6 +37,18 @@ class TestNormalizeRef:
         expected = pd.Timestamp("2024-01-01").toordinal()
         assert normalize_ref(dt) == expected
 
+    def test_python_date(self):
+        # datetime.date は datetime.datetime のサブクラスではないため else 分岐を通る
+        d = _datetime.date(2024, 1, 1)
+        expected = pd.Timestamp("2024-01-01").toordinal()
+        assert normalize_ref(d) == expected
+
+    def test_numpy_datetime64(self):
+        # np.datetime64 スカラーも else 分岐（pd.to_datetime 経由）で解決される
+        d = np.datetime64("2024-01-01")
+        expected = pd.Timestamp("2024-01-01").toordinal()
+        assert normalize_ref(d) == expected
+
     def test_invalid_type_raises(self):
         with pytest.raises(ValueError, match="time value could not be normalized"):
             normalize_ref(object())
@@ -203,6 +215,34 @@ class TestSplitByDate:
         df_obs, df_gt = split_by_date(df, target_ord, time_col="seq")
         assert (df_obs["seq"] <= target_ord).all()
         assert (df_gt["seq"] > target_ord).all()
+
+    def test_datetime64_time_col(self):
+        # 実用上もっとも一般的な pd.to_datetime 済みの datetime64 列での分割
+        df = _make_df().copy()
+        df["datetime"] = pd.to_datetime(df["datetime"])
+        df_obs, df_gt = split_by_date(df, "2024-01-07", observation_days=28, gt_days=7)
+        assert set(df_obs["datetime"]) == {
+            pd.Timestamp("2024-01-01"),
+            pd.Timestamp("2024-01-03"),
+            pd.Timestamp("2024-01-05"),
+            pd.Timestamp("2024-01-07"),
+        }
+        assert set(df_gt["datetime"]) == {
+            pd.Timestamp("2024-01-09"),
+            pd.Timestamp("2024-01-12"),
+        }
+        # datetime64 dtype が保持される
+        assert pd.api.types.is_datetime64_any_dtype(df_obs["datetime"])
+
+    def test_datetime64_target_date(self):
+        # target_date を Timestamp で渡しても文字列と同じ結果になる
+        df = _make_df().copy()
+        df["datetime"] = pd.to_datetime(df["datetime"])
+        df_obs, df_gt = split_by_date(
+            df, pd.Timestamp("2024-01-07"), observation_days=28, gt_days=7
+        )
+        assert pd.Timestamp("2024-01-07") in set(df_obs["datetime"])
+        assert pd.Timestamp("2024-01-07") not in set(df_gt["datetime"])
 
     def test_invalid_target_date_raises(self):
         df = _make_df()

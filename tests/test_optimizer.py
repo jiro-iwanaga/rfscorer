@@ -25,6 +25,20 @@ _F2N = {1: 300, 2: 300, 3: 300}
 _F2Prob = {1: 0.55, 2: 0.70, 3: 0.65}  # 意図的に単調性違反あり
 _TOL = 1e-4
 
+# 制約（recency 減少・frequency 増加）を最初から満たす実行可能データ。
+# build_model(kind="mono") の最適解は入力と一致し、目的関数値は 0 になる。
+_RF2Prob_FEASIBLE = {
+    (1, 1): 0.60,
+    (1, 2): 0.70,
+    (1, 3): 0.80,
+    (2, 1): 0.40,
+    (2, 2): 0.50,
+    (2, 3): 0.60,
+    (3, 1): 0.20,
+    (3, 2): 0.30,
+    (3, 3): 0.40,
+}
+
 
 @pytest.fixture
 def opt():
@@ -271,12 +285,9 @@ class TestSetMarginalData:
         with pytest.raises(ValueError, match="F2Prob is missing 1"):
             opt_with_data.set_marginal_data(_R2N, _R2Prob, _F2N, F2Prob_incomplete)
 
-    def test_missing_multiple_keys_truncates(self, opt_with_data):
-        # R2N から r=1,2,3 の全3キーより多い欠損は存在できないので F2Prob で "..." テスト
-        # R=3 なので R2N から全3件欠損 → 3件ちょうどは "..." なし; F側で4件欠損は不可能
-        # よって R2Prob から2件欠損させて suffix なしを確認し、別途 truncation は
-        # set_data 側でカバー済み
-        # R2N から全件除去して3件欠損のケース（3件以下なので "..." は付かない）
+    def test_missing_all_R2N_keys_raises(self, opt_with_data):
+        # R2N を空にして全3キー欠損。R は3要素しかないため "..." 切り詰めは発火しない
+        # （長リストの切り詰めは set_data 側 test_missing_RF2N_truncates_long_list でカバー）。
         with pytest.raises(ValueError, match="R2N is missing 3"):
             opt_with_data.set_marginal_data({}, _R2Prob, _F2N, _F2Prob)
 
@@ -425,6 +436,12 @@ class TestBuildModel:
     def test_eps_at_max_2d_ok(self, opt_with_data):
         opt_with_data.build_model(kind="mono", eps=0.45)  # 上界ちょうどは許容
 
+    @pytest.mark.parametrize("kind", ["mrc", "mfc", "mcc"])
+    def test_eps_exceeds_max_2d_other_kinds_raises(self, opt_with_data, kind):
+        # 2D eps 上限は kind 非依存: max(RF2Prob) / (nr - 1) = 0.90 / 2 = 0.45
+        with pytest.raises(ValueError, match="eps"):
+            opt_with_data.build_model(kind=kind, eps=0.45 + 1e-9)
+
     def test_eps_exceeds_max_mr_raises(self, opt_with_marginal_data):
         # eps_max = max(R2Prob) / (nr - 1) = 0.82 / 2 = 0.41
         with pytest.raises(ValueError, match="eps"):
@@ -460,6 +477,23 @@ class TestBuildModel:
         vals = [opt_with_marginal_data.F2X[f] for f in opt_with_marginal_data.F]
         for i in range(len(vals) - 1):
             assert vals[i + 1] >= vals[i] + eps - 1e-9
+
+    def test_strict_mono_2d_enforced(self, opt_with_data):
+        """2D mono でも eps > 0 のとき recency/frequency 隣接値の差が eps 以上になること。"""
+        eps = 1e-4
+        opt_with_data.build_model(kind="mono", eps=eps)
+        opt_with_data.solve()
+        opt_with_data.postprocess()
+        # Recency 方向: x[r,f] >= x[r+1,f] + eps
+        for f in _F:
+            for i in range(len(_R) - 1):
+                r, r_next = _R[i], _R[i + 1]
+                assert opt_with_data.RF2X[r, f] >= opt_with_data.RF2X[r_next, f] + eps - 1e-9
+        # Frequency 方向: x[r,f] + eps <= x[r,f+1]
+        for r in _R:
+            for j in range(len(_F) - 1):
+                f, f_next = _F[j], _F[j + 1]
+                assert opt_with_data.RF2X[r, f_next] >= opt_with_data.RF2X[r, f] + eps - 1e-9
 
 
 # ---------------------------------------------------------------------------
@@ -532,6 +566,43 @@ class TestPostprocess:
 
     def test_F2X_empty_after_2D(self, opt_solved_mono):
         assert opt_solved_mono.F2X == {}
+
+
+# ---------------------------------------------------------------------------
+# 目的関数のフィット品質
+#
+# 制約充足だけでは「全セル同値」のような退化解も通過してしまうため、
+# 解が実際にデータへ当てはまっている（目的関数 Σ N·(x-p)^2 が最小化されている）
+# ことを検証する。
+# ---------------------------------------------------------------------------
+class TestFitQuality:
+    def test_mono_feasible_data_reproduces_input(self):
+        # 入力が制約を最初から満たす場合、最適解は入力に一致し目的関数値は 0
+        o = RecencyFrequencyOptimizer()
+        o.set_data(_R, _F, _RF2N, _RF2Prob_FEASIBLE)
+        o.build_model(kind="mono")
+        o.solve()
+        o.postprocess()
+        for key, p in _RF2Prob_FEASIBLE.items():
+            assert o.RF2X[key] == pytest.approx(p, abs=1e-5)
+        assert o.objective_value == pytest.approx(0.0, abs=1e-6)
+
+    def test_mr_feasible_data_reproduces_input(self, opt_solved_mr):
+        # _R2Prob (0.82, 0.65, 0.48) は減少かつ凸（二階差分=0）を満たすため、
+        # mr の最適解は入力に一致する
+        for r, p in _R2Prob.items():
+            assert opt_solved_mr.R2X[r] == pytest.approx(p, abs=1e-5)
+        assert opt_solved_mr.objective_value == pytest.approx(0.0, abs=1e-6)
+
+    def test_mf_infeasible_data_matches_analytic_optimum(self, opt_solved_mf):
+        # _F2Prob (0.55, 0.70, 0.65) は f2>f3 で単調性違反。等重みの単調増加
+        # 最小二乗（PAVA）で f2,f3 が平均 (0.70+0.65)/2 = 0.675 に併合される。
+        # この解は凹性も満たすため最終最適解となる。
+        expected = {1: 0.55, 2: 0.675, 3: 0.675}
+        for f, p in expected.items():
+            assert opt_solved_mf.F2X[f] == pytest.approx(p, abs=1e-4)
+        # 入力に当てはまらないため目的関数値は厳密に正
+        assert opt_solved_mf.objective_value > 0
 
 
 # ---------------------------------------------------------------------------

@@ -8,7 +8,7 @@ from ._time_utils import normalize_ref, normalize_sequence_col
 class RecencyFrequencyScorer(PlottingMixin):
     """Recency-Frequency based recommendation scorer.
 
-    Estimates product-choice probabilities from user-item interaction histories
+    Estimates product-choice probabilities from user-item behavior histories
     using recency and frequency as behavioral signals.
     """
 
@@ -63,8 +63,6 @@ class RecencyFrequencyScorer(PlottingMixin):
 
         self.observation_start_ = None
         self.observation_end_ = None
-        self.gt_start_ = None
-        self.gt_end_ = None
         self.recency_limit = (
             None  # 最新度の上限値(デフォルトでは _RECENCY_LIMIT_RATE を用いて自動計算)
         )
@@ -72,25 +70,22 @@ class RecencyFrequencyScorer(PlottingMixin):
             None  # 頻度の上限値(デフォルトでは _FREQUENCY_LIMIT_RATE を用いて自動計算)
         )
 
-        self.R = []  # 最新度のリスト
-        self.F = []  # 頻度のリスト
-        self.RF2N = {}  # 最新度と頻度に対して閲覧数合計を紐づける辞書
-        self.RF2CV = {}  # 最新度と頻度に対して対象イベント発生数合計を紐づける辞書
-        self.RF2Prob = {}  # 最新度と頻度に対して経験的商品選択確率を紐づける辞書
-        self.R2N = {}  # 最新度に対して閲覧数合計を紐づける辞書
-        self.R2CV = {}  # 最新度に対して対象イベント発生数合計を紐づける辞書
-        self.R2Prob = {}  # 最新度に対して経験的商品選択確率を紐づける辞書
-        self.F2N = {}  # 頻度に対して閲覧数合計を紐づける辞書
-        self.F2CV = {}  # 頻度に対して対象イベント発生数合計を紐づける辞書
-        self.F2Prob = {}  # 頻度に対して経験的商品選択確率を紐づける辞書
+        self._R = []  # 最新度のリスト
+        self._F = []  # 頻度のリスト
+        self._RF2N = {}  # 最新度と頻度に対して閲覧数合計を紐づける辞書
+        self._RF2CV = {}  # 最新度と頻度に対して対象イベント発生数合計を紐づける辞書
+        self._RF2Prob = {}  # 最新度と頻度に対して経験的商品選択確率を紐づける辞書
+        self._R2N = {}  # 最新度に対して閲覧数合計を紐づける辞書
+        self._R2CV = {}  # 最新度に対して対象イベント発生数合計を紐づける辞書
+        self._R2Prob = {}  # 最新度に対して経験的商品選択確率を紐づける辞書
+        self._F2N = {}  # 頻度に対して閲覧数合計を紐づける辞書
+        self._F2CV = {}  # 頻度に対して対象イベント発生数合計を紐づける辞書
+        self._F2Prob = {}  # 頻度に対して経験的商品選択確率を紐づける辞書
 
         # empirical
         self.emp_probability_ = None  # 経験的商品選択確率データフレーム(縦持ち)
         self.emp_probability_table_ = None  # 経験的商品選択確率データフレーム(横持ち)
         self.emp_probability_dict_ = None  # 経験的商品選択確率（辞書：キーは最新度と頻度のペア）
-        self.recency_probability_ = None  # 最新度別経験的商品選択確率データフレーム
-        self.frequency_probability_ = None  # 頻度別経験的商品選択確率データフレーム
-
         # er (1D: recency only)
         self.er_probability_ = None  # DataFrame(recency, probability)
         self.er_probability_dict_ = None  # dict[int, float]
@@ -128,6 +123,14 @@ class RecencyFrequencyScorer(PlottingMixin):
         self.mcc_probability_dict_ = None
 
         # データ解析用
+        self.recency_corr_ = None  # スピアマン ρ（r 値と P(r) の等重み相関）
+        self.recency_corr_pvalue_ = None  # recency_corr_ の p 値
+        self.frequency_corr_ = None  # スピアマン ρ（f 値と P(f) の等重み相関）
+        self.frequency_corr_pvalue_ = None  # frequency_corr_ の p 値
+        self.recency_corr_weighted_ = None  # スピアマン ρ（N_r 重み付き）
+        self.frequency_corr_weighted_ = None  # スピアマン ρ（N_f 重み付き）
+        self.recency_slice_corr_ = None  # dict[r, float] r 固定スライスの重み付きスピアマン ρ
+        self.frequency_slice_corr_ = None  # dict[f, float] f 固定スライスの重み付きスピアマン ρ
         self.record_num = None  # レコード数（fit() 後に設定）
         self.record_num_obs = None  # 観測期間レコード数
         self.record_num_gt = None  # 正解期間レコード数
@@ -148,7 +151,7 @@ class RecencyFrequencyScorer(PlottingMixin):
         recency_limit=None,
         frequency_limit=None,
     ):
-        """Estimate empirical product-choice probabilities from pre-split interaction data.
+        """Estimate empirical product-choice probabilities from pre-split behavior data.
 
         Accepts observation and ground truth DataFrames that have already been
         filtered to the respective periods by the caller. For convenience,
@@ -166,7 +169,7 @@ class RecencyFrequencyScorer(PlottingMixin):
         ref : str, datetime, or int, optional
             Reference value for recency computation. Recency of each
             user-item pair is ``(ref - value) // unit + 1``, where the
-            minimum across interactions is taken. When None, defaults to the
+            minimum across behavior records is taken. When None, defaults to the
             maximum value in df_obs time_col.
         recency_limit : int, optional
             Maximum recency rank to include. If None, automatically set to
@@ -195,8 +198,8 @@ class RecencyFrequencyScorer(PlottingMixin):
         After a successful call, the following attributes become available
         for use with predict(), transform(), and plot_*() methods:
         ``emp_probability_``, ``emp_probability_table_``,
-        ``emp_probability_dict_``, ``recency_probability_``,
-        ``frequency_probability_``, ``recency_limit``, ``frequency_limit``.
+        ``emp_probability_dict_``, ``er_probability_``, ``ef_probability_``,
+        ``recency_limit``, ``frequency_limit``.
         """
         if not isinstance(df_obs, pd.DataFrame):
             raise TypeError("df_obs must be a pandas DataFrame.")
@@ -307,23 +310,23 @@ class RecencyFrequencyScorer(PlottingMixin):
         self.record_num_target = len(df_ui2frc)
         self.total_cv = df_ui2frc.cv.sum()
 
-        self.R = list(range(1, self.recency_limit + 1))
-        self.F = list(range(1, self.frequency_limit + 1))
+        self._R = list(range(1, self.recency_limit + 1))
+        self._F = list(range(1, self.frequency_limit + 1))
 
-        self.RF2N = {(r, f): 0.0 for r in self.R for f in self.F}
-        self.RF2CV = {(r, f): 0.0 for r in self.R for f in self.F}
+        self._RF2N = {(r, f): 0.0 for r in self._R for f in self._F}
+        self._RF2CV = {(r, f): 0.0 for r in self._R for f in self._F}
 
         for row in df_ui2frc.itertuples():
-            self.RF2N[row.recency, row.frequency] += 1
+            self._RF2N[row.recency, row.frequency] += 1
             if row.cv == 1:
-                self.RF2CV[row.recency, row.frequency] += 1
+                self._RF2CV[row.recency, row.frequency] += 1
 
         RowsRF = []
-        for r in self.R:
-            for f in self.F:
-                prob = self.RF2CV[r, f] / self.RF2N[r, f] if self.RF2N[r, f] > 0 else 0.0
-                self.RF2Prob[r, f] = prob
-                RowsRF.append((r, f, self.RF2N[r, f], self.RF2CV[r, f], prob))
+        for r in self._R:
+            for f in self._F:
+                prob = self._RF2CV[r, f] / self._RF2N[r, f] if self._RF2N[r, f] > 0 else 0.0
+                self._RF2Prob[r, f] = prob
+                RowsRF.append((r, f, self._RF2N[r, f], self._RF2CV[r, f], prob))
 
         self.emp_probability_dict_ = {(r, f): prob for r, f, _, _, prob in RowsRF}
         self.emp_probability_ = pd.DataFrame(
@@ -337,37 +340,86 @@ class RecencyFrequencyScorer(PlottingMixin):
 
         df_r = self.emp_probability_.groupby("recency")[["N", "cv"]].sum().reset_index()
         df_r["probability"] = (df_r["cv"] / df_r["N"]).where(df_r["N"] > 0, 0.0)
-        self.recency_probability_ = df_r
-        self.R2N = dict(zip(df_r["recency"], df_r["N"]))
-        self.R2CV = dict(zip(df_r["recency"], df_r["cv"]))
-        self.R2Prob = dict(zip(df_r["recency"], df_r["probability"]))
+        self._R2N = dict(zip(df_r["recency"], df_r["N"]))
+        self._R2CV = dict(zip(df_r["recency"], df_r["cv"]))
+        self._R2Prob = dict(zip(df_r["recency"], df_r["probability"]))
 
         df_f = self.emp_probability_.groupby("frequency")[["N", "cv"]].sum().reset_index()
         df_f["probability"] = (df_f["cv"] / df_f["N"]).where(df_f["N"] > 0, 0.0)
-        self.frequency_probability_ = df_f
-        self.F2N = dict(zip(df_f["frequency"], df_f["N"]))
-        self.F2CV = dict(zip(df_f["frequency"], df_f["cv"]))
-        self.F2Prob = dict(zip(df_f["frequency"], df_f["probability"]))
+        self._F2N = dict(zip(df_f["frequency"], df_f["N"]))
+        self._F2CV = dict(zip(df_f["frequency"], df_f["cv"]))
+        self._F2Prob = dict(zip(df_f["frequency"], df_f["probability"]))
 
-        self.er_probability_dict_ = dict(self.R2Prob)
+        self.er_probability_dict_ = dict(self._R2Prob)
         self.er_probability_ = (
-            pd.DataFrame(list(self.R2Prob.items()), columns=["recency", "probability"])
+            pd.DataFrame(list(self._R2Prob.items()), columns=["recency", "probability"])
             .sort_values("recency")
             .reset_index(drop=True)
         )
 
-        self.ef_probability_dict_ = dict(self.F2Prob)
+        self.ef_probability_dict_ = dict(self._F2Prob)
         self.ef_probability_ = (
-            pd.DataFrame(list(self.F2Prob.items()), columns=["frequency", "probability"])
+            pd.DataFrame(list(self._F2Prob.items()), columns=["frequency", "probability"])
             .sort_values("frequency")
             .reset_index(drop=True)
         )
+
+        r_vals = sorted(r for r in self._R2Prob if self._R2N[r] > 0)
+        r_probs = [self._R2Prob[r] for r in r_vals]
+        r_weights = [self._R2N[r] for r in r_vals]
+        f_vals = sorted(f for f in self._F2Prob if self._F2N[f] > 0)
+        f_probs = [self._F2Prob[f] for f in f_vals]
+        f_weights = [self._F2N[f] for f in f_vals]
+        from scipy.stats import spearmanr
+
+        if len(r_vals) >= 2 and len(set(r_probs)) >= 2:
+            _res = spearmanr(r_vals, r_probs)
+            self.recency_corr_ = float(_res.statistic)
+            self.recency_corr_pvalue_ = float(_res.pvalue)
+        else:
+            self.recency_corr_ = float("nan")
+            self.recency_corr_pvalue_ = float("nan")
+        if len(f_vals) >= 2 and len(set(f_probs)) >= 2:
+            _res = spearmanr(f_vals, f_probs)
+            self.frequency_corr_ = float(_res.statistic)
+            self.frequency_corr_pvalue_ = float(_res.pvalue)
+        else:
+            self.frequency_corr_ = float("nan")
+            self.frequency_corr_pvalue_ = float("nan")
+        self.recency_corr_weighted_ = self._marginal_spearman(r_vals, r_probs, r_weights)
+        self.frequency_corr_weighted_ = self._marginal_spearman(f_vals, f_probs, f_weights)
+
+        rec_slice = {}
+        for r in sorted(r for r in self._R if self._R2N.get(r, 0) > 0):
+            fs = sorted(f for f in self._F if self._RF2N.get((r, f), 0) > 0)
+            if len(fs) < 2:
+                rec_slice[r] = float("nan")
+            else:
+                rec_slice[r] = self._marginal_spearman(
+                    fs,
+                    [self._RF2Prob[(r, f)] for f in fs],
+                    [self._RF2N[(r, f)] for f in fs],
+                )
+        self.recency_slice_corr_ = rec_slice
+
+        freq_slice = {}
+        for f in sorted(f for f in self._F if self._F2N.get(f, 0) > 0):
+            rs = sorted(r for r in self._R if self._RF2N.get((r, f), 0) > 0)
+            if len(rs) < 2:
+                freq_slice[f] = float("nan")
+            else:
+                freq_slice[f] = self._marginal_spearman(
+                    rs,
+                    [self._RF2Prob[(r, f)] for r in rs],
+                    [self._RF2N[(r, f)] for r in rs],
+                )
+        self.frequency_slice_corr_ = freq_slice
 
     # ---------------------------------------------------------------------------
     # Optimization (単調性制約付き再推定)
     # ---------------------------------------------------------------------------
 
-    def optimize(self, kind="mono", eps=0.0):
+    def optimize(self, kind="mono", eps=0.0, verbose=False):
         """Estimate optimized product-choice probabilities under RF constraints.
 
         Solves a convex quadratic programming problem with monotonicity
@@ -394,10 +446,12 @@ class RecencyFrequencyScorer(PlottingMixin):
             (non-strict inequalities allow ties between adjacent levels).
             When positive, strict monotonicity is enforced, preventing ties
             between adjacent recency or frequency levels.
+        verbose : bool, default False
+            If True, print optimization solver status information.
 
         Returns
         -------
-        self
+        None
 
         Raises
         ------
@@ -421,13 +475,14 @@ class RecencyFrequencyScorer(PlottingMixin):
             raise RuntimeError("fit() must be called before optimize().")
 
         optimizer = RecencyFrequencyOptimizer()
-        optimizer.set_data(self.R, self.F, self.RF2N, self.RF2Prob)
-        optimizer.set_marginal_data(self.R2N, self.R2Prob, self.F2N, self.F2Prob)
+        optimizer.set_data(self._R, self._F, self._RF2N, self._RF2Prob)
+        optimizer.set_marginal_data(self._R2N, self._R2Prob, self._F2N, self._F2Prob)
 
         if kind == "mr":
             optimizer.build_marginal_model(axis="r", eps=eps)
             optimizer.solve()
-            optimizer.show_solve_info()
+            if verbose:
+                optimizer.show_solve_info()
             optimizer.postprocess()
             self.mr_probability_dict_ = optimizer.R2X
             self.mr_probability_ = (
@@ -439,7 +494,8 @@ class RecencyFrequencyScorer(PlottingMixin):
         elif kind == "mf":
             optimizer.build_marginal_model(axis="f", eps=eps)
             optimizer.solve()
-            optimizer.show_solve_info()
+            if verbose:
+                optimizer.show_solve_info()
             optimizer.postprocess()
             self.mf_probability_dict_ = optimizer.F2X
             self.mf_probability_ = (
@@ -451,10 +507,11 @@ class RecencyFrequencyScorer(PlottingMixin):
         else:
             optimizer.build_model(kind=kind, eps=eps)
             optimizer.solve()
-            optimizer.show_solve_info()
+            if verbose:
+                optimizer.show_solve_info()
             optimizer.postprocess()
 
-            rows = [(r, f, optimizer.RF2X[(r, f)]) for r in self.R for f in self.F]
+            rows = [(r, f, optimizer.RF2X[(r, f)]) for r in self._R for f in self._F]
             df_opt = pd.DataFrame(rows, columns=["recency", "frequency", "probability"])
             table = df_opt.pivot_table(index="recency", columns="frequency", values="probability")
 
@@ -475,8 +532,6 @@ class RecencyFrequencyScorer(PlottingMixin):
                 self.mcc_probability_ = df_opt
                 self.mcc_probability_table_ = table
 
-        return self
-
     # ---------------------------------------------------------------------------
     # Inference (推論・スコアリング)
     # ---------------------------------------------------------------------------
@@ -489,10 +544,10 @@ class RecencyFrequencyScorer(PlottingMixin):
         r : int
             Recency rank (1 = most recently interacted, higher = older).
         f : int
-            Frequency (number of interactions in the observation period).
+            Frequency (number of behavior records in the observation period).
         kind : {"emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc"}, default "emp"
-            Which probability to use. "emp", "er", and "ef" use fit(),
-            fit() results; others use optimize() results.
+            Which probability to use. "emp", "er", and "ef" use fit()
+            results; others use optimize() results.
             For 1D marginal models, only the relevant dimension is used:
             "mr" and "er" use r only; "mf" and "ef" use f only.
 
@@ -585,14 +640,14 @@ class RecencyFrequencyScorer(PlottingMixin):
         Parameters
         ----------
         df : pd.DataFrame
-            User-item interaction history to score. Pre-filter to the desired
+            User-item behavior history to score. Pre-filter to the desired
             observation window before calling.
         ref : str, datetime, or int, optional
             Reference value for computing recency. When None, defaults to the
             maximum value in df time_col.
         kind : {"emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc"}, default "emp"
-            Which probability to use. "emp", "er", and "ef" use fit(),
-            fit() results; others use optimize() results.
+            Which probability to use. "emp", "er", and "ef" use fit()
+            results; others use optimize() results.
             For 1D marginal models ("mr", "er", "mf", "ef"), probability is
             looked up by recency or frequency alone.
         user_col : str, optional
@@ -795,16 +850,17 @@ class RecencyFrequencyScorer(PlottingMixin):
         Parameters
         ----------
         kind : {"emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc", "all"}, default "emp"
-            Which probability to export. "emp", "er", and "ef" use fit(),
-            fit() results; others use optimize() results;
+            Which probability to export. "emp", "er", and "ef" use fit()
+            results; others use optimize() results;
             "all" merges all nine models into a single file. For 2D models the
             merge key is (recency, frequency); for 1D models mr merges on
             recency and mf merges on frequency, so their probability columns
             are constant along the other axis.
         path : str or None, default None
             Output file path for the CSV. If None, saves as
-            "{kind}_probability.csv" in the current directory.
-            If a directory, saves "{kind}_probability.csv" inside it.
+            "probability_{kind}.csv" in the current directory.
+            If a directory, saves "probability_{kind}.csv" inside it.
+            If a file path, saves directly to that path.
 
         Returns
         -------
@@ -854,7 +910,7 @@ class RecencyFrequencyScorer(PlottingMixin):
 
         from pathlib import Path
 
-        default_filename = f"{kind}_probability.csv"
+        default_filename = f"probability_{kind}.csv"
         if path is None:
             output_path = Path(default_filename)
         else:
@@ -897,6 +953,8 @@ class RecencyFrequencyScorer(PlottingMixin):
                     on="frequency",
                 )
             )
+            _prob_order = ["er", "ef", "mr", "mf", "emp", "mono", "mrc", "mfc", "mcc"]
+            df = df[["recency", "frequency", "N", "cv"] + [f"{k}_probability" for k in _prob_order]]
         elif kind == "emp":
             df = self.emp_probability_
         elif kind == "er":
@@ -1084,16 +1142,16 @@ class RecencyFrequencyScorer(PlottingMixin):
                     zf.writestr(f"plots/{kind}_surface.png", buf.getvalue())
                     plt.close(fig)
 
-                for name, axis, kind in [("er", "recency", "er"), ("ef", "frequency", "ef")]:
-                    fig = self.plot_marginal_probability(axis=axis, kind=kind)
+                for kind in ("er", "ef"):
+                    fig = self.plot_marginal_probability(kind=kind)
                     buf = io.BytesIO()
                     fig.savefig(buf, format="png", bbox_inches="tight")
-                    zf.writestr(f"plots/{name}_marginal.png", buf.getvalue())
+                    zf.writestr(f"plots/{kind}_marginal.png", buf.getvalue())
                     plt.close(fig)
 
-            for name, axis in [("mr", "recency"), ("mf", "frequency")]:
+            for name in ("mr", "mf"):
                 if name in optimized_kinds:
-                    fig = self.plot_marginal_probability(axis=axis, kind=name)
+                    fig = self.plot_marginal_probability(kind=name)
                     buf = io.BytesIO()
                     fig.savefig(buf, format="png", bbox_inches="tight")
                     zf.writestr(f"plots/{name}_marginal.png", buf.getvalue())
@@ -1149,48 +1207,137 @@ class RecencyFrequencyScorer(PlottingMixin):
     # ---------------------------------------------------------------------------
 
     def show(self):
-        """Print a summary of fit() results to stdout."""
-        print("=== profiling ===")
+        """Print a diagnostic summary of fit() results."""
 
-        if self.record_num:
-            print("record_num:", self.record_num)
+        def sec(title=""):
+            pad = max(0, 54 - len(title) - 4)
+            return f"── {title} " + "─" * pad if title else "─" * 54
 
-        if self.record_num_obs:
-            print("record_num_obs:", self.record_num_obs)
-        if self.record_num_gt:
-            print("record_num_gt:", self.record_num_gt)
+        print("=== RecencyFrequencyScorer ===")
+        if self.emp_probability_ is None:
+            print("  [not fitted]")
+            return
 
-        if self.observation_start_ and self.observation_end_:
-            print("observation: {} -> {}".format(self.observation_start_, self.observation_end_))
+        import math
 
-        if self.recency_limit:
-            print("recency_limit:", self.recency_limit)
-        if self.frequency_limit:
-            print("frequency_limit:", self.frequency_limit)
+        print()
+        print(sec("Data"))
+        print(
+            f"  rows (obs + gt)  : {self.record_num}"
+            f"  (obs: {self.record_num_obs},  gt: {self.record_num_gt})"
+        )
+        print(
+            f"  observation      : {self._fmt_ordinal(self.observation_start_)}"
+            f" → {self._fmt_ordinal(self.observation_end_)}"
+        )
+        print(
+            f"  user×item pairs  : {self.record_num_target_org}"
+            f" → {self.record_num_target}"
+            f"  (before → after applying limits)"
+        )
+        print(
+            f"  target events    : {self.total_cv_org}"
+            f" → {self.total_cv}"
+            f"  (before → after applying limits)"
+        )
 
-        if self.record_num_target_org and self.record_num_target:
-            print(
-                "target_record_num: {} -> {}".format(
-                    self.record_num_target_org, self.record_num_target
-                )
-            )
+        print()
+        print(sec("Model"))
+        print(f"  recency_limit    : {self.recency_limit}")
+        print(f"  frequency_limit  : {self.frequency_limit}")
 
-        if self.total_cv_org and self.total_cv:
-            print("total_cv: {} -> {}".format(self.total_cv_org, self.total_cv))
+        print()
+        print(sec("Correlation"))
+        print("  [expected: recency ρ < 0  (more recent → higher prob),")
+        print("             frequency ρ > 0  (more frequent → higher prob)]")
+        n_r = sum(1 for v in self._R2N.values() if v > 0)
+        n_f = sum(1 for v in self._F2N.values() if v > 0)
 
-        if self.emp_probability_table_ is not None:
-            print("emp_probability_table_:")
-            print(self.emp_probability_table_.round(3).to_string())
+        def _fmt_rho(v):
+            return f"{v: .4f}" if not math.isnan(v) else " nan"
+
+        def _fmt_p(v):
+            return f"{v:.4f}" if not math.isnan(v) else "nan"
+
+        rho_r = _fmt_rho(self.recency_corr_)
+        p_r = _fmt_p(self.recency_corr_pvalue_)
+        wrho_r = _fmt_rho(self.recency_corr_weighted_)
+        rho_f = _fmt_rho(self.frequency_corr_)
+        p_f = _fmt_p(self.frequency_corr_pvalue_)
+        wrho_f = _fmt_rho(self.frequency_corr_weighted_)
+        print(f"  recency  ρ       : {rho_r}  (p={p_r},  n={n_r},  weighted ρ: {wrho_r})")
+        print(f"  frequency ρ      : {rho_f}  (p={p_f},  n={n_f},  weighted ρ: {wrho_f})")
+        print()
+        print("  Slice ρ by r  [corr(f, P(r,f)),  expected > 0]")
+        for line in self._fmt_slice_lines(self.recency_slice_corr_, "r"):
+            print(f"    {line}")
+        print("  Slice ρ by f  [corr(r, P(r,f)),  expected < 0]")
+        for line in self._fmt_slice_lines(self.frequency_slice_corr_, "f"):
+            print(f"    {line}")
+
+        print()
+        print(sec("Empirical Probability Table"))
+        print(self.emp_probability_table_.round(3).to_string())
 
     # ---------------------------------------------------------------------------
     # Internal helpers
     # ---------------------------------------------------------------------------
 
+    def _fmt_ordinal(self, v):
+        try:
+            ts = pd.Timestamp.fromordinal(int(v))
+            if 1900 <= ts.year <= 2200:
+                return str(ts.date())
+        except (ValueError, OverflowError, AttributeError):
+            pass
+        return str(int(v))
+
+    def _fmt_slice_lines(self, d, prefix):
+        import math
+
+        lines = [
+            f"{prefix}={k:2d}:  {v: .4f}" if not math.isnan(v) else f"{prefix}={k:2d}:  nan"
+            for k, v in sorted(d.items())
+        ]
+        return lines
+
+    def _marginal_spearman(self, x_vals, y_vals, weights=None):
+        """Spearman ρ between x_vals and y_vals, optionally N-weighted.
+
+        When weights is None, equal weights are used (standard Spearman ρ).
+        When weights is provided, computes weighted Pearson on ranks (weighted
+        Spearman). Returns float("nan") when n < 2 or all ranks are tied.
+        """
+        import numpy as np
+        from scipy.stats import rankdata
+
+        n = len(x_vals)
+        if n < 2:
+            return float("nan")
+        rx = rankdata(x_vals).astype(float)
+        ry = rankdata(y_vals).astype(float)
+        if weights is None:
+            w = np.ones(n) / n
+        else:
+            w = np.array(weights, dtype=float)
+            total = w.sum()
+            if total == 0:
+                return float("nan")
+            w = w / total
+        mx = np.dot(w, rx)
+        my = np.dot(w, ry)
+        cov = np.dot(w, (rx - mx) * (ry - my))
+        sx = np.sqrt(np.dot(w, (rx - mx) ** 2))
+        sy = np.sqrt(np.dot(w, (ry - my) ** 2))
+        if sx == 0.0 or sy == 0.0:
+            return float("nan")
+        return float(cov / (sx * sy))
+
     def _build_ui_rf_df(self, df, ref_int):
         """Compute recency and frequency for each (user, item) pair.
 
         Recency is ``(ref_int - value) // unit + 1`` (1-indexed; most recent
-        interaction at ref_int has recency 1). Frequency is the interaction
+        behavior at ref_int has recency 1). Frequency is the behavior
         count. Uses pandas groupby.
         """
         tmp = df[[self._USER_COL, self._ITEM_COL]].copy()
@@ -1248,34 +1395,27 @@ if __name__ == "__main__":
     df_train_obs, df_train_gt = split_by_date(df_train, target_date)
     scorer.fit(df_train_obs, df_train_gt)
 
-    scorer.plot_probability_surface("empirical").savefig("surface_emp_probability.png")
-    scorer.plot_marginal_probability("recency").savefig("marginal_recency_probability.png")
-    scorer.plot_marginal_probability("frequency").savefig("marginal_frequency_probability.png")
+    scorer.plot_probability_surface("empirical").savefig("surf_emp_prob.png")
+    scorer.plot_marginal_probability(kind="er").savefig("marg_emp_recen_prob.png")
+    scorer.plot_marginal_probability(kind="ef").savefig("marg_emp_freq_prob.png")
 
     scorer.optimize(kind="mr")
-    scorer.plot_marginal_probability("recency", kind="mr").savefig(
-        "marginal_mono_recency_probability.png"
-    )
-    scorer.plot_marginal_probability("recency", kind="all").savefig(
-        "marginal_all_recency_probability.png"
-    )
+    scorer.plot_marginal_probability(kind="mr").savefig("marg_mono_recen_prob.png")
+    scorer.plot_marginal_probability(kind="rboth").savefig("marg_recens_prob.png")
 
     scorer.optimize(kind="mf")
-    scorer.plot_marginal_probability("frequency", kind="mf").savefig(
-        "marginal_mono_frequency_probability.png"
-    )
-    scorer.plot_marginal_probability("frequency", kind="all").savefig(
-        "marginal_all_frequency_probability.png"
-    )
+    scorer.plot_marginal_probability(kind="mf").savefig("marg_mono_freq_prob.png")
+    scorer.plot_marginal_probability(kind="fboth").savefig("marg_freqs_prob.png")
 
     scorer.optimize(kind="mono")
-    scorer.plot_probability_surface("mono").savefig("surface_mono_probability.png")
+    scorer.plot_probability_surface("mono").savefig("surf_mono_prob.png")
     scorer.optimize(kind="mrc")
-    scorer.plot_probability_surface("mrc").savefig("surface_mrc_probability.png")
+    scorer.plot_probability_surface("mrc").savefig("surf_mrc_prob.png")
     scorer.optimize(kind="mfc")
-    scorer.plot_probability_surface("mfc").savefig("surface_mfc_probability.png")
+    scorer.plot_probability_surface("mfc").savefig("surf_mfc_prob.png")
     scorer.optimize(kind="mcc")
-    scorer.plot_probability_surface("mcc").savefig("surface_mcc_probability.png")
+    scorer.plot_probability_surface("mcc").savefig("surf_mcc_prob.png")
+
     scorer.export_probability_csv("all")
 
     scorer.save("rfscorer.pkl")
@@ -1291,8 +1431,8 @@ if __name__ == "__main__":
     for kind in ("emp", "er", "ef", "mr", "mf", "mono", "mrc", "mfc", "mcc"):
         print(f"--- {kind} ---")
         df_rec = scorer.transform(df_test_obs, kind=kind)
-        df_rec.to_csv(f"df_recommend_{kind}.csv", index=False)
+        df_rec.to_csv(f"df_rec_{kind}.csv", index=False)
 
         df_eval = scorer.evaluate(df_rec, df_test_gt, order=10)
         print(df_eval)
-        df_eval.to_csv(f"df_evaluate_{kind}.csv", index=False)
+        df_eval.to_csv(f"df_eval_{kind}.csv", index=False)

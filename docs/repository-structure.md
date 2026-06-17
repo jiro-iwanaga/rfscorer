@@ -1,4 +1,4 @@
-# リポジトリ構造定義書
+# リポジトリ構成
 
 ## ディレクトリ構成
 
@@ -34,16 +34,18 @@ rfscorer/
 │   ├── test_utils.py
 │   └── test_save_load.py
 ├── examples/
-│   ├── tutorial_beginner_en.ipynb        # 初級チュートリアル（英語）
-│   └── tutorial_beginner_ja.ipynb        # 初級チュートリアル（日本語）
+│   ├── tutorial_beginner_en.ipynb    # 初級チュートリアル（英語）
+│   ├── tutorial_practical_en.ipynb   # 実践チュートリアル（英語）
+│   ├── tutorial_beginner_ja.ipynb    # 初級チュートリアル（日本語）
+│   └── tutorial_practical_ja.ipynb   # 実践チュートリアル（日本語）
 ├── img/                              # README 向け画像
-└── docs/                             # 永続的ドキュメント
+└── docs/                             # ドキュメント
     ├── product-requirements.md       # プロダクト要求定義書
-    ├── functional-design.md          # 機能設計書
-    ├── architecture.md               # 技術仕様書
-    ├── repository-structure.md       # リポジトリ構造定義書（本書）
+    ├── functional-design.md          # 機能仕様書
+    ├── architecture.md               # アーキテクチャ構成書
+    ├── repository-structure.md       # リポジトリ構成（本書）
     ├── development-guidelines.md     # 開発ガイドライン
-    └── glossary.md                   # ユビキタス言語定義
+    └── glossary.md                   # 用語集
 ```
 
 ## 各ファイル・ディレクトリの役割
@@ -95,6 +97,7 @@ rfscorer/
 |------|------|
 | `tutorial_beginner_en.ipynb` | 初級チュートリアル（英語）。fit・optimize・transform・evaluate・save・load の基本ワークフローを解説 |
 | `tutorial_beginner_ja.ipynb` | 初級チュートリアル（日本語）。同上 |
+| `tutorial_practical_ja.ipynb` | 実践チュートリアル（日本語）。実データを使った応用的なワークフローを解説 |
 
 
 ### `img/`
