@@ -213,7 +213,7 @@ scorer.fit(df_obs, df_gt)
 scorer.optimize(kind="mono")
 
 # 推薦スコアを算出(テストデータ)
-df_test = ...  # test data (columns: user, item, datetime)
+df_test = ...  # テストデータ（カラム: user, item, datetime）
 df_test_obs, _ = split_by_date(df_test, target_date)
 df_scores = scorer.transform(df_test_obs, target_date, kind="mono")
 ```

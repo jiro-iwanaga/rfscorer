@@ -546,8 +546,8 @@ class RecencyFrequencyOptimizer:
 if __name__ == "__main__":
     import pandas as pd
 
-    # データの取得
-    df = pd.read_csv("all_probability.csv")
+    # データの取得（RecencyFrequencyScorer.export_probability_csv("all") の出力を利用）
+    df = pd.read_csv("probability_all.csv")
     R = df.recency.unique()
     F = df.frequency.unique()
     RF2N = {(row.recency, row.frequency): row.N for row in df.itertuples()}

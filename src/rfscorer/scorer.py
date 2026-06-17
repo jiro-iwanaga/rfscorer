@@ -826,13 +826,14 @@ class RecencyFrequencyScorer(PlottingMixin):
             Rows.append((recommend_num, n_recommended, n_hit, precision))
         df_result = pd.DataFrame(Rows, columns=["order", "n_recommended", "n_hit", "precision"])
 
+        n_event = len(UIevent)
         total_hit = df_result.n_hit.max()
-        df_result["recall"] = df_result.n_hit / len(UIevent)
+        df_result["recall"] = df_result.n_hit / n_event if n_event > 0 else 0.0
         denom = df_result.precision + df_result.recall
         df_result["f1"] = (2 * df_result.precision * df_result.recall).where(
             denom > 0, 0.0
         ) / denom.where(denom > 0, 1.0)
-        df_result["recall_norm"] = df_result.n_hit / total_hit
+        df_result["recall_norm"] = df_result.n_hit / total_hit if total_hit > 0 else 0.0
         denom_norm = df_result.precision + df_result.recall_norm
         df_result["f1_norm"] = (2 * df_result.precision * df_result.recall_norm).where(
             denom_norm > 0, 0.0
@@ -1423,7 +1424,7 @@ if __name__ == "__main__":
     # print("load ok:", scorer_loaded.predict(1, 1, kind="mono"))
 
     scorer.save_zip("scorer.zip")
-    # scorer_loaded_zip = RecencyFrequencyScorer.load_zip("rfscorer.zip")
+    # scorer_loaded_zip = RecencyFrequencyScorer.load_zip("scorer.zip")
     # print("load_zip ok:", scorer_loaded_zip.predict(1, 1, kind="mono"))
 
     df_test_obs, df_test_gt = split_by_date(df_test, target_date)
