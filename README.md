@@ -31,7 +31,7 @@ pip install rfscorer
 
 ## Usage
 
-Below is a minimal example of building a model and scoring recommendations from an behavior history.
+Below is a minimal example of building a model and scoring recommendations from a behavior history.
 For complete, working code with data loading and evaluation, see [examples/tutorial_beginner_en.ipynb](examples/tutorial_beginner_en.ipynb).
 
 ### Minimal Example
@@ -103,6 +103,7 @@ Each surface reflects different assumptions about **recency** (time since a user
 ## Examples
 
 - [examples/tutorial_beginner_en.ipynb](examples/tutorial_beginner_en.ipynb) — end-to-end walkthrough: load data, fit, optimize, visualize, transform, and evaluate recommendation quality (precision, recall, F1 at each rank cutoff)
+- [examples/tutorial_practical_en.ipynb](examples/tutorial_practical_en.ipynb) — practical workflow: user-level train/test split, build all 9 models, compare accuracy, and save/load models (pickle and zip archive)
 
 ## References
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
@@ -161,7 +162,7 @@ MIT License
 
 
 -----
-# RFScorer (日本語README)
+# RFscorer (日本語README)
 
 [English README](#RFscorer)
 
@@ -262,6 +263,7 @@ scorer.plot_probability_surface(kind="mcc")
 ## サンプル
 
 - [examples/tutorial_beginner_ja.ipynb](examples/tutorial_beginner_ja.ipynb) — データロードからモデル構築、最適化、可視化、推薦スコア算出、推薦品質の評価までのコードを紹介します。
+- [examples/tutorial_practical_ja.ipynb](examples/tutorial_practical_ja.ipynb) — 実践的なワークフロー：ユーザー単位の訓練・テスト分割、全9種のモデル構築と精度比較、モデルの保存・ロード（pickle・zip アーカイブ）までを紹介します。
 
 ## 参考文献
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, "Estimating product-choice probabilities from recency and frequency of page views," Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
