@@ -1,3 +1,6 @@
+import math
+
+import matplotlib.figure
 import pandas as pd
 import pytest
 
@@ -49,7 +52,7 @@ def _make_df():
 
 
 def _split_by_period(df, obs_period, gt_period, time_col="datetime"):
-    """Filter df into observation and ground truth datas by string-date period tuples."""
+    """Filter df into observation and ground truth data by string-date period tuples."""
     obs_mask = (df[time_col] >= obs_period[0]) & (df[time_col] <= obs_period[1])
     gt_mask = (df[time_col] >= gt_period[0]) & (df[time_col] <= gt_period[1])
     return df[obs_mask], df[gt_mask]
@@ -593,6 +596,26 @@ class TestOptimize:
         with pytest.raises(ValueError, match="eps"):
             scorer.optimize(kind="mrc", eps=1.0 / 6 + 1e-9)
 
+    def test_optimize_eps_too_large_mfc_raises(self, scorer, df):
+        # 2D eps 上限は mono と共通: min(p_max/(nr-1), p_max/(nf-1)) = min(1.0/6, 1.0/2) = 1.0/6
+        scorer.fit(
+            *_split_by_period(df, _OBS_PERIOD, _GT_PERIOD),
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        with pytest.raises(ValueError, match="eps"):
+            scorer.optimize(kind="mfc", eps=1.0 / 6 + 1e-9)
+
+    def test_optimize_eps_too_large_mcc_raises(self, scorer, df):
+        # 2D eps 上限は mono と共通: min(p_max/(nr-1), p_max/(nf-1)) = min(1.0/6, 1.0/2) = 1.0/6
+        scorer.fit(
+            *_split_by_period(df, _OBS_PERIOD, _GT_PERIOD),
+            recency_limit=_RECENCY_LIMIT,
+            frequency_limit=_FREQUENCY_LIMIT,
+        )
+        with pytest.raises(ValueError, match="eps"):
+            scorer.optimize(kind="mcc", eps=1.0 / 6 + 1e-9)
+
     def test_optimize_with_eps_mono_produces_results(self, scorer, df):
         scorer.fit(
             *_split_by_period(df, _OBS_PERIOD, _GT_PERIOD),
@@ -954,6 +977,47 @@ class TestTransform:
             expected = scorer_fitted.ef_probability_dict_[f_adj]
             assert row["probability"] == pytest.approx(expected)
 
+    def test_before_optimize_mono_raises(self, scorer_fitted):
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer_fitted.transform(self._make_obs(), kind="mono")
+
+    def test_before_optimize_mrc_raises(self, scorer_fitted):
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer_fitted.transform(self._make_obs(), kind="mrc")
+
+    def test_before_optimize_mfc_raises(self, scorer_fitted):
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer_fitted.transform(self._make_obs(), kind="mfc")
+
+    def test_before_optimize_mcc_raises(self, scorer_fitted):
+        with pytest.raises(RuntimeError, match="optimize"):
+            scorer_fitted.transform(self._make_obs(), kind="mcc")
+
+    @pytest.mark.parametrize("kind", ["mono", "mrc", "mfc", "mcc"])
+    def test_2d_probability_matches_dict(
+        self,
+        kind,
+        scorer_optimized_mono,
+        scorer_optimized_mrc,
+        scorer_optimized_mfc,
+        scorer_optimized_mcc,
+    ):
+        # 2次元最適化モデルは (r_adj, f_adj) を {kind}_probability_dict_ で参照する
+        scorers = {
+            "mono": scorer_optimized_mono,
+            "mrc": scorer_optimized_mrc,
+            "mfc": scorer_optimized_mfc,
+            "mcc": scorer_optimized_mcc,
+        }
+        s = scorers[kind]
+        prob_dict = getattr(s, f"{kind}_probability_dict_")
+        result = s.transform(self._make_obs(), ref=_FIT_TARGET_DATE, kind=kind)
+        for _, row in result.iterrows():
+            r_adj = min(int(row["recency"]), _RECENCY_LIMIT)
+            f_adj = min(int(row["frequency"]), _FREQUENCY_LIMIT)
+            expected = prob_dict[r_adj, f_adj]
+            assert row["probability"] == pytest.approx(expected)
+
     def test_clamps_recency_above_limit(self, scorer_fitted):
         # recency > recency_limit の行は limit にクランプして確率を引く
         # 2023-12-30 → ref_date Jan07 との差 = 8日 → recency = 9 > limit=7
@@ -1146,14 +1210,10 @@ class TestPlotProbabilitySurface:
             scorer_fitted.plot_probability_surface(kind="mcc")
 
     def test_returns_figure_empirical(self, scorer_fitted):
-        import matplotlib.figure
-
         fig = scorer_fitted.plot_probability_surface(kind="emp")
         assert isinstance(fig, matplotlib.figure.Figure)
 
     def test_returns_figure_mono(self, scorer_optimized_mono):
-        import matplotlib.figure
-
         fig = scorer_optimized_mono.plot_probability_surface(kind="mono")
         assert isinstance(fig, matplotlib.figure.Figure)
 
@@ -1168,20 +1228,14 @@ class TestPlotProbabilitySurface:
             scorer_optimized_mf.plot_probability_surface(kind="mf")
 
     def test_returns_figure_mrc(self, scorer_optimized_mrc):
-        import matplotlib.figure
-
         fig = scorer_optimized_mrc.plot_probability_surface(kind="mrc")
         assert isinstance(fig, matplotlib.figure.Figure)
 
     def test_returns_figure_mfc(self, scorer_optimized_mfc):
-        import matplotlib.figure
-
         fig = scorer_optimized_mfc.plot_probability_surface(kind="mfc")
         assert isinstance(fig, matplotlib.figure.Figure)
 
     def test_returns_figure_mcc(self, scorer_optimized_mcc):
-        import matplotlib.figure
-
         fig = scorer_optimized_mcc.plot_probability_surface(kind="mcc")
         assert isinstance(fig, matplotlib.figure.Figure)
 
@@ -1228,6 +1282,16 @@ class TestPlotProbabilitySurface:
     def test_probability_label_applied(self, scorer_fitted):
         fig = scorer_fitted.plot_probability_surface(probability_label="custom_p")
         assert fig.axes[0].get_zlabel() == "custom_p"
+
+    def test_path_directory_saves_default_name(self, scorer_fitted, tmp_path):
+        # ディレクトリを渡すと surface_{kind}_probability.png として保存される
+        scorer_fitted.plot_probability_surface(kind="emp", path=str(tmp_path))
+        assert (tmp_path / "surface_emp_probability.png").exists()
+
+    def test_path_file_saves_with_given_name(self, scorer_fitted, tmp_path):
+        out = tmp_path / "my_surface.png"
+        scorer_fitted.plot_probability_surface(kind="emp", path=str(out))
+        assert out.exists()
 
 
 # ---------------------------------------------------------------------------
@@ -1327,32 +1391,22 @@ class TestPlotMarginalProbability:
             scorer_fitted.plot_marginal_probability(kind="fboth")
 
     def test_returns_figure_er(self, scorer_fitted):
-        import matplotlib.figure
-
         fig = scorer_fitted.plot_marginal_probability(kind="er")
         assert isinstance(fig, matplotlib.figure.Figure)
 
     def test_returns_figure_ef(self, scorer_fitted):
-        import matplotlib.figure
-
         fig = scorer_fitted.plot_marginal_probability(kind="ef")
         assert isinstance(fig, matplotlib.figure.Figure)
 
     def test_returns_figure_mr(self, scorer_optimized_mr):
-        import matplotlib.figure
-
         fig = scorer_optimized_mr.plot_marginal_probability(kind="mr")
         assert isinstance(fig, matplotlib.figure.Figure)
 
     def test_returns_figure_mf(self, scorer_optimized_mf):
-        import matplotlib.figure
-
         fig = scorer_optimized_mf.plot_marginal_probability(kind="mf")
         assert isinstance(fig, matplotlib.figure.Figure)
 
     def test_rboth_returns_figure_with_legend(self, scorer_optimized_mr):
-        import matplotlib.figure
-
         fig = scorer_optimized_mr.plot_marginal_probability(kind="rboth")
         assert isinstance(fig, matplotlib.figure.Figure)
         assert fig.axes[0].get_legend() is not None
@@ -1364,8 +1418,6 @@ class TestPlotMarginalProbability:
         assert {line.get_label() for line in ax.lines} == {"er", "mr"}
 
     def test_fboth_returns_figure_with_legend(self, scorer_optimized_mf):
-        import matplotlib.figure
-
         fig = scorer_optimized_mf.plot_marginal_probability(kind="fboth")
         assert isinstance(fig, matplotlib.figure.Figure)
         assert fig.axes[0].get_legend() is not None
@@ -1430,6 +1482,16 @@ class TestPlotMarginalProbability:
         fig = scorer_fitted.plot_marginal_probability(probability_label="custom_p")
         assert fig.axes[0].get_ylabel() == "custom_p"
 
+    def test_path_directory_saves_default_name(self, scorer_fitted, tmp_path):
+        # ディレクトリを渡すと marginal_{kind}_probability.png として保存される
+        scorer_fitted.plot_marginal_probability(kind="er", path=str(tmp_path))
+        assert (tmp_path / "marginal_er_probability.png").exists()
+
+    def test_path_file_saves_with_given_name(self, scorer_fitted, tmp_path):
+        out = tmp_path / "my_marginal.png"
+        scorer_fitted.plot_marginal_probability(kind="er", path=str(out))
+        assert out.exists()
+
 
 # ---------------------------------------------------------------------------
 # export_probability_csv
@@ -1462,7 +1524,7 @@ class TestExportProbabilityCsv:
     def test_default_path_creates_file(self, scorer_fitted, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         scorer_fitted.export_probability_csv(kind="emp")
-        assert (tmp_path / "emp_probability.csv").exists()
+        assert (tmp_path / "probability_emp.csv").exists()
 
     def test_explicit_file_path(self, scorer_fitted, tmp_path):
         out = tmp_path / "my_output.csv"
@@ -1471,7 +1533,7 @@ class TestExportProbabilityCsv:
 
     def test_directory_path_creates_file_inside(self, scorer_fitted, tmp_path):
         scorer_fitted.export_probability_csv(kind="emp", path=str(tmp_path))
-        assert (tmp_path / "emp_probability.csv").exists()
+        assert (tmp_path / "probability_emp.csv").exists()
 
     def test_emp_output_columns(self, scorer_fitted, tmp_path):
         out = tmp_path / "emp.csv"
@@ -1508,6 +1570,24 @@ class TestExportProbabilityCsv:
         scorer_optimized_mf.export_probability_csv(kind="mf", path=str(out))
         df = pd.read_csv(out)
         assert set(df.columns) == {"frequency", "probability"}
+
+    def test_mrc_output_columns(self, scorer_optimized_mrc, tmp_path):
+        out = tmp_path / "mrc.csv"
+        scorer_optimized_mrc.export_probability_csv(kind="mrc", path=str(out))
+        df = pd.read_csv(out)
+        assert set(df.columns) == {"recency", "frequency", "probability"}
+
+    def test_mfc_output_columns(self, scorer_optimized_mfc, tmp_path):
+        out = tmp_path / "mfc.csv"
+        scorer_optimized_mfc.export_probability_csv(kind="mfc", path=str(out))
+        df = pd.read_csv(out)
+        assert set(df.columns) == {"recency", "frequency", "probability"}
+
+    def test_mcc_output_columns(self, scorer_optimized_mcc, tmp_path):
+        out = tmp_path / "mcc.csv"
+        scorer_optimized_mcc.export_probability_csv(kind="mcc", path=str(out))
+        df = pd.read_csv(out)
+        assert set(df.columns) == {"recency", "frequency", "probability"}
 
     def test_emp_row_count(self, scorer_fitted, tmp_path):
         out = tmp_path / "emp.csv"
@@ -1647,7 +1727,7 @@ class TestUnit:
 # show
 # ---------------------------------------------------------------------------
 class TestShow:
-    def test_show_does_not_raise(self, scorer_fitted, capsys):
+    def test_show_does_not_raise(self, scorer_fitted):
         scorer_fitted.show()
 
     def test_show_not_fitted(self, scorer, capsys):
@@ -1845,22 +1925,16 @@ class TestSliceCorrelation:
 
     def test_recency_slice_corr_sparse_data_all_nan(self, scorer_fitted):
         # デフォルトテストデータは各 r スライスに有効セルが1つ以下 → 全 NaN
-        import math
-
         assert all(math.isnan(v) for v in scorer_fitted.recency_slice_corr_.values())
 
     def test_recency_slice_corr_positive_for_dense_data(self, scorer_slice):
         # r=1,2: f=1 → cv=0, f=2 → cv=1 → f と P(r,f) は正の相関
-        import math
-
         non_nan = {k: v for k, v in scorer_slice.recency_slice_corr_.items() if not math.isnan(v)}
         assert len(non_nan) > 0
         assert all(v > 0 for v in non_nan.values())
 
     def test_frequency_slice_corr_negative_for_dense_data(self, scorer_slice):
         # f=2: r=1 cv=1, r=2 cv=1, r=3 cv=0 → r と P(r,f) は負の相関
-        import math
-
         non_nan = {k: v for k, v in scorer_slice.frequency_slice_corr_.items() if not math.isnan(v)}
         assert len(non_nan) > 0
         assert all(v < 0 for v in non_nan.values())

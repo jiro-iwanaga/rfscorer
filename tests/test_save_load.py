@@ -48,6 +48,15 @@ def optimized_scorer():
     return s
 
 
+@pytest.fixture(scope="module")
+def marginal_optimized_scorer():
+    s = RecencyFrequencyScorer()
+    s.fit(*_split(_make_df()), recency_limit=7, frequency_limit=3)
+    s.optimize(kind="mr")
+    s.optimize(kind="mf")
+    return s
+
+
 class TestSaveLoad:
     def test_save_load_after_fit(self, fitted_scorer, tmp_path):
         path = tmp_path / "model.pkl"
@@ -91,6 +100,37 @@ class TestSaveLoad:
 
         with pytest.warns(UserWarning, match="Version mismatch"):
             RecencyFrequencyScorer.load(path)
+
+    def test_load_patch_version_difference_no_warning(self, fitted_scorer, tmp_path, recwarn):
+        # バージョン判定は major.minor のみ。パッチ差では警告を出さない
+        from importlib.metadata import version
+
+        major, minor = version("rfscorer").split(".")[:2]
+        path = tmp_path / "model.pkl"
+        fitted_scorer.save(path)
+
+        with path.open("rb") as f:
+            payload = pickle.load(f)  # noqa: S301
+        payload["rfscorer_version"] = f"{major}.{minor}.999"
+        with path.open("wb") as f:
+            pickle.dump(payload, f)
+
+        RecencyFrequencyScorer.load(path)
+        assert not any("Version mismatch" in str(w.message) for w in recwarn)
+
+    def test_load_unknown_version_no_warning(self, fitted_scorer, tmp_path, recwarn):
+        # rfscorer_version キーが無い (saved="unknown") 場合は警告しない
+        path = tmp_path / "model.pkl"
+        fitted_scorer.save(path)
+
+        with path.open("rb") as f:
+            payload = pickle.load(f)  # noqa: S301
+        del payload["rfscorer_version"]
+        with path.open("wb") as f:
+            pickle.dump(payload, f)
+
+        RecencyFrequencyScorer.load(path)
+        assert not any("Version mismatch" in str(w.message) for w in recwarn)
 
     def test_path_accepts_string(self, fitted_scorer, tmp_path):
         path = str(tmp_path / "model.pkl")
@@ -165,6 +205,40 @@ class TestSaveZipLoadZip:
 
             meta = json.loads(zf.read("metadata.json"))
             assert "mono" in meta["optimized_kinds"]
+
+    def test_save_zip_contents_after_marginal_optimize(self, marginal_optimized_scorer, tmp_path):
+        # mr/mf は 1D モデルのため marginal PNG を生成し、surface PNG は作られない
+        path = tmp_path / "model.zip"
+        marginal_optimized_scorer.save_zip(path)
+
+        with zipfile.ZipFile(path, "r") as zf:
+            names = set(zf.namelist())
+            assert "probabilities/mr_probability.csv" in names
+            assert "probabilities/mf_probability.csv" in names
+            assert "plots/mr_marginal.png" in names
+            assert "plots/mf_marginal.png" in names
+            # 1D モデルに surface PNG は存在しない
+            assert "plots/mr_surface.png" not in names
+            assert "plots/mf_surface.png" not in names
+
+            meta = json.loads(zf.read("metadata.json"))
+            assert "mr" in meta["optimized_kinds"]
+            assert "mf" in meta["optimized_kinds"]
+
+    def test_save_zip_metadata_fields(self, fitted_scorer, tmp_path):
+        # metadata.json に主要なパラメータ・統計が記録される
+        path = tmp_path / "model.zip"
+        fitted_scorer.save_zip(path)
+
+        with zipfile.ZipFile(path, "r") as zf:
+            meta = json.loads(zf.read("metadata.json"))
+        assert meta["user_col"] == "user"
+        assert meta["item_col"] == "item"
+        assert meta["time_col"] == "datetime"
+        assert meta["recency_limit"] == 7
+        assert meta["frequency_limit"] == 3
+        assert meta["observation_start"] is not None
+        assert meta["observation_end"] is not None
 
     def test_save_zip_version_mismatch(self, fitted_scorer, tmp_path):
         path = tmp_path / "model.zip"
