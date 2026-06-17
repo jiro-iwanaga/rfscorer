@@ -419,7 +419,7 @@ class RecencyFrequencyScorer(PlottingMixin):
     # Optimization (単調性制約付き再推定)
     # ---------------------------------------------------------------------------
 
-    def optimize(self, kind="mono", eps=0.0):
+    def optimize(self, kind="mono", eps=0.0, verbose=False):
         """Estimate optimized product-choice probabilities under RF constraints.
 
         Solves a convex quadratic programming problem with monotonicity
@@ -446,10 +446,12 @@ class RecencyFrequencyScorer(PlottingMixin):
             (non-strict inequalities allow ties between adjacent levels).
             When positive, strict monotonicity is enforced, preventing ties
             between adjacent recency or frequency levels.
+        verbose : bool, default False
+            If True, print optimization solver status information.
 
         Returns
         -------
-        self
+        None
 
         Raises
         ------
@@ -479,7 +481,8 @@ class RecencyFrequencyScorer(PlottingMixin):
         if kind == "mr":
             optimizer.build_marginal_model(axis="r", eps=eps)
             optimizer.solve()
-            optimizer.show_solve_info()
+            if verbose:
+                optimizer.show_solve_info()
             optimizer.postprocess()
             self.mr_probability_dict_ = optimizer.R2X
             self.mr_probability_ = (
@@ -491,7 +494,8 @@ class RecencyFrequencyScorer(PlottingMixin):
         elif kind == "mf":
             optimizer.build_marginal_model(axis="f", eps=eps)
             optimizer.solve()
-            optimizer.show_solve_info()
+            if verbose:
+                optimizer.show_solve_info()
             optimizer.postprocess()
             self.mf_probability_dict_ = optimizer.F2X
             self.mf_probability_ = (
@@ -503,7 +507,8 @@ class RecencyFrequencyScorer(PlottingMixin):
         else:
             optimizer.build_model(kind=kind, eps=eps)
             optimizer.solve()
-            optimizer.show_solve_info()
+            if verbose:
+                optimizer.show_solve_info()
             optimizer.postprocess()
 
             rows = [(r, f, optimizer.RF2X[(r, f)]) for r in self._R for f in self._F]
@@ -526,8 +531,6 @@ class RecencyFrequencyScorer(PlottingMixin):
                 self.mcc_probability_dict_ = optimizer.RF2X
                 self.mcc_probability_ = df_opt
                 self.mcc_probability_table_ = table
-
-        return self
 
     # ---------------------------------------------------------------------------
     # Inference (推論・スコアリング)
@@ -1265,9 +1268,11 @@ class RecencyFrequencyScorer(PlottingMixin):
         print(f"  frequency ρ      : {rho_f}  (p={p_f},  n={n_f},  weighted ρ: {wrho_f})")
         print()
         print("  Slice ρ by r  [corr(f, P(r,f)),  expected > 0]")
-        print(f"    {self._fmt_slice_row(self.recency_slice_corr_, 'r')}")
+        for line in self._fmt_slice_lines(self.recency_slice_corr_, "r"):
+            print(f"    {line}")
         print("  Slice ρ by f  [corr(r, P(r,f)),  expected < 0]")
-        print(f"    {self._fmt_slice_row(self.frequency_slice_corr_, 'f')}")
+        for line in self._fmt_slice_lines(self.frequency_slice_corr_, "f"):
+            print(f"    {line}")
 
         print()
         print(sec("Empirical Probability Table"))
@@ -1286,14 +1291,14 @@ class RecencyFrequencyScorer(PlottingMixin):
             pass
         return str(int(v))
 
-    def _fmt_slice_row(self, d, prefix):
+    def _fmt_slice_lines(self, d, prefix):
         import math
 
-        parts = [
-            f"{prefix}={k}: {v:.4f}" if not math.isnan(v) else f"{prefix}={k}: nan"
+        lines = [
+            f"{prefix}={k:2d}:  {v: .4f}" if not math.isnan(v) else f"{prefix}={k:2d}:  nan"
             for k, v in sorted(d.items())
         ]
-        return "    ".join(parts)
+        return lines
 
     def _marginal_spearman(self, x_vals, y_vals, weights=None):
         """Spearman ρ between x_vals and y_vals, optionally N-weighted.

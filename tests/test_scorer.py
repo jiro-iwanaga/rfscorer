@@ -401,14 +401,14 @@ class TestOptimize:
         with pytest.raises(ValueError, match="kind"):
             scorer.optimize(kind="invalid")
 
-    def test_optimize_mono_returns_self(self, scorer, df):
+    def test_optimize_mono_returns_none(self, scorer, df):
         scorer.fit(
             *_split_by_period(df, _OBS_PERIOD, _GT_PERIOD),
             recency_limit=_RECENCY_LIMIT,
             frequency_limit=_FREQUENCY_LIMIT,
         )
         result = scorer.optimize(kind="mono")
-        assert result is scorer
+        assert result is None
 
     def test_mono_sets_probability(self, scorer_optimized_mono):
         assert scorer_optimized_mono.mono_probability_ is not None
