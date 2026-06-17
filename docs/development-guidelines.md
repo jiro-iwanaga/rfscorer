@@ -57,11 +57,11 @@
 | ファイル | 内容 |
 |---------|------|
 | `product-requirements.md` | プロダクト要求定義書 |
-| `functional-design.md` | 機能設計書 |
-| `architecture.md` | 技術仕様書 |
-| `repository-structure.md` | リポジトリ構造定義書 |
+| `functional-design.md` | 機能仕様書 |
+| `architecture.md` | アーキテクチャ構成書 |
+| `repository-structure.md` | リポジトリ構成 |
 | `development-guidelines.md` | 本書 |
-| `glossary.md` | ユビキタス言語定義 |
+| `glossary.md` | 用語集 |
 
 ### 作業単位のドキュメント: `.steering/`
 
@@ -69,7 +69,6 @@
 ディレクトリ名は `YYYYMMDD-development-title` 形式。
 
 ```
-.steering/20260602-initial-implementation/
 .steering/20260610-add-optimized-scorer/
 ```
 
@@ -88,11 +87,19 @@
 3. `requirements.md`・`design.md`・`tasklist.md` に作業内容を整理する
 4. `tasklist.md` に基づいて実装を進める
 5. 基本設計に影響する変更は `docs/` も更新する
-6. 実装後にテスト・リント・フォーマットを確認する
+6. 実装後にテスト・リント・フォーマットを実行し、問題がある場合は修正する
+   - `uv run pytest` でテスト成功を確認
+   - `uv run ruff check .` でリント実行
+   - `uv run ruff format .` でフォーマット実行
 
 ## リリース手順
 
-1. `pyproject.toml` のバージョンを更新する
-2. `uv build` でパッケージをビルドする
-3. `uv publish` で PyPI に公開する
-4. GitHub にバージョンタグを付けてプッシュする（例: `git tag v0.1.0 && git push origin v0.1.0`）
+1. バージョンを決める（セマンティックバージョニング: `MAJOR.MINOR.PATCH`。例: `0.2.0`）
+2. 当該バージョンの変更点を `CHANGELOG.md` に追記する（`## [X.Y.Z] - YYYY-MM-DD` 形式）
+3. テスト実行：`uv run pytest` で全テスト成功を確認
+4. `pyproject.toml` のバージョンを更新する
+5. `rm -rf dist/` で以前にビルドした成果物を削除
+6. `uv build` でパッケージをビルドする
+7. `uv publish` で PyPI に公開する
+8. GitHub にバージョンタグを付けてプッシュする（例: `git tag v0.2.0 && git push origin v0.2.0`）
+9. GitHub でリリースノートを作成する（`CHANGELOG.md` の内容を記載）
