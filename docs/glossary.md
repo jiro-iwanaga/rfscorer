@@ -9,39 +9,64 @@
 | RFscorer | RFscorer | プロジェクトの総称。PyPI で公開される Python パッケージの公式名称 |
 | rfscorer | rfscorer | Python パッケージの実装名。`pip install rfscorer` でインストール時、および `from rfscorer import ...` でインポート時に使用する |
 
-## データ
+## 基本概念
 
 | 用語 | 英語 / 記号 | 定義 |
 |------|------------|------|
-| 行動履歴 | behavior history | ユーザーが商品を閲覧した記録。`fit()` に DataFrame として渡す。カラム名はコンストラクタ引数で指定し、内部で `user`・`item`・`datetime` に正規化される |
-| ユーザー | user | 行動履歴の主体。`user` カラムで識別する |
+| ユーザー | user | 行動の主体。`user` カラムで識別する |
 | 商品 | item | 閲覧対象。`item` カラムで識別する |
-| 観測期間 | observation period | 最新度・頻度を算出するために使用する期間。`fit()` に `df_obs` として渡す。`split_by_date()` を使えば単一の DataFrame から `target_date` を基準に自動分割できる |
-| 正解期間 | ground truth period | 対象イベント（閲覧・購買・CV など）の発生を観測するために使用する期間。観測期間の直後に設定する。`fit()` に `df_gt` として渡す |
-| 観測データ | observation data | 観測期間に該当する行動履歴 DataFrame。`fit(df_obs, ...)` に `df_obs` として渡す。最新度・頻度を計算する基となる閲覧履歴 |
-| 正解データ | ground truth data | 正解期間に該当するイベント履歴 DataFrame。`fit(..., df_gt)` に `df_gt` として渡す。対象イベント（再閲覧・購買・CV など）の発生を記録 |
+| 対象イベント | target event | 推定対象のイベント。再閲覧・購買・CV など。`fit()` 時に `df_gt` で指定 |
+| 行動履歴 | behavior history | ユーザーが商品を閲覧した記録の時系列データ。`fit()` に DataFrame として渡す |
+
+## 期間とデータ分割
+
+| 用語 | 英語 / 記号 | 定義 |
+|------|------------|------|
+| 観測期間 | observation period | 最新度・頻度を計算する期間。`split_by_date()` で `observation_days` パラメータで指定 |
+| 正解期間 | ground truth period | ターゲットイベントを観測する期間。観測期間の直後に設定。`split_by_date()` で `gt_days` パラメータで指定 |
+| 観測データ | observation data | 観測期間に該当する行動履歴 DataFrame。`fit()` に `df_obs` として渡す |
+| 正解データ | ground truth data | 正解期間に該当するイベント履歴 DataFrame。`fit()` に `df_gt` として渡す |
 
 ## アルゴリズム
 
+### コア概念
+
 | 用語 | 英語 / 記号 | 定義 |
 |------|------------|------|
-| RF | Recency-Frequency | 最新度と頻度の2つの行動シグナルを指す。Random Forest ではない |
-| RF スコアリング | RF scoring | 最新度（Recency）と頻度（Frequency）を行動シグナルとして用い、商品選択確率を推定する解釈可能な推薦スコアリング手法。本パッケージが提供する中核機能 |
-| 最新度 | recency / $r$ | 観測期間における、ユーザーが最後に閲覧した時点からの経過時間を整数で表した値。1 が最も直近。$r \in R$（$R$ は観測されたすべての最新度の集合） |
-| 頻度 | frequency / $f$ | 観測期間における、ユーザーによる商品の閲覧回数。$f \in F$（$F$ は観測されたすべての頻度の集合） |
-| 商品選択確率 | product-choice probability | 観測期間で最新度 $r$・頻度 $f$ であった商品が、正解期間に対象イベント（再閲覧・購買・CV など）を発生させる確率 |
-| 経験的商品選択確率 | empirical product-choice probability / $p_{r,f}$ | $p_{r,f} = n_{r,f} / N_{r,f}$。観測データから直接算出した商品選択確率 |
-| 最適化商品選択確率 | optimized product-choice probability / $x_{r,f}$ | RF 制約（単調性制約）と最小二乗誤差を目的関数とする凸2次計画問題を解いて得られる商品選択確率 |
-| $n_{r,f}$ | — | 観測期間で最新度 $r$・頻度 $f$ であった商品が、正解期間に対象イベントを発生させた回数の合計 |
-| $N_{r,f}$ | — | 観測期間で最新度 $r$・頻度 $f$ であった (user, item) ペアの数（=サンプル数） |
-| RF 制約 | RF constraints | 最適化商品選択確率に課す単調性制約の総称。Recency 制約と Frequency 制約からなる |
-| Recency 制約 | recency constraint | $x_{r,f} \geq x_{r+1,f} + \varepsilon\ \ \ (r, r+1 \in R,\ f \in F)$。最新度が小さい（より直近に閲覧した）商品ほど商品選択確率が高い |
-| Frequency 制約 | frequency constraint | $x_{r,f} + \varepsilon \leq x_{r,f+1}\ \ \ (r \in R,\ f, f+1 \in F)$。頻度が高い商品ほど商品選択確率が高い |
-| 広義単調性 | weak monotonicity | $\varepsilon = 0$ のときの単調性制約。隣接する確率値が同値になることを許す（$\geq$ または $\leq$） |
-| 狭義単調性 | strict monotonicity | $\varepsilon > 0$ のときの単調性制約。隣接する最新度・頻度の確率値が必ず $\varepsilon$ 以上離れることを保証する |
-| $\varepsilon$（eps） | eps | `optimize(eps=ε)` で指定する単調性制約の最小ギャップ。デフォルト `0.0`（広義単調性）。2次元モデル（mono/mrc/mfc/mcc）の上限は $\min(\max(p_{r,f}) / (\lvert R\rvert - 1),\ \max(p_{r,f}) / (\lvert F\rvert - 1))$、`mr` の上限は $\max(p_r) / (\lvert R\rvert - 1)$、`mf` の上限は $\max(p_f) / (\lvert F\rvert - 1)$ で自動計算される |
-| 1次元最適化モデル | 1D optimization model | `optimize(kind='mr')` または `optimize(kind='mf')` で構築する1次元の最適化モデル。`mr` は最新度のみを変数とするモデル（最新度別経験的確率 $p_r$ を目標）、`mf` は頻度のみを変数とするモデル（頻度別経験的確率 $p_f$ を目標）。結果は1次元 dict として保存される |
-| 2次元最適化モデル | 2D optimization model | `optimize(kind='mono'/'mrc'/'mfc'/'mcc')` で構築する2次元の最適化モデル。最新度と頻度の全ペア $(r, f) \in R \times F$ を変数とするモデル（経験的商品選択確率 $p_{r,f}$ を目標）。結果は `{kind}_probability_dict_`（dict）に格納される |
+| RF | Recency-Frequency | 最新度と頻度の2つの行動シグナル。Random Forest ではない |
+| RF スコアリング | RF scoring | 最新度と頻度から商品選択確率を推定する解釈可能な推薦スコアリング手法 |
+| 最新度 | recency / $r$ | 最後の閲覧からの経過時間を整数化したもの。1 が最も直近。$r \in R$ |
+| 頻度 | frequency / $f$ | 観測期間における閲覧回数。$f \in F$ |
+
+### 商品選択確率
+
+| 用語 | 英語 / 記号 | 定義 |
+|------|------------|------|
+| 商品選択確率 | product-choice probability | 観測期間の (r,f) が正解期間でターゲットイベントを発生させる確率 |
+| 推薦スコア | recommendation score | 商品選択確率の別称。推薦の根拠となるスコア |
+| 経験的商品選択確率 | empirical product-choice probability / $p_{r,f}$ | $p_{r,f} = n_{r,f} / N_{r,f}$。観測データから直接算出。ノイズを含む |
+| 最適化商品選択確率 | optimized product-choice probability / $x_{r,f}$ | RF 制約を満たすよう最適化した商品選択確率 |
+| $n_{r,f}$ | — | 観測期間で (r,f) であった商品が正解期間でターゲットイベントを発生させた回数の合計 |
+| $N_{r,f}$ | — | 観測期間で (r,f) であった (user, item) ペアの数 |
+
+### 最適化と制約
+
+| 用語 | 英語 / 記号 | 定義 |
+|------|------------|------|
+| 凸2次計画問題 | convex quadratic programming | 目的関数が凸で制約が線形な最適化問題。本パッケージは cvxpy で求解 |
+| RF 制約 | RF constraints | 最適化に課す単調性制約の総称。Recency 制約と Frequency 制約からなる |
+| Recency 制約 | recency constraint | $x_{r,f} \geq x_{r+1,f} + \varepsilon$。より直近 ($r$ が小さい) の商品ほど確率が高い |
+| Frequency 制約 | frequency constraint | $x_{r,f} + \varepsilon \leq x_{r,f+1}$。より高頻度 ($f$ が大きい) の商品ほど確率が高い |
+| 広義単調性 | weak monotonicity | $\varepsilon = 0$ のときの単調性。隣接する確率値が同値になることを許す |
+| 狭義単調性 | strict monotonicity | $\varepsilon > 0$ のときの単調性。隣接する値が必ず $\varepsilon$ 以上離れることを保証 |
+| $\varepsilon$（eps） | eps | 単調性制約における隣接値の最小差。`optimize(eps=ε)` で指定。デフォルト `0.0` |
+
+### モデルの種類
+
+| 用語 | 英語 / 記号 | 定義 |
+|------|------------|------|
+| 1次元最適化モデル | 1D optimization model | 最新度または頻度のみを変数とする1次元最適化。`mr`（Recency）と `mf`（Frequency） |
+| 2次元最適化モデル | 2D optimization model | 最新度と頻度の全ペア $(r, f)$ を変数とする2次元最適化。`mono`・`mrc`・`mfc`・`mcc` |
 
 > **表記ルール — "monotonic" と "monotonicity"**
 >
@@ -51,3 +76,23 @@
 > - **`monotonicity`**（名詞）: docstring・コメント・テストコードで単調性という数学的性質を説明する際に使用する。例: `monotonicity constraints`, `weak monotonicity`, `test_recency_monotonicity`
 >
 > 識別子には `monotonic`、説明文には `monotonicity` を使用する。この共存は表記ゆれではなく意図的な使い分けである。
+
+## API（簡潔版）
+
+主要メソッドの簡潔説明。詳細は機能仕様書（`functional-design.md`）を参照。
+
+| 用語 | 説明 |
+|------|------|
+| `RecencyFrequencyScorer` | RF スコアリングの主クラス。コンストラクタで列名・粒度 `unit` を指定 |
+| `fit(df_obs, df_gt, ref, recency_limit, frequency_limit)` | 観測データと正解データから経験的商品選択確率を推定する |
+| `transform(df, ref, kind)` | 行動履歴 DataFrame に最新度・頻度・確率・順位を付与する |
+| `optimize(kind, eps, verbose)` | RF 制約付き凸2次計画問題を解いて最適化確率を推定する |
+| `predict(r, f, kind)` | 指定した最新度・頻度の商品選択確率を返す |
+| `evaluate(df_rec, df_gt, order)` | 推薦結果と正解データを比較し precision・recall・F1 を返す |
+| `show()` | `fit()` 後の状態をデータ統計・相関係数・確率テーブルで表示 |
+| `export_probability_csv(kind, path)` | 商品選択確率テーブルを CSV に出力 |
+| `plot_probability_surface(kind, ...)` | 商品選択確率を3次元ワイヤーフレームで可視化 |
+| `plot_marginal_probability(kind, ...)` | 最新度または頻度の一方向の確率を折れ線グラフで可視化 |
+| `save(path)` / `load(path)` | モデルの pickle 形式での保存・ロード |
+| `save_zip(path)` / `load_zip(path)` | モデルを zip アーカイブ（pickle + CSV + PNG）で保存・ロード |
+| `split_by_date(df, target_date, observation_days, gt_days)` | 観測データと正解データに自動分割するユーティリティ関数 |
