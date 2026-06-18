@@ -277,3 +277,118 @@ return self
 - **将来タスク（本タスク対象外）**: H1 のベクトル化（最優先・効果大）、続いて H4 の事前集約、H3 の searchsorted、H2 のベクトル化。いずれも 11.1 のシームの内側で完結し、`fit_rolling()` 本体・公開 API・テスト契約を変えずに差し替え可能。
 
 > H1 のベクトル化は可読性も損なわず効果が大きいため、初手に含めることも選択肢。その場合も Phase 1 の純粋移設（既存テスト緑）を先に確定し、その後シーム内で差し替えて再度テスト緑を確認する2段で行い、リスクを切り分ける。
+
+## 12. 統計属性の仕様確定（レビュー追補）
+
+`fit_rolling()` 実装後のレビューで、保存している統計量の意味が `fit()` と `fit_rolling()` で食い違い、`show()` / `save_zip` メタデータが誤解を招くことが判明した。論文記載に耐えるデータ数を出力できるよう、属性仕様を以下に確定する。
+
+### 12.1 問題（確定済みの歪み）
+
+1. **延べ数の二重カウント**: `record_num*` / `total_cv*` は `fit()`＝データセット実サイズだが、`fit_rolling()`＝全ロール合算（延べ）。観測窓幅 `observation_days`・正解窓幅 `gt_days` でロールが重なるため、1物理行が最大 `min(observation_days, roll_days)` 回カウントされ、入力行数を超える。
+2. **正解期間・データ末尾が不可視**: `observation_end_`(=anchor) は正解データ末尾 `end_int = anchor + gt_days` を示さず、`show()` も正解期間を表示しない。
+3. **ローリング構成が未保存**: `observation_days` / `gt_days` / `roll_days` を破棄し、`load()` 後・メタデータで復元不能。`fit()` と `fit_rolling()` を区別できない。
+
+### 12.2 方針
+
+延べ数（実効サンプルサイズ）は推定の分母として正しいので**値は維持し、ラベルで明示**する。これと別に**物理ユニーク件数**（データセット記述用）を追加する。両系統を `show()` / メタデータで別物として提示する。
+
+### 12.3 属性仕様（確定）
+
+| 属性 | `fit()` | `fit_rolling()` | 区分 |
+|------|---------|-----------------|------|
+| `record_num` / `record_num_obs` / `record_num_gt` | データセット実サイズ | **全ロール合算（延べ）** | 実効サンプル（既存・維持） |
+| `record_num_target_org` / `record_num_target` | 同上 | 全ロール合算（延べ） | 実効サンプル（既存・維持） |
+| `total_cv_org` / `total_cv` | 同上 | 全ロール合算（延べ） | 実効サンプル（既存・維持） |
+| `n_obs_rows_` | `len(obs_log)` | 観測和集合区間内の **物理ユニーク行数** | **新規・物理** |
+| `n_gt_events_` | `len(gt_log)` | 正解和集合区間内の **物理ユニークイベント数** | **新規・物理** |
+| `n_users_` | `obs_log` のユニークユーザ数 | 観測和集合区間内のユニークユーザ数 | **新規・物理** |
+| `n_items_` | `obs_log` のユニーク商品数 | 観測和集合区間内のユニーク商品数 | **新規・物理** |
+| `fit_method_` | `"fit"` | `"fit_rolling"` | **新規・構成** |
+| `roll_days_` | `1` | 指定値 | **新規・構成** |
+| `observation_days_` | `None` | 指定値 | **新規・構成** |
+| `gt_days_` | `None` | 指定値 | **新規・構成** |
+
+- **採用しない**: `anchor_`（= `observation_end_` と同値・冗長）、`end_date_`（= `observation_end_ + gt_days_` で派生可能）。正解期間の表示には `observation_end_` と `gt_days_` を用いる。
+- `fit()` では物理＝実効（プール係数1）のため両系統は一致する。`fit_rolling()` で初めて乖離し、その差自体が情報となる。
+- 全属性は `__init__` で `None` 初期化する（stale 値混入防止）。
+
+### 12.4 和集合区間の定義（`fit_rolling`）
+
+- 観測和集合: `[observation_start_, observation_end_] = [oldest_obs_start, anchor]`。
+- 正解和集合: 各ロールの正解窓 `[td+1, td+gt_days]`（`td = anchor-k`, `k=0..roll_days-1`）の和。窓は連続して重なるため `[anchor - roll_days + 2, anchor + gt_days] = [anchor - roll_days + 2, end_int]`。
+- 物理件数は元の `obs_internal` / `gt_internal` を当該区間で**一度だけ**フィルタして数える（プールしない）。
+
+### 12.5 算出ヘルパー
+
+物理件数は内部列フレームから算出する共有ヘルパーに集約する。
+
+```python
+def _set_dataset_stats(self, obs_df, gt_df):
+    self.n_obs_rows_ = len(obs_df)
+    self.n_gt_events_ = len(gt_df)
+    self.n_users_ = obs_df[self._USER_COL].nunique()
+    self.n_items_ = obs_df[self._ITEM_COL].nunique()
+```
+
+- `_fit_impl()`（fit 経路）: `self._set_dataset_stats(obs_log, gt_log)` を呼ぶ。`fit_method_="fit"`, `roll_days_=1`, `observation_days_=None`, `gt_days_=None` を設定。
+- `fit_rolling()` 本体: 観測和集合・正解和集合で `obs_internal` / `gt_internal` をフィルタして `_set_dataset_stats(...)` を呼ぶ。`fit_method_="fit_rolling"`, `roll_days_`/`observation_days_`/`gt_days_` を設定。
+
+> `_aggregate_empirical()` は 3 列 tidy フレーム（user/item を持たない）を受けるため、物理件数算出は各メソッド本体側に置く（集計部には入れない）。
+
+### 12.6 `show()` の改修
+
+`Data` セクションを「物理（データセット）」と「延べ（実効サンプル）」に分離する。`fit_method_` で分岐し、`fit_rolling` 時のみローリング行・正解期間行を表示する。延べ系の行には `(pooled over R rolls / 延べ)` を明示。
+
+```
+── Data ─────────────────────────────────────────
+  dataset          : obs {n_obs_rows_} rows, gt {n_gt_events_} events
+                     (users: {n_users_}, items: {n_items_})
+  observation      : {start} → {end=anchor}
+  ground truth     : {anchor+1} → {end_int}            ← fit_rolling 時のみ
+  rolling          : roll_days={roll_days_}, obs_window={observation_days_}, gt_window={gt_days_}  ← fit_rolling 時のみ
+  user×item pairs  : {target_org} → {target}   (before → after limits; pooled over R rolls)
+  target events    : {total_cv_org} → {total_cv}  (before → after limits; pooled over R rolls)
+```
+
+`fit()` 時はローリング行・正解期間行を出さず、pooled ラベルも付けない（延べ＝実数のため）。
+
+### 12.7 `save_zip` メタデータの追加
+
+`metadata.json`（`scorer.py` 現 1284–1297）に以下を追加する。
+
+```python
+"fit_method": self.fit_method_,
+"roll_days": _to_python(self.roll_days_),
+"observation_days": _to_python(self.observation_days_),
+"gt_days": _to_python(self.gt_days_),
+"n_obs_rows": _to_python(self.n_obs_rows_),
+"n_gt_events": _to_python(self.n_gt_events_),
+"n_users": _to_python(self.n_users_),
+"n_items": _to_python(self.n_items_),
+```
+
+既存キー（`observation_start` / `observation_end` / `record_num` / `total_cv` 等）は維持。
+
+### 12.8 テスト追加（`TestFitRolling` ほか）
+
+| テスト | 検証内容 |
+|--------|----------|
+| `test_fit_sets_dataset_stats` | `fit()` 後に `fit_method_=="fit"`, `roll_days_==1`, `observation_days_ is None`, `gt_days_ is None`, `n_obs_rows_==len(df_obs)`, `n_gt_events_==len(df_gt)` |
+| `test_rolling_sets_config` | `fit_rolling()` 後に `fit_method_=="fit_rolling"` と `roll_days_`/`observation_days_`/`gt_days_` が引数値 |
+| `test_rolling_physical_vs_pooled` | 重なるロールで `n_obs_rows_ < record_num_obs`（延べ＞物理）、かつ `n_obs_rows_` が観測和集合区間の物理行数と一致 |
+| `test_rolling_no_anchor_end_date_attr` | `anchor_` / `end_date_` 属性を持たない |
+| `test_rolling_n_users_items` | `n_users_`/`n_items_` が観測和集合区間のユニーク数と一致 |
+| `test_save_zip_metadata_rolling` | `metadata.json` に新キーが含まれ値が正しい |
+
+### 12.9 ドキュメント更新
+
+- `docs/functional-design.md` 属性表（現 L362–370）: 新属性 `n_obs_rows_`/`n_gt_events_`/`n_users_`/`n_items_`/`fit_method_`/`roll_days_`/`observation_days_`/`gt_days_` を追記。`record_num*`/`total_cv*` の「`fit_rolling()` では延べ（実効サンプル）、物理は `n_*` を参照」を明記。補足注（L370）を本仕様に合わせ更新。
+- `save_zip` の metadata 記述（現 L292）に新キーを追記。
+
+### 12.10 影響範囲（10章への追加）
+
+| ファイル | 追加変更 |
+|----------|----------|
+| `src/rfscorer/scorer.py` | `__init__` に新属性初期化、`_set_dataset_stats()` 追加、`_fit_impl`/`fit_rolling` で構成・物理件数設定、`show()` 分岐、`save_zip` メタデータ追加 |
+| `tests/test_scorer.py` | 12.8 のテスト追加 |
+| `docs/functional-design.md` | 属性表・metadata 記述更新 |

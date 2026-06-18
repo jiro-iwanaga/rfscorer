@@ -2195,3 +2195,101 @@ class TestFitRolling:
             cv_total += s.emp_probability_["cv"].sum()
         assert s2.emp_probability_["N"].sum() == n_total
         assert s2.emp_probability_["cv"].sum() == cv_total
+
+    def test_rolling_sets_config(self):
+        df = _make_rolling_df()
+        s = RecencyFrequencyScorer().fit_rolling(
+            df,
+            df,
+            observation_days=7,
+            gt_days=3,
+            roll_days=3,
+            recency_limit=7,
+            frequency_limit=5,
+        )
+        assert s.fit_method_ == "fit_rolling"
+        assert s.roll_days_ == 3
+        assert s.observation_days_ == 7
+        assert s.gt_days_ == 3
+
+    def test_rolling_no_anchor_end_date_attr(self):
+        df = _make_rolling_df()
+        s = RecencyFrequencyScorer().fit_rolling(
+            df, df, 7, 3, roll_days=2, recency_limit=7, frequency_limit=5
+        )
+        assert not hasattr(s, "anchor_")
+        assert not hasattr(s, "end_date_")
+
+    def test_rolling_physical_vs_pooled(self):
+        # 重なるロールでは延べ(record_num_obs) > 物理(n_obs_rows_)。
+        # 物理は観測和集合区間 [observation_start_, observation_end_] の実行数に一致。
+        df = _make_rolling_df()
+        s = RecencyFrequencyScorer().fit_rolling(
+            df, df, 7, 3, roll_days=3, recency_limit=7, frequency_limit=5
+        )
+        dt_ord = pd.to_datetime(df["datetime"]).map(lambda x: x.toordinal())
+        obs_mask = (dt_ord >= s.observation_start_) & (dt_ord <= s.observation_end_)
+        assert s.n_obs_rows_ == int(obs_mask.sum())
+        assert s.n_obs_rows_ < s.record_num_obs
+
+    def test_rolling_n_users_items(self):
+        df = _make_rolling_df()
+        s = RecencyFrequencyScorer().fit_rolling(
+            df, df, 7, 3, roll_days=3, recency_limit=7, frequency_limit=5
+        )
+        dt_ord = pd.to_datetime(df["datetime"]).map(lambda x: x.toordinal())
+        obs_union = df[(dt_ord >= s.observation_start_) & (dt_ord <= s.observation_end_)]
+        assert s.n_users_ == obs_union["user"].nunique()
+        assert s.n_items_ == obs_union["item"].nunique()
+
+    def test_rolling_n_gt_events_over_union(self):
+        df = _make_rolling_df()
+        roll_days, gt_days = 3, 3
+        s = RecencyFrequencyScorer().fit_rolling(
+            df, df, 7, gt_days, roll_days=roll_days, recency_limit=7, frequency_limit=5
+        )
+        dt_ord = pd.to_datetime(df["datetime"]).map(lambda x: x.toordinal())
+        lo = s.observation_end_ - roll_days + 2
+        hi = s.observation_end_ + gt_days
+        gt_mask = (dt_ord >= lo) & (dt_ord <= hi)
+        assert s.n_gt_events_ == int(gt_mask.sum())
+
+    def test_save_zip_metadata_rolling(self, tmp_path):
+        import json
+        import zipfile
+
+        df = _make_rolling_df()
+        s = RecencyFrequencyScorer().fit_rolling(
+            df, df, 7, 3, roll_days=3, recency_limit=7, frequency_limit=5
+        )
+        out = tmp_path / "scorer.zip"
+        s.save_zip(out)
+        with zipfile.ZipFile(out) as zf:
+            meta = json.loads(zf.read("metadata.json"))
+        assert meta["fit_method"] == "fit_rolling"
+        assert meta["roll_days"] == 3
+        assert meta["observation_days"] == 7
+        assert meta["gt_days"] == 3
+        assert meta["n_obs_rows"] == s.n_obs_rows_
+        assert meta["n_gt_events"] == s.n_gt_events_
+        assert meta["n_users"] == s.n_users_
+        assert meta["n_items"] == s.n_items_
+
+
+class TestDatasetStats:
+    def test_fit_sets_dataset_stats(self):
+        df = _make_rolling_df()
+        dt = pd.to_datetime(df["datetime"])
+        obs = df[dt <= pd.Timestamp("2024-01-16")]
+        gt = df[dt >= pd.Timestamp("2024-01-17")]
+        s = RecencyFrequencyScorer().fit(
+            obs, gt, ref="2024-01-16", recency_limit=7, frequency_limit=5
+        )
+        assert s.fit_method_ == "fit"
+        assert s.roll_days_ == 1
+        assert s.observation_days_ is None
+        assert s.gt_days_ is None
+        assert s.n_obs_rows_ == len(obs)
+        assert s.n_gt_events_ == len(gt)
+        assert s.n_users_ == obs["user"].nunique()
+        assert s.n_items_ == obs["item"].nunique()

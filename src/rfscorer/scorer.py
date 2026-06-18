@@ -131,6 +131,7 @@ class RecencyFrequencyScorer(PlottingMixin):
         self.frequency_corr_weighted_ = None  # スピアマン ρ（N_f 重み付き）
         self.recency_slice_corr_ = None  # dict[r, float] r 固定スライスの重み付きスピアマン ρ
         self.frequency_slice_corr_ = None  # dict[f, float] f 固定スライスの重み付きスピアマン ρ
+        # 実効サンプル（延べ）: fit() では物理と一致、fit_rolling() では全ロール合算
         self.record_num = None  # レコード数（fit() 後に設定）
         self.record_num_obs = None  # 観測期間レコード数
         self.record_num_gt = None  # 正解期間レコード数
@@ -138,6 +139,18 @@ class RecencyFrequencyScorer(PlottingMixin):
         self.record_num_target = None  # 分析対象レコード数
         self.total_cv_org = None  # フィルタリング前 cv 数
         self.total_cv = None  # cv 数
+
+        # 物理ユニーク（データセット記述用）: 和集合区間を一度だけ数えた実数
+        self.n_obs_rows_ = None  # 観測ログの物理ユニーク行数
+        self.n_gt_events_ = None  # 正解ログの物理ユニークイベント数
+        self.n_users_ = None  # 観測ログのユニークユーザ数
+        self.n_items_ = None  # 観測ログのユニーク商品数
+
+        # 学習構成（再現性・表示用）
+        self.fit_method_ = None  # "fit" | "fit_rolling"
+        self.roll_days_ = None  # fit()→1, fit_rolling()→指定値
+        self.observation_days_ = None  # fit()→None, fit_rolling()→観測窓幅
+        self.gt_days_ = None  # fit()→None, fit_rolling()→正解窓幅
 
     # ---------------------------------------------------------------------------
     # Fitting (経験的確率推定)
@@ -254,8 +267,27 @@ class RecencyFrequencyScorer(PlottingMixin):
         """Core fitting logic. obs_log and gt_log must use internal column names."""
         self.record_num_obs = len(obs_log)
         self.record_num_gt = len(gt_log)
+        self.fit_method_ = "fit"
+        self.roll_days_ = 1
+        self.observation_days_ = None
+        self.gt_days_ = None
+        self._set_dataset_stats(obs_log, gt_log)
         df_ui2frc = self._build_ui_rf_cv(obs_log, gt_log, ref_int)
         self._aggregate_empirical(df_ui2frc, recency_limit, frequency_limit)
+
+    def _set_dataset_stats(self, obs_df, gt_df):
+        """Record physical (de-duplicated) dataset counts for paper reporting.
+
+        obs_df and gt_df must use internal column names and must already be
+        filtered to the actual coverage span (a single window for fit(); the
+        union of all rolling windows for fit_rolling()), so each physical row
+        is counted once. Unlike record_num_* (which pool over rolls), these are
+        the true dataset sizes.
+        """
+        self.n_obs_rows_ = len(obs_df)
+        self.n_gt_events_ = len(gt_df)
+        self.n_users_ = int(obs_df[self._USER_COL].nunique())
+        self.n_items_ = int(obs_df[self._ITEM_COL].nunique())
 
     def _build_ui_rf_cv(self, obs_log, gt_log, ref_int):
         """Build per (user, item) recency/frequency with a cv flag for one window.
@@ -596,6 +628,17 @@ class RecencyFrequencyScorer(PlottingMixin):
         self.observation_end_ = anchor
         # The fail-fast check above guarantees oldest_obs_start >= obs_min.
         self.observation_start_ = oldest_obs_start
+
+        self.fit_method_ = "fit_rolling"
+        self.roll_days_ = roll_days
+        self.observation_days_ = observation_days
+        self.gt_days_ = gt_days
+        # Physical counts over the union of all rolling windows (counted once,
+        # not pooled): observation span [observation_start_, anchor]; ground
+        # truth span [anchor - roll_days + 2, end_int].
+        obs_union = obs_internal[(obs_seq >= oldest_obs_start) & (obs_seq <= anchor)]
+        gt_union = gt_internal[(gt_seq >= anchor - roll_days + 2) & (gt_seq <= end_int)]
+        self._set_dataset_stats(obs_union, gt_union)
 
         self._aggregate_empirical(combined, recency_limit, frequency_limit)
         return self
@@ -1291,6 +1334,14 @@ class RecencyFrequencyScorer(PlottingMixin):
             "frequency_limit": _to_python(self.frequency_limit),
             "observation_start": _to_python(self.observation_start_),
             "observation_end": _to_python(self.observation_end_),
+            "fit_method": self.fit_method_,
+            "roll_days": _to_python(self.roll_days_),
+            "observation_days": _to_python(self.observation_days_),
+            "gt_days": _to_python(self.gt_days_),
+            "n_obs_rows": _to_python(self.n_obs_rows_),
+            "n_gt_events": _to_python(self.n_gt_events_),
+            "n_users": _to_python(self.n_users_),
+            "n_items": _to_python(self.n_items_),
             "record_num": _to_python(self.record_num),
             "total_cv": _to_python(self.total_cv),
             "optimized_kinds": optimized_kinds,
@@ -1406,25 +1457,41 @@ class RecencyFrequencyScorer(PlottingMixin):
 
         import math
 
+        rolling = self.fit_method_ == "fit_rolling"
+        pooled = "  (before → after limits; pooled over rolls)" if rolling else ""
+
         print()
         print(sec("Data"))
         print(
-            f"  rows (obs + gt)  : {self.record_num}"
-            f"  (obs: {self.record_num_obs},  gt: {self.record_num_gt})"
+            f"  dataset          : obs {self.n_obs_rows_} rows,  gt {self.n_gt_events_} events"
+            f"  (users: {self.n_users_},  items: {self.n_items_})"
         )
         print(
             f"  observation      : {self._fmt_ordinal(self.observation_start_)}"
             f" → {self._fmt_ordinal(self.observation_end_)}"
         )
+        if rolling:
+            print(
+                f"  ground truth     : {self._fmt_ordinal(self.observation_end_ + 1)}"
+                f" → {self._fmt_ordinal(self.observation_end_ + self.gt_days_)}"
+            )
+            print(
+                f"  rolling          : roll_days={self.roll_days_},"
+                f"  obs_window={self.observation_days_},  gt_window={self.gt_days_}"
+            )
+            print(
+                f"  pooled rows      : {self.record_num}"
+                f"  (obs: {self.record_num_obs},  gt: {self.record_num_gt})"
+            )
         print(
             f"  user×item pairs  : {self.record_num_target_org}"
             f" → {self.record_num_target}"
-            f"  (before → after applying limits)"
+            f"{pooled if rolling else '  (before → after applying limits)'}"
         )
         print(
             f"  target events    : {self.total_cv_org}"
             f" → {self.total_cv}"
-            f"  (before → after applying limits)"
+            f"{pooled if rolling else '  (before → after applying limits)'}"
         )
 
         print()

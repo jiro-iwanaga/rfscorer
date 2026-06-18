@@ -114,6 +114,32 @@
 
 - [x] **T20** 全テストを実行する（`uv run pytest`）
 
+### Phase 6: 統計属性の仕様確定（design 12）
+
+- [x] **T21** `__init__` に新属性を `None` 初期化で追加する
+  - 物理: `n_obs_rows_`, `n_gt_events_`, `n_users_`, `n_items_`
+  - 構成: `fit_method_`, `roll_days_`, `observation_days_`, `gt_days_`
+
+- [x] **T22** `_set_dataset_stats(self, obs_df, gt_df)` ヘルパーを追加する（design 12.5）
+
+- [x] **T23** `_fit_impl()`（fit 経路）で構成・物理件数を設定する
+  - `fit_method_="fit"`, `roll_days_=1`, `observation_days_=None`, `gt_days_=None`
+  - `self._set_dataset_stats(obs_log, gt_log)`
+
+- [x] **T24** `fit_rolling()` 本体で構成・物理件数を設定する
+  - `fit_method_="fit_rolling"`, `roll_days_`/`observation_days_`/`gt_days_`
+  - 観測和集合 `[observation_start_, anchor]`・正解和集合 `[anchor-roll_days+2, end_int]` でフィルタし `_set_dataset_stats(...)`
+
+- [x] **T25** `show()` の `Data` セクションを物理／延べに分離し `fit_method_` で分岐する（design 12.6）
+
+- [x] **T26** `save_zip` の `metadata.json` に新キーを追加する（design 12.7）
+
+- [x] **T27** `tests/test_scorer.py` に統計属性テストを追加する（design 12.8）
+
+- [x] **T28** `docs/functional-design.md` の属性表・metadata 記述を更新する（design 12.9）
+
+- [x] **T29** 品質チェック: `uv run ruff check . && uv run ruff format . && uv run pytest`
+
 ## 完了条件
 
 すべてのタスクが完了し、以下が成立していること：

@@ -289,7 +289,7 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 `fit()` / `optimize()` 後のインスタンスを zip アーカイブとして保存する。zip 内には以下が含まれる。
 
 - `rfscorer.pkl` — モデル本体（`load_zip()` はここから復元）
-- `metadata.json` — バージョン・パラメータ・統計情報（`rfscorer_version`, `user_col`, `item_col`, `time_col`, `unit`, `recency_limit`, `frequency_limit`, `observation_start`, `observation_end`, `record_num`, `total_cv`, `optimized_kinds`）
+- `metadata.json` — バージョン・パラメータ・統計情報（`rfscorer_version`, `user_col`, `item_col`, `time_col`, `unit`, `recency_limit`, `frequency_limit`, `observation_start`, `observation_end`, `fit_method`, `roll_days`, `observation_days`, `gt_days`, `n_obs_rows`, `n_gt_events`, `n_users`, `n_items`, `record_num`, `total_cv`, `optimized_kinds`）
 - `probabilities/` — 計算済みの各モデルの確率テーブル CSV（`emp_probability.csv`, `er_probability.csv`, `ef_probability.csv`, および `optimize()` 済みのモデル分）
 - `plots/` — 計算済みの各モデルの確率グラフ PNG（2D モデルは `plot_probability_surface()` の出力、1D モデルは `plot_marginal_probability()` の出力）
 
@@ -315,7 +315,7 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 
 `fit()` 後の状態を構造化された診断レポートとして標準出力に表示する。以下の4セクションで構成される。
 
-- **Data**: レコード数・観測期間・user×item ペア数・対象イベント数（フィルタ前後）
+- **Data**: データセット規模（物理ユニーク: 観測行数・正解イベント数・ユーザ数・商品数）・観測期間・user×item ペア数・対象イベント数（フィルタ前後）。`fit_rolling()` 後は正解期間・ローリング構成・延べレコード数（pooled）の行を追加表示し、user×item ペア数・対象イベント数には「pooled over rolls」を明示
 - **Model**: `recency_limit`・`frequency_limit`
 - **Correlation**: スピアマン相関係数・p 値・重み付き相関係数・スライス別相関係数
 - **Empirical Probability Table**: 経験的商品選択確率の横持ちテーブル
@@ -359,15 +359,23 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 | `mcc_probability_` | `pd.DataFrame` | mcc モデル最適化商品選択確率（カラム: `recency`, `frequency`, `probability`） | `optimize(kind="mcc")` 後 |
 | `mcc_probability_table_` | `pd.DataFrame` | mcc モデル最適化商品選択確率（横持ち） | `optimize(kind="mcc")` 後 |
 | `mcc_probability_dict_` | `dict` | mcc モデル最適化商品選択確率（キー: `(r, f)`、値: `probability`） | `optimize(kind="mcc")` 後 |
-| `record_num` | `int` | 全行動履歴のレコード数 | `fit()` 後 |
-| `record_num_obs` | `int` | 観測期間のレコード数 | `fit()` 後 |
-| `record_num_gt` | `int` | 正解期間のレコード数 | `fit()` 後 |
-| `record_num_target_org` | `int` | フィルタリング前の分析対象レコード数 | `fit()` 後 |
-| `record_num_target` | `int` | フィルタリング後の分析対象レコード数 | `fit()` 後 |
-| `total_cv_org` | `int` | フィルタリング前の cv 数 | `fit()` 後 |
-| `total_cv` | `int` | フィルタリング後の cv 数 | `fit()` 後 |
+| `record_num` | `int` | 全行動履歴のレコード数（実効サンプル。`fit_rolling()` では延べ） | `fit()` 後 |
+| `record_num_obs` | `int` | 観測期間のレコード数（実効サンプル。`fit_rolling()` では延べ） | `fit()` 後 |
+| `record_num_gt` | `int` | 正解期間のレコード数（実効サンプル。`fit_rolling()` では延べ） | `fit()` 後 |
+| `record_num_target_org` | `int` | フィルタリング前の分析対象レコード数（実効サンプル。`fit_rolling()` では延べ） | `fit()` 後 |
+| `record_num_target` | `int` | フィルタリング後の分析対象レコード数（実効サンプル。`fit_rolling()` では延べ） | `fit()` 後 |
+| `total_cv_org` | `int` | フィルタリング前の cv 数（実効サンプル。`fit_rolling()` では延べ） | `fit()` 後 |
+| `total_cv` | `int` | フィルタリング後の cv 数（実効サンプル。`fit_rolling()` では延べ） | `fit()` 後 |
+| `n_obs_rows_` | `int` | 観測ログの物理ユニーク行数（データセット規模。`fit_rolling()` では観測和集合区間で重複なく計数） | `fit()` 後 |
+| `n_gt_events_` | `int` | 正解ログの物理ユニークイベント数（データセット規模。`fit_rolling()` では正解和集合区間で重複なく計数） | `fit()` 後 |
+| `n_users_` | `int` | 観測ログのユニークユーザ数 | `fit()` 後 |
+| `n_items_` | `int` | 観測ログのユニーク商品数 | `fit()` 後 |
+| `fit_method_` | `str` | 学習方法（`"fit"` / `"fit_rolling"`） | `fit()` 後 |
+| `roll_days_` | `int` | ロール数（`fit()` では `1`、`fit_rolling()` では指定値） | `fit()` 後 |
+| `observation_days_` | `int \| None` | 観測窓幅（`fit()` では `None`、`fit_rolling()` では指定値） | `fit()` 後 |
+| `gt_days_` | `int \| None` | 正解窓幅（`fit()` では `None`、`fit_rolling()` では指定値） | `fit()` 後 |
 
-> **タイミング欄の補足**: 「`fit()` 後」と記載した経験的確率・相関診断・統計属性は `fit_rolling()` 後にも同様に生成される（`fit_rolling()` は内部で `fit()` と同一の集計部を使用する）。`record_num_*` / `total_cv*` は `fit_rolling()` では全ロール集計後の合算値、`observation_end_` は最新ロールの分割点（anchor）、`observation_start_` は最古ロールの観測開始日となる。
+> **タイミング欄の補足**: 「`fit()` 後」と記載した経験的確率・相関診断・統計属性は `fit_rolling()` 後にも同様に生成される（`fit_rolling()` は内部で `fit()` と同一の集計部を使用する）。`record_num_*` / `total_cv*` は実効サンプルサイズ（推定の分母）で、`fit_rolling()` では全ロール集計後の**延べ合算値**となる（重なるロールで物理行が複数回計数される）。データセットの実規模（論文記載用）は物理ユニーク件数 `n_obs_rows_` / `n_gt_events_` / `n_users_` / `n_items_` を参照する（`fit()` では両者は一致、`fit_rolling()` で初めて乖離する）。`observation_end_` は最新ロールの分割点（anchor）、`observation_start_` は最古ロールの観測開始日。正解期間は `observation_end_ + 1` 〜 `observation_end_ + gt_days_`。`anchor` / `end_date` は別属性として保持せず、`observation_end_` と `gt_days_` から導出する。
 
 ## ユーティリティ
 
