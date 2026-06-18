@@ -313,7 +313,7 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 
 ##### `show()`
 
-`fit()` 後の状態を構造化された診断レポートとして標準出力に表示する。以下の4セクションで構成される。
+`fit()` / `fit_rolling()` 後の状態を構造化された診断レポートとして標準出力に表示する。以下の4セクションで構成される。
 
 - **Data**: データセット規模（物理ユニーク: 観測行数・正解イベント数・ユーザ数・商品数）・観測期間・user×item ペア数・対象イベント数（フィルタ前後）。`fit_rolling()` 後は正解期間・ローリング構成・延べレコード数（pooled）の行を追加表示し、user×item ペア数・対象イベント数には「pooled over rolls」を明示
 - **Model**: `recency_limit`・`frequency_limit`
@@ -368,8 +368,8 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 | `total_cv` | `int` | フィルタリング後の cv 数（実効サンプル。`fit_rolling()` では延べ） | `fit()` 後 |
 | `n_obs_rows_` | `int` | 観測ログの物理ユニーク行数（データセット規模。`fit_rolling()` では観測和集合区間で重複なく計数） | `fit()` 後 |
 | `n_gt_events_` | `int` | 正解ログの物理ユニークイベント数（データセット規模。`fit_rolling()` では正解和集合区間で重複なく計数） | `fit()` 後 |
-| `n_users_` | `int` | 観測ログのユニークユーザ数 | `fit()` 後 |
-| `n_items_` | `int` | 観測ログのユニーク商品数 | `fit()` 後 |
+| `n_users_` | `int` | 観測ログのユニークユーザ数（`fit_rolling()` では観測和集合区間） | `fit()` 後 |
+| `n_items_` | `int` | 観測ログのユニーク商品数（`fit_rolling()` では観測和集合区間） | `fit()` 後 |
 | `fit_method_` | `str` | 学習方法（`"fit"` / `"fit_rolling"`） | `fit()` 後 |
 | `roll_days_` | `int` | ロール数（`fit()` では `1`、`fit_rolling()` では指定値） | `fit()` 後 |
 | `observation_days_` | `int \| None` | 観測窓幅（`fit()` では `None`、`fit_rolling()` では指定値） | `fit()` 後 |
