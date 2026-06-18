@@ -236,8 +236,6 @@ class RecencyFrequencyScorer(PlottingMixin):
         if not is_string_dtype(gt_log[self._ITEM_COL]):
             gt_log[self._ITEM_COL] = gt_log[self._ITEM_COL].astype(str)
 
-        self.record_num = len(obs_log) + len(gt_log)
-
         if ref is None:
             ref_int = int(obs_log[self._SEQUENCE_COL].max())
         else:
@@ -267,6 +265,7 @@ class RecencyFrequencyScorer(PlottingMixin):
         """Core fitting logic. obs_log and gt_log must use internal column names."""
         self.record_num_obs = len(obs_log)
         self.record_num_gt = len(gt_log)
+        self.record_num = self.record_num_obs + self.record_num_gt
         self.fit_method_ = "fit"
         self.roll_days_ = 1
         self.observation_days_ = None
@@ -288,6 +287,22 @@ class RecencyFrequencyScorer(PlottingMixin):
         self.n_gt_events_ = len(gt_df)
         self.n_users_ = int(obs_df[self._USER_COL].nunique())
         self.n_items_ = int(obs_df[self._ITEM_COL].nunique())
+
+    def _reset_optimization_results(self):
+        """Invalidate previous optimize() results so a re-fit stays consistent.
+
+        fit() / fit_rolling() recompute the empirical attributes but never
+        re-run optimize(). Clearing the optimization outputs here (the common
+        chokepoint reached once per fit) prevents predict() / transform() /
+        export_probability_csv() with an optimization kind from returning
+        values tied to a stale fit.
+        """
+        self.mono_probability_ = self.mono_probability_table_ = self.mono_probability_dict_ = None
+        self.mrc_probability_ = self.mrc_probability_table_ = self.mrc_probability_dict_ = None
+        self.mfc_probability_ = self.mfc_probability_table_ = self.mfc_probability_dict_ = None
+        self.mcc_probability_ = self.mcc_probability_table_ = self.mcc_probability_dict_ = None
+        self.mr_probability_ = self.mr_probability_dict_ = None
+        self.mf_probability_ = self.mf_probability_dict_ = None
 
     def _build_ui_rf_cv(self, obs_log, gt_log, ref_int):
         """Build per (user, item) recency/frequency with a cv flag for one window.
@@ -313,8 +328,9 @@ class RecencyFrequencyScorer(PlottingMixin):
         fit_rolling(); fit_rolling() passes a frame concatenated across rolls.
         Sets the empirical/er/ef attributes and correlation diagnostics.
         """
+        self._reset_optimization_results()
         self.record_num_target_org = len(df_ui2frc)
-        self.total_cv_org = df_ui2frc.cv.sum()
+        self.total_cv_org = int(df_ui2frc.cv.sum())
 
         if recency_limit is not None:
             self.recency_limit = recency_limit
@@ -359,7 +375,7 @@ class RecencyFrequencyScorer(PlottingMixin):
             & (df_ui2frc.frequency <= self.frequency_limit)
         ]
         self.record_num_target = len(df_ui2frc)
-        self.total_cv = df_ui2frc.cv.sum()
+        self.total_cv = int(df_ui2frc.cv.sum())
 
         self._R = list(range(1, self.recency_limit + 1))
         self._F = list(range(1, self.frequency_limit + 1))
@@ -550,10 +566,17 @@ class RecencyFrequencyScorer(PlottingMixin):
         ``emp_probability_dict_``, ``er_probability_``, ``ef_probability_``,
         ``recency_limit``, ``frequency_limit`` and the correlation
         diagnostics), so predict(), transform(), optimize(), show() and the
-        plot_*() methods behave as after fit(). The record counts
-        (``record_num_*``, ``total_cv*``) are summed across all rolls, and
-        ``observation_end_`` is the anchor while ``observation_start_`` is the
-        oldest roll's observation start.
+        plot_*() methods behave as after fit(). Any optimize() results from a
+        previous fit are cleared, so re-run optimize() after each fit.
+
+        The record counts (``record_num_*``, ``total_cv*``) are summed across
+        all rolls (pooled effective sample size; a physical row may be counted
+        in several overlapping windows). The de-duplicated dataset sizes are in
+        ``n_obs_rows_`` / ``n_gt_events_`` / ``n_users_`` / ``n_items_``.
+        ``observation_end_`` is the anchor; ``observation_start_`` is the oldest
+        roll's observation window start -- a window boundary, which (unlike
+        fit(), where it is the earliest actual record) may precede the first
+        record present in the data.
         """
         if not isinstance(df_obs, pd.DataFrame):
             raise TypeError("df_obs must be a pandas DataFrame.")

@@ -128,6 +128,8 @@ RecencyFrequencyScorer(user_col="user", item_col="item", time_col="datetime", un
 
 戻り値: `self`
 
+> `fit()` / `fit_rolling()` を呼ぶと、経験的確率を再計算するとともに過去の `optimize()` 結果（`mono_*` / `mr_*` / `mf_*` / `mrc_*` / `mfc_*` / `mcc_*`）を `None` にリセットする。再フィット後に最適化確率を使う場合は `optimize()` を再実行する。
+
 ##### `fit_rolling(df_obs, df_gt, observation_days, gt_days, roll_days=1, end_date=None, recency_limit=None, frequency_limit=None, time_col=None)`
 
 分割点（基準日）を1日ずつ過去にずらしながら複数基準日で集計を積み増し、$(r, f)$ 別の経験的商品選択確率を推定する（ローリング集計）。サンプル数を増やして経験的確率を安定化し、基準日固有の偏り（曜日性など）を平滑化する。

@@ -2293,3 +2293,51 @@ class TestDatasetStats:
         assert s.n_gt_events_ == len(gt)
         assert s.n_users_ == obs["user"].nunique()
         assert s.n_items_ == obs["item"].nunique()
+
+    def test_total_cv_is_python_int(self):
+        df = _make_rolling_df()
+        dt = pd.to_datetime(df["datetime"])
+        obs = df[dt <= pd.Timestamp("2024-01-16")]
+        gt = df[dt >= pd.Timestamp("2024-01-17")]
+        s = RecencyFrequencyScorer().fit(
+            obs, gt, ref="2024-01-16", recency_limit=7, frequency_limit=5
+        )
+        assert type(s.total_cv) is int
+        assert type(s.total_cv_org) is int
+        assert type(s.record_num) is int
+
+
+class TestRefitInvalidatesOptimize:
+    def _obs_gt(self):
+        df = _make_rolling_df()
+        dt = pd.to_datetime(df["datetime"])
+        return df[dt <= pd.Timestamp("2024-01-16")], df[dt >= pd.Timestamp("2024-01-17")]
+
+    def test_fit_resets_optimize_results(self):
+        obs, gt = self._obs_gt()
+        s = RecencyFrequencyScorer().fit(
+            obs, gt, ref="2024-01-16", recency_limit=7, frequency_limit=5
+        )
+        s.optimize(kind="mono")
+        s.optimize(kind="mr")
+        assert s.mono_probability_dict_ is not None
+        # 再フィットは古い optimize 結果を無効化しなければならない
+        s.fit(obs, gt, ref="2024-01-16", recency_limit=7, frequency_limit=5)
+        for kind in ("mono", "mr", "mf", "mrc", "mfc", "mcc"):
+            assert getattr(s, f"{kind}_probability_") is None
+            assert getattr(s, f"{kind}_probability_dict_") is None
+        # 再 optimize 前は optimization kind の predict が RuntimeError
+        with pytest.raises(RuntimeError):
+            s.predict(1, 1, kind="mono")
+
+    def test_fit_rolling_resets_optimize_results(self):
+        df = _make_rolling_df()
+        s = RecencyFrequencyScorer().fit_rolling(
+            df, df, 7, 3, roll_days=2, recency_limit=7, frequency_limit=5
+        )
+        s.optimize(kind="mono")
+        assert s.mono_probability_dict_ is not None
+        s.fit_rolling(df, df, 7, 3, roll_days=3, recency_limit=7, frequency_limit=5)
+        assert s.mono_probability_ is None
+        assert s.mono_probability_table_ is None
+        assert s.mono_probability_dict_ is None

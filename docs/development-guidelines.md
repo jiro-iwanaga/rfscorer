@@ -44,7 +44,7 @@
 
 - テストコードは `tests/` に配置する
 - `pytest` を使用する
-- `fit()`・`predict()`・`transform()`・`evaluate()`・`optimize()`・`show()`・`plot_probability_surface()`・`plot_marginal_probability()`・`export_probability_csv()`・`save()`・`load()`・`save_zip()`・`load_zip()` の正常系・異常系をカバーする
+- `fit()`・`fit_rolling()`・`predict()`・`transform()`・`evaluate()`・`optimize()`・`show()`・`plot_probability_surface()`・`plot_marginal_probability()`・`export_probability_csv()`・`save()`・`load()`・`save_zip()`・`load_zip()` の正常系・異常系をカバーする
 - `split_by_date()` ユーティリティの正常系・異常系をカバーする
 
 ## ドキュメント管理
