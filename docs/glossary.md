@@ -15,7 +15,7 @@
 |------|------------|------|
 | ユーザー | user | 行動の主体。`user` カラムで識別する |
 | 商品 | item | 閲覧対象。`item` カラムで識別する |
-| 対象イベント | target event | 推定対象のイベント。再閲覧・購買・CV など。`fit()` 時に `df_gt` で指定 |
+| 対象イベント | target event | 推定対象のイベント。再閲覧・購買・CV など。`fit()` / `fit_rolling()` 時に `df_gt` で指定 |
 | 行動履歴 | behavior history | ユーザーが商品を閲覧した記録の時系列データ。`fit()` に DataFrame として渡す |
 
 ## 期間とデータ分割
@@ -24,8 +24,8 @@
 |------|------------|------|
 | 観測期間 | observation period | 最新度・頻度を計算する期間。`split_by_date()` で `observation_days` パラメータで指定 |
 | 正解期間 | ground truth period | 対象イベントを観測する期間。観測期間の直後に設定。`split_by_date()` で `gt_days` パラメータで指定 |
-| 観測データ | observation data | 観測期間に該当する行動履歴 DataFrame。`fit()` に `df_obs` として渡す |
-| 正解データ | ground truth data | 正解期間に該当するイベント履歴 DataFrame。`fit()` に `df_gt` として渡す |
+| 観測データ | observation data | 観測期間に該当する行動履歴 DataFrame。`fit()` / `fit_rolling()` に `df_obs` として渡す |
+| 正解データ | ground truth data | 正解期間に該当するイベント履歴 DataFrame。`fit()` / `fit_rolling()` に `df_gt` として渡す |
 
 ## アルゴリズム
 

@@ -367,6 +367,8 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 | `total_cv_org` | `int` | フィルタリング前の cv 数 | `fit()` 後 |
 | `total_cv` | `int` | フィルタリング後の cv 数 | `fit()` 後 |
 
+> **タイミング欄の補足**: 「`fit()` 後」と記載した経験的確率・相関診断・統計属性は `fit_rolling()` 後にも同様に生成される（`fit_rolling()` は内部で `fit()` と同一の集計部を使用する）。`record_num_*` / `total_cv*` は `fit_rolling()` では全ロール集計後の合算値、`observation_end_` は最新ロールの分割点（anchor）、`observation_start_` は最古ロールの観測開始日となる。
+
 ## ユーティリティ
 
 ### `split_by_date(df, target_date, observation_days=28, gt_days=7, time_col="datetime")`

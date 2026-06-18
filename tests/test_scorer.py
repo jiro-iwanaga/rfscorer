@@ -2033,7 +2033,10 @@ class TestFitRolling:
         s = RecencyFrequencyScorer().fit_rolling(
             df, df, 7, 3, roll_days=1, recency_limit=7, frequency_limit=5
         )
+        # anchor = gt_max(Jan19) - gt_days(3) = Jan16
         assert s.observation_end_ == pd.Timestamp("2024-01-19").toordinal() - 3
+        # roll_days=1 の観測窓開始 = anchor - observation_days + 1 = Jan10
+        assert s.observation_start_ == pd.Timestamp("2024-01-10").toordinal()
 
     def test_end_date_explicit(self):
         df = _make_rolling_df()
@@ -2121,3 +2124,74 @@ class TestFitRolling:
         gt = _make_rolling_df()[["user", "item"]]
         with pytest.raises(ValueError, match="Missing required columns in df_gt"):
             RecencyFrequencyScorer().fit_rolling(obs, gt, 7, 3, roll_days=1)
+
+    def test_df_obs_missing_column_raises(self):
+        obs = _make_rolling_df()[["user", "datetime"]]  # item 欠落
+        gt = _make_rolling_df()
+        with pytest.raises(ValueError, match="Missing required columns in df_obs"):
+            RecencyFrequencyScorer().fit_rolling(obs, gt, 7, 3, roll_days=1)
+
+    @pytest.mark.parametrize(
+        ("obs_d", "gt_d", "roll_d", "msg"),
+        [
+            (7, 3, 0, "roll_days must be >= 1"),
+            (0, 3, 1, "observation_days must be >= 1"),
+            (7, 0, 1, "gt_days must be >= 1"),
+        ],
+    )
+    def test_invalid_count_params_raise(self, obs_d, gt_d, roll_d, msg):
+        df = _make_rolling_df()
+        with pytest.raises(ValueError, match=msg):
+            RecencyFrequencyScorer().fit_rolling(df, df, obs_d, gt_d, roll_days=roll_d)
+
+    @pytest.mark.parametrize(("bad_obs", "bad_gt"), [(True, False), (False, True)])
+    def test_non_dataframe_raises(self, bad_obs, bad_gt):
+        df = _make_rolling_df()
+        obs = [1, 2, 3] if bad_obs else df
+        gt = [1, 2, 3] if bad_gt else df
+        with pytest.raises(TypeError):
+            RecencyFrequencyScorer().fit_rolling(obs, gt, 7, 3, roll_days=1)
+
+    def test_observation_days_too_long_raises(self):
+        # observation_days がデータ全期間より長く、roll_days=1 でも観測窓を確保できない
+        df = _make_rolling_df()
+        with pytest.raises(ValueError, match="Data range is too short"):
+            RecencyFrequencyScorer().fit_rolling(
+                df, df, observation_days=20, gt_days=3, roll_days=1
+            )
+
+    def test_auto_limits_from_pool(self):
+        # recency_limit / frequency_limit 未指定 → 全ロール集計後のプールから自動決定
+        df = _make_rolling_df()
+        s = RecencyFrequencyScorer().fit_rolling(df, df, 7, 3, roll_days=3)
+        assert isinstance(s.recency_limit, int) and s.recency_limit >= 1
+        assert isinstance(s.frequency_limit, int) and s.frequency_limit >= 1
+
+    def test_rolling_two_rolls_additive(self):
+        # roll_days=2 の N・cv 合計が、各ロール(anchor, anchor-1)の単一 fit 合計と一致
+        df = _make_rolling_df()
+        rl, fl = 7, 5
+        s2 = RecencyFrequencyScorer().fit_rolling(
+            df,
+            df,
+            7,
+            3,
+            roll_days=2,
+            end_date="2024-01-19",
+            recency_limit=rl,
+            frequency_limit=fl,
+        )
+        dt = pd.to_datetime(df["datetime"])
+        n_total = 0
+        cv_total = 0
+        for anchor_str in ["2024-01-16", "2024-01-15"]:  # roll0, roll1
+            anchor = pd.Timestamp(anchor_str)
+            obs_f = df[(dt >= anchor - pd.Timedelta(days=6)) & (dt <= anchor)]
+            gt_f = df[(dt >= anchor + pd.Timedelta(days=1)) & (dt <= anchor + pd.Timedelta(days=3))]
+            s = RecencyFrequencyScorer().fit(
+                obs_f, gt_f, ref=anchor_str, recency_limit=rl, frequency_limit=fl
+            )
+            n_total += s.emp_probability_["N"].sum()
+            cv_total += s.emp_probability_["cv"].sum()
+        assert s2.emp_probability_["N"].sum() == n_total
+        assert s2.emp_probability_["cv"].sum() == cv_total

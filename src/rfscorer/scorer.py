@@ -510,6 +510,18 @@ class RecencyFrequencyScorer(PlottingMixin):
             roll_days are below 1, if end_date exceeds the latest ground truth
             date, or if the oldest roll cannot secure a full observation window
             (the message reports the maximum feasible roll_days).
+
+        Notes
+        -----
+        On success the same attributes as fit() become available
+        (``emp_probability_``, ``emp_probability_table_``,
+        ``emp_probability_dict_``, ``er_probability_``, ``ef_probability_``,
+        ``recency_limit``, ``frequency_limit`` and the correlation
+        diagnostics), so predict(), transform(), optimize(), show() and the
+        plot_*() methods behave as after fit(). The record counts
+        (``record_num_*``, ``total_cv*``) are summed across all rolls, and
+        ``observation_end_`` is the anchor while ``observation_start_`` is the
+        oldest roll's observation start.
         """
         if not isinstance(df_obs, pd.DataFrame):
             raise TypeError("df_obs must be a pandas DataFrame.")
