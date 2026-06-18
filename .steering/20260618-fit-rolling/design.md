@@ -175,7 +175,7 @@ self.record_num_obs = total_obs_rows
 self.record_num_gt = total_gt_rows
 self.record_num = total_obs_rows + total_gt_rows
 self.observation_end_ = anchor
-self.observation_start_ = max(obs_min, oldest_obs_start)
+self.observation_start_ = oldest_obs_start  # fail-fast により oldest_obs_start >= obs_min が保証される
 
 self._aggregate_empirical(combined, recency_limit, frequency_limit)
 return self

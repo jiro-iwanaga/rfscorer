@@ -594,7 +594,8 @@ class RecencyFrequencyScorer(PlottingMixin):
         self.record_num_gt = total_gt_rows
         self.record_num = total_obs_rows + total_gt_rows
         self.observation_end_ = anchor
-        self.observation_start_ = max(obs_min, oldest_obs_start)
+        # The fail-fast check above guarantees oldest_obs_start >= obs_min.
+        self.observation_start_ = oldest_obs_start
 
         self._aggregate_empirical(combined, recency_limit, frequency_limit)
         return self
