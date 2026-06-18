@@ -238,9 +238,10 @@ class RecencyFrequencyScorer(PlottingMixin):
         self._fit_impl(obs_log, gt_log, ref_int, recency_limit, frequency_limit)
         return self
 
-    def _to_internal(self, df):
+    def _to_internal(self, df, time_col=None):
         """Convert a user-facing DataFrame to internal column names and types."""
-        result = df[[self.user_col, self.item_col, self.time_col]].copy()
+        tc = time_col if time_col is not None else self.time_col
+        result = df[[self.user_col, self.item_col, tc]].copy()
         result.columns = [self._USER_COL, self._ITEM_COL, self._SEQUENCE_COL]
         if not is_string_dtype(result[self._USER_COL]):
             result[self._USER_COL] = result[self._USER_COL].astype(str)
@@ -253,15 +254,33 @@ class RecencyFrequencyScorer(PlottingMixin):
         """Core fitting logic. obs_log and gt_log must use internal column names."""
         self.record_num_obs = len(obs_log)
         self.record_num_gt = len(gt_log)
+        df_ui2frc = self._build_ui_rf_cv(obs_log, gt_log, ref_int)
+        self._aggregate_empirical(df_ui2frc, recency_limit, frequency_limit)
 
+    def _build_ui_rf_cv(self, obs_log, gt_log, ref_int):
+        """Build per (user, item) recency/frequency with a cv flag for one window.
+
+        obs_log and gt_log must use internal column names. Returns a DataFrame
+        with columns: user, item, recency, frequency, cv. Shared by fit()
+        (single window) and fit_rolling() (one call per rolling window).
+        """
         UIcv = {(row.user, row.item) for row in gt_log.itertuples()}
-
         df_ui2frc = self._build_ui_rf_df(obs_log, ref_int)
         df_ui2frc["cv"] = (
             pd.MultiIndex.from_frame(df_ui2frc[[self._USER_COL, self._ITEM_COL]])
             .isin(UIcv)
             .astype(int)
         )
+        return df_ui2frc
+
+    def _aggregate_empirical(self, df_ui2frc, recency_limit, frequency_limit):
+        """Aggregate empirical probabilities from a (recency, frequency, cv) frame.
+
+        df_ui2frc must contain at least the columns ``recency``, ``frequency``
+        and ``cv`` (user/item columns are not required). Shared by fit() and
+        fit_rolling(); fit_rolling() passes a frame concatenated across rolls.
+        Sets the empirical/er/ef attributes and correlation diagnostics.
+        """
         self.record_num_target_org = len(df_ui2frc)
         self.total_cv_org = df_ui2frc.cv.sum()
 
@@ -313,13 +332,19 @@ class RecencyFrequencyScorer(PlottingMixin):
         self._R = list(range(1, self.recency_limit + 1))
         self._F = list(range(1, self.frequency_limit + 1))
 
-        self._RF2N = {(r, f): 0.0 for r in self._R for f in self._F}
-        self._RF2CV = {(r, f): 0.0 for r in self._R for f in self._F}
-
-        for row in df_ui2frc.itertuples():
-            self._RF2N[row.recency, row.frequency] += 1
-            if row.cv == 1:
-                self._RF2CV[row.recency, row.frequency] += 1
+        # Vectorized counts of N (pair count) and CV per (recency, frequency).
+        # df_ui2frc is already clamped to the (R, F) grid above; reindex onto the
+        # full grid fills unobserved cells with 0. Equivalent to a per-row loop
+        # but C-level, which matters for fit_rolling() where rows scale with
+        # roll_days.
+        full_index = pd.MultiIndex.from_product([self._R, self._F], names=["recency", "frequency"])
+        grouped = (
+            df_ui2frc.groupby(["recency", "frequency"])
+            .agg(N=("cv", "size"), cv=("cv", "sum"))
+            .reindex(full_index, fill_value=0)
+        )
+        self._RF2N = {rf: float(n) for rf, n in grouped["N"].items()}
+        self._RF2CV = {rf: float(c) for rf, c in grouped["cv"].items()}
 
         RowsRF = []
         for r in self._R:
@@ -414,6 +439,153 @@ class RecencyFrequencyScorer(PlottingMixin):
                     [self._RF2N[(r, f)] for r in rs],
                 )
         self.frequency_slice_corr_ = freq_slice
+
+    def fit_rolling(
+        self,
+        df_obs,
+        df_gt,
+        observation_days,
+        gt_days,
+        roll_days=1,
+        end_date=None,
+        recency_limit=None,
+        frequency_limit=None,
+        time_col=None,
+    ):
+        """Estimate empirical probabilities by rolling the split point over days.
+
+        Aggregates over ``roll_days`` reference dates, rolling the split point
+        one time step into the past per roll, and accumulates the counts. This
+        increases the effective sample size (stabilizing the empirical
+        probabilities) and smooths reference-date-specific bias.
+
+        ``df_obs`` (observation log) and ``df_gt`` (ground truth event log) are
+        kept separate, so the target event in ``df_gt`` may be a different event
+        type (purchase, conversion, etc.) than the views in ``df_obs``. For each
+        roll the observation window is taken from ``df_obs`` and the ground truth
+        window from ``df_gt``. To use a single combined log (re-view case), pass
+        the same DataFrame as both arguments: ``fit_rolling(df, df, ...)``.
+
+        Unlike ``fit()``, ``df_gt`` must contain ``time_col`` because the ground
+        truth window is sliced per roll.
+
+        Parameters
+        ----------
+        df_obs : pd.DataFrame
+            Observation event log (views). Must contain user, item and time_col.
+        df_gt : pd.DataFrame
+            Ground truth event log (re-views, purchases, conversions, etc.).
+            Must contain user, item and time_col.
+        observation_days : int
+            Length of the observation window (in time_col units), per roll.
+        gt_days : int
+            Length of the ground truth window (in time_col units), per roll.
+        roll_days : int, default 1
+            Number of reference dates to aggregate. ``1`` is a single snapshot.
+            ``N`` aggregates the anchor down to anchor-(N-1).
+        end_date : str, datetime, int, or None, default None
+            Last day of usable ground truth data. The most recent ground truth
+            window ends exactly at this date. When None, defaults to the maximum
+            value in ``df_gt[time_col]``. The anchor (most recent split point) is
+            ``end_date - gt_days``.
+        recency_limit : int, optional
+            Maximum recency rank. When None, determined from the pooled (all
+            rolls) cumulative event distribution.
+        frequency_limit : int, optional
+            Maximum frequency. When None, determined from the pooled distribution.
+        time_col : str, optional
+            Time column name. When None, uses the value set in ``__init__``.
+            Applied to both df_obs and df_gt.
+
+        Returns
+        -------
+        self
+
+        Raises
+        ------
+        TypeError
+            If df_obs or df_gt is not a pandas DataFrame.
+        ValueError
+            If required columns are missing, if observation_days / gt_days /
+            roll_days are below 1, if end_date exceeds the latest ground truth
+            date, or if the oldest roll cannot secure a full observation window
+            (the message reports the maximum feasible roll_days).
+        """
+        if not isinstance(df_obs, pd.DataFrame):
+            raise TypeError("df_obs must be a pandas DataFrame.")
+        if not isinstance(df_gt, pd.DataFrame):
+            raise TypeError("df_gt must be a pandas DataFrame.")
+
+        tc = time_col if time_col is not None else self.time_col
+
+        missing_obs = [c for c in [self.user_col, self.item_col, tc] if c not in df_obs.columns]
+        if missing_obs:
+            raise ValueError(f"Missing required columns in df_obs: {missing_obs}")
+        missing_gt = [c for c in [self.user_col, self.item_col, tc] if c not in df_gt.columns]
+        if missing_gt:
+            raise ValueError(f"Missing required columns in df_gt: {missing_gt}")
+
+        if observation_days < 1:
+            raise ValueError(f"observation_days must be >= 1, got {observation_days}.")
+        if gt_days < 1:
+            raise ValueError(f"gt_days must be >= 1, got {gt_days}.")
+        if roll_days < 1:
+            raise ValueError(f"roll_days must be >= 1, got {roll_days}.")
+
+        obs_internal = self._to_internal(df_obs, time_col=tc)
+        gt_internal = self._to_internal(df_gt, time_col=tc)
+        obs_seq = obs_internal[self._SEQUENCE_COL]
+        gt_seq = gt_internal[self._SEQUENCE_COL]
+        obs_min = int(obs_seq.min())
+        gt_max = int(gt_seq.max())
+
+        end_int = gt_max if end_date is None else normalize_ref(end_date)
+        anchor = end_int - gt_days
+
+        # Fail-fast: validate before any window slicing or aggregation begins.
+        if end_date is not None and end_int > gt_max:
+            raise ValueError(
+                f"end_date ({end_int}) exceeds the latest ground-truth date "
+                f"({gt_max}); the most recent ground-truth window would extend "
+                f"beyond available df_gt data."
+            )
+
+        oldest_obs_start = anchor - (roll_days - 1) - observation_days + 1
+        if oldest_obs_start < obs_min:
+            max_roll_days = anchor - obs_min - observation_days + 2
+            if max_roll_days < 1:
+                raise ValueError(
+                    f"Data range is too short for observation_days={observation_days} "
+                    f"and gt_days={gt_days}: even roll_days=1 cannot secure a full "
+                    f"observation window (anchor={anchor}, obs_min={obs_min})."
+                )
+            raise ValueError(
+                f"roll_days={roll_days} exceeds available observation history. "
+                f"Maximum feasible roll_days is {max_roll_days} "
+                f"(anchor={anchor}, obs_min={obs_min}, observation_days={observation_days})."
+            )
+
+        frames = []
+        total_obs_rows = 0
+        total_gt_rows = 0
+        for k in range(roll_days):
+            td = anchor - k
+            obs_w = obs_internal[(obs_seq >= td - observation_days + 1) & (obs_seq <= td)]
+            gt_w = gt_internal[(gt_seq >= td + 1) & (gt_seq <= td + gt_days)]
+            total_obs_rows += len(obs_w)
+            total_gt_rows += len(gt_w)
+            # cv flag no longer needs user/item; keep 3 columns to bound concat memory.
+            frames.append(self._build_ui_rf_cv(obs_w, gt_w, td)[["recency", "frequency", "cv"]])
+        combined = pd.concat(frames, ignore_index=True)
+
+        self.record_num_obs = total_obs_rows
+        self.record_num_gt = total_gt_rows
+        self.record_num = total_obs_rows + total_gt_rows
+        self.observation_end_ = anchor
+        self.observation_start_ = max(obs_min, oldest_obs_start)
+
+        self._aggregate_empirical(combined, recency_limit, frequency_limit)
+        return self
 
     # ---------------------------------------------------------------------------
     # Optimization (単調性制約付き再推定)

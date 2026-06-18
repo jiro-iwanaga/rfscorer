@@ -128,6 +128,28 @@ RecencyFrequencyScorer(user_col="user", item_col="item", time_col="datetime", un
 
 戻り値: `self`
 
+##### `fit_rolling(df_obs, df_gt, observation_days, gt_days, roll_days=1, end_date=None, recency_limit=None, frequency_limit=None, time_col=None)`
+
+分割点（基準日）を1日ずつ過去にずらしながら複数基準日で集計を積み増し、$(r, f)$ 別の経験的商品選択確率を推定する（ローリング集計）。サンプル数を増やして経験的確率を安定化し、基準日固有の偏り（曜日性など）を平滑化する。
+
+`df_obs`（観測ログ）と `df_gt`（正解ログ）は別々に受け取るため、`df_gt` の対象イベントは再閲覧だけでなく購買・CV など `df_obs` と別種のイベントでもよい。各ロールで観測窓は `df_obs` から、正解窓は `df_gt` から独立に切り出す。同一ログを使う（再閲覧）場合は `fit_rolling(df, df, ...)` と同じ DataFrame を両方に渡す。`fit()` と異なり、ロールごとに正解窓を切るため **`df_gt` にも `time_col` が必須**となる。
+
+| パラメータ | 型 | デフォルト | 説明 |
+|-----------|-----|-----------|------|
+| `df_obs` | `pd.DataFrame` | — | 観測イベントの行動履歴（閲覧）。`time_col` 必須 |
+| `df_gt` | `pd.DataFrame` | — | 正解イベントの履歴（再閲覧・購買・CV など）。`time_col` 必須 |
+| `observation_days` | `int` | — | 観測期間の長さ（time_col の単位）。各ロールの観測窓幅 |
+| `gt_days` | `int` | — | 正解期間の長さ（time_col の単位）。各ロールの正解窓幅 |
+| `roll_days` | `int` | `1` | ローリング回数。`1` で単一スナップショット。`N` で起点〜起点$-(N-1)$ の N 基準日を集計 |
+| `end_date` | `str \| datetime \| int \| None` | `None` | 使用する正解データの最終日。`None` の場合は `df_gt[time_col]` の最大値を使用。最新ロールの分割点（anchor）は `end_date - gt_days` |
+| `recency_limit` | `int \| None` | `None` | 最大最新度。`None` の場合、全ロール集計後のプールから自動決定 |
+| `frequency_limit` | `int \| None` | `None` | 最大頻度。`None` の場合、全ロール集計後のプールから自動決定 |
+| `time_col` | `str \| None` | `None` | 時点カラム名。省略時は `__init__` の値。`df_obs`・`df_gt` 双方に適用 |
+
+各ロール `k`（`0 ≤ k < roll_days`）で分割点 `td = anchor - k`（過去方向）とし、観測窓 `[td - observation_days + 1, td]`・正解窓 `[td + 1, td + gt_days]` を切り出して集計を積み増す。集計開始前に、最古ロールが完全な観測窓を確保できない場合は `ValueError`（確保可能な最大 `roll_days` を提示）、`end_date` が正解データ最終日を超える場合も `ValueError` を送出する（fail-fast）。
+
+戻り値: `self`。`fit()` と同一の属性（`emp_probability_` 等）を生成し、後続の `predict` / `transform` / `optimize` / `plot_*` をそのまま利用できる。
+
 ##### `predict(r, f, kind="emp")`
 
 指定した最新度 $r$・頻度 $f$ の商品選択確率を返す。
@@ -373,8 +395,10 @@ flowchart TD
     OBS[df_obs 観測データ]
     GT[df_gt 正解データ]
     OBS & GT --> FIT["fit(df_obs, df_gt)<br/>正規化・期間フィルタ・r/f 算出・集計"]
+    OBS & GT --> FITR["fit_rolling(df_obs, df_gt, ...)<br/>基準日を1日ずつずらし<br/>ローリング窓フィルタ・集計を積み増し"]
 
     FIT --> EMP[経験的確率<br/>emp / er / ef + 相関診断]
+    FITR --> EMP
 
     EMP --> PRED["predict(r, f, kind)"]
     EMP --> TRANS["transform(df, ref, kind)"]

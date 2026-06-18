@@ -35,6 +35,7 @@
 |------|------------|------|
 | RF | Recency-Frequency | 最新度と頻度の2つの行動シグナル。Random Forest ではない |
 | RF スコアリング | RF scoring | 最新度と頻度から商品選択確率を推定する解釈可能な推薦スコアリング手法 |
+| ローリング集計 | rolling aggregation | 分割点（基準日）を1日ずつ過去にずらしながら複数基準日で $n_{r,f}$・$N_{r,f}$ を積み増す集計。サンプル増による経験的確率の安定化と基準日バイアスの平滑化を目的とする。`fit_rolling()` が実装 |
 | 最新度 | recency / $r$ | 最後の閲覧からの経過時間を整数化したもの。1 が最も直近。$r \in R$ |
 | 頻度 | frequency / $f$ | 観測期間における閲覧回数。$f \in F$ |
 
@@ -85,6 +86,7 @@
 |------|------|
 | `RecencyFrequencyScorer` | RF スコアリングの主クラス。コンストラクタで列名・粒度 `unit` を指定 |
 | `fit(df_obs, df_gt, ref, recency_limit, frequency_limit)` | 観測データと正解データから経験的商品選択確率を推定する |
+| `fit_rolling(df_obs, df_gt, observation_days, gt_days, roll_days, end_date)` | 基準日を1日ずつ過去にずらしながら複数基準日で集計を積み増し、経験的商品選択確率を推定する（ローリング集計） |
 | `transform(df, ref, kind)` | 行動履歴 DataFrame に最新度・頻度・確率・順位を付与する |
 | `optimize(kind, eps, verbose)` | RF 制約付き凸2次計画問題を解いて最適化確率を推定する |
 | `predict(r, f, kind)` | 指定した最新度・頻度の商品選択確率を返す |

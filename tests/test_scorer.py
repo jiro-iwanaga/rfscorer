@@ -1938,3 +1938,186 @@ class TestSliceCorrelation:
         non_nan = {k: v for k, v in scorer_slice.frequency_slice_corr_.items() if not math.isnan(v)}
         assert len(non_nan) > 0
         assert all(v < 0 for v in non_nan.values())
+
+
+# ---------------------------------------------------------------------------
+# fit_rolling: ローリング集計
+#
+# ローリング用データ: 2024-01-02 〜 2024-01-19 の日次行動
+# obs_min = Jan02, gt_max = Jan19
+# ---------------------------------------------------------------------------
+
+
+def _make_rolling_df():
+    rows = []
+    for d in ["2024-01-02", "2024-01-05", "2024-01-08", "2024-01-11", "2024-01-14", "2024-01-17"]:
+        rows.append(("u1", "item1", d))
+    for d in ["2024-01-03", "2024-01-09", "2024-01-15"]:
+        rows.append(("u2", "item2", d))
+    for d in ["2024-01-06", "2024-01-12", "2024-01-18"]:
+        rows.append(("u3", "item3", d))
+    for d in ["2024-01-04", "2024-01-07", "2024-01-10", "2024-01-13", "2024-01-16", "2024-01-19"]:
+        rows.append(("u1", "item2", d))
+    return pd.DataFrame(rows, columns=["user", "item", "datetime"])
+
+
+class TestFitRolling:
+    def test_roll_days_1_equiv_manual_fit(self):
+        df = _make_rolling_df()
+        obs_days, gt_days = 7, 3
+        s_roll = RecencyFrequencyScorer().fit_rolling(
+            df,
+            df,
+            obs_days,
+            gt_days,
+            roll_days=1,
+            end_date="2024-01-19",
+            recency_limit=7,
+            frequency_limit=5,
+        )
+        # anchor = Jan19 - gt_days(3) = Jan16
+        anchor = pd.Timestamp("2024-01-16")
+        obs_start = anchor - pd.Timedelta(days=obs_days - 1)  # Jan10
+        gt_start = anchor + pd.Timedelta(days=1)  # Jan17
+        gt_end = anchor + pd.Timedelta(days=gt_days)  # Jan19
+        dt = pd.to_datetime(df["datetime"])
+        obs_f = df[(dt >= obs_start) & (dt <= anchor)]
+        gt_f = df[(dt >= gt_start) & (dt <= gt_end)]
+        s_fit = RecencyFrequencyScorer().fit(
+            obs_f, gt_f, ref="2024-01-16", recency_limit=7, frequency_limit=5
+        )
+        pd.testing.assert_frame_equal(
+            s_roll.emp_probability_.reset_index(drop=True),
+            s_fit.emp_probability_.reset_index(drop=True),
+        )
+
+    def test_rolling_accumulates_N(self):
+        df = _make_rolling_df()
+        s1 = RecencyFrequencyScorer().fit_rolling(
+            df, df, 7, 3, roll_days=1, recency_limit=7, frequency_limit=5
+        )
+        s3 = RecencyFrequencyScorer().fit_rolling(
+            df, df, 7, 3, roll_days=3, recency_limit=7, frequency_limit=5
+        )
+        assert s3.emp_probability_["N"].sum() > s1.emp_probability_["N"].sum()
+
+    def test_gt_distinct_event(self):
+        obs = pd.DataFrame(
+            [
+                ("u1", "A", "2024-01-10"),
+                ("u1", "A", "2024-01-13"),
+                ("u2", "B", "2024-01-12"),
+            ],
+            columns=["user", "item", "datetime"],
+        )
+        gt = pd.DataFrame(
+            [("u1", "A", "2024-01-17")],  # 別イベント(購買)ログ
+            columns=["user", "item", "datetime"],
+        )
+        s = RecencyFrequencyScorer().fit_rolling(
+            obs,
+            gt,
+            observation_days=5,
+            gt_days=3,
+            roll_days=1,
+            recency_limit=10,
+            frequency_limit=5,
+        )
+        # end_date 既定=gt_max(Jan17) → anchor=Jan14
+        # u1-A: recency=2 freq=2 cv=1 / u2-B: recency=3 freq=1 cv=0
+        assert s.predict(2, 2, kind="emp") == 1.0
+        assert s.predict(3, 1, kind="emp") == 0.0
+
+    def test_end_date_default_uses_gt_max(self):
+        df = _make_rolling_df()
+        s = RecencyFrequencyScorer().fit_rolling(
+            df, df, 7, 3, roll_days=1, recency_limit=7, frequency_limit=5
+        )
+        assert s.observation_end_ == pd.Timestamp("2024-01-19").toordinal() - 3
+
+    def test_end_date_explicit(self):
+        df = _make_rolling_df()
+        s = RecencyFrequencyScorer().fit_rolling(
+            df,
+            df,
+            7,
+            3,
+            roll_days=1,
+            end_date="2024-01-15",
+            recency_limit=7,
+            frequency_limit=5,
+        )
+        assert s.observation_end_ == pd.Timestamp("2024-01-15").toordinal() - 3
+
+    def test_roll_days_too_large_raises(self):
+        df = _make_rolling_df()
+        with pytest.raises(ValueError, match="Maximum feasible roll_days is 9"):
+            RecencyFrequencyScorer().fit_rolling(df, df, 7, 3, roll_days=10)
+
+    def test_end_date_beyond_gt_max_raises(self):
+        df = _make_rolling_df()
+        with pytest.raises(ValueError, match="exceeds the latest ground-truth date"):
+            RecencyFrequencyScorer().fit_rolling(df, df, 7, 3, roll_days=1, end_date="2024-01-25")
+
+    def test_integer_time_col(self):
+        rows = [("u1", "A", t) for t in [1, 3, 5, 7, 9]]
+        rows += [("u2", "B", t) for t in [2, 6, 10]]
+        df = pd.DataFrame(rows, columns=["user", "item", "t"])
+        s = RecencyFrequencyScorer(time_col="t").fit_rolling(
+            df,
+            df,
+            observation_days=3,
+            gt_days=2,
+            roll_days=1,
+            recency_limit=5,
+            frequency_limit=3,
+        )
+        assert s.emp_probability_ is not None
+
+    def test_datetime_time_col(self):
+        df = _make_rolling_df()
+        df = df.assign(datetime=pd.to_datetime(df["datetime"]))
+        s = RecencyFrequencyScorer().fit_rolling(
+            df, df, 7, 3, roll_days=2, recency_limit=7, frequency_limit=5
+        )
+        assert s.emp_probability_ is not None
+
+    def test_time_col_override(self):
+        df = _make_rolling_df().rename(columns={"datetime": "ts"})
+        s = RecencyFrequencyScorer().fit_rolling(
+            df,
+            df,
+            7,
+            3,
+            roll_days=1,
+            end_date="2024-01-19",
+            recency_limit=7,
+            frequency_limit=5,
+            time_col="ts",
+        )
+        assert s.emp_probability_ is not None
+
+    def test_same_log_df_df(self):
+        df = _make_rolling_df()
+        s = RecencyFrequencyScorer().fit_rolling(
+            df, df, 7, 3, roll_days=3, recency_limit=7, frequency_limit=5
+        )
+        assert s.emp_probability_["N"].sum() > 0
+
+    def test_downstream_after_rolling(self):
+        df = _make_rolling_df()
+        s = RecencyFrequencyScorer().fit_rolling(
+            df, df, 7, 3, roll_days=3, recency_limit=7, frequency_limit=5
+        )
+        assert isinstance(s.predict(1, 1, kind="emp"), float)
+        out = s.transform(df, ref="2024-01-16")
+        assert isinstance(out, pd.DataFrame)
+        s.optimize(kind="mono")
+        assert s.mono_probability_ is not None
+        s.show()
+
+    def test_df_gt_missing_time_col_raises(self):
+        obs = _make_rolling_df()
+        gt = _make_rolling_df()[["user", "item"]]
+        with pytest.raises(ValueError, match="Missing required columns in df_gt"):
+            RecencyFrequencyScorer().fit_rolling(obs, gt, 7, 3, roll_days=1)
