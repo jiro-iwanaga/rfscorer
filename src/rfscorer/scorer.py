@@ -1471,8 +1471,12 @@ class RecencyFrequencyScorer(PlottingMixin):
             f" → {self._fmt_ordinal(self.observation_end_)}"
         )
         if rolling:
+            # Ground-truth coverage is the union of all rolls' gt windows
+            # [anchor - roll_days + 2, anchor + gt_days], matching n_gt_events_
+            # and consistent with the observation line (also a union span).
             print(
-                f"  ground truth     : {self._fmt_ordinal(self.observation_end_ + 1)}"
+                f"  ground truth     : "
+                f"{self._fmt_ordinal(self.observation_end_ - self.roll_days_ + 2)}"
                 f" → {self._fmt_ordinal(self.observation_end_ + self.gt_days_)}"
             )
             print(

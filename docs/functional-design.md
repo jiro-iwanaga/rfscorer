@@ -375,7 +375,7 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 | `observation_days_` | `int \| None` | 観測窓幅（`fit()` では `None`、`fit_rolling()` では指定値） | `fit()` 後 |
 | `gt_days_` | `int \| None` | 正解窓幅（`fit()` では `None`、`fit_rolling()` では指定値） | `fit()` 後 |
 
-> **タイミング欄の補足**: 「`fit()` 後」と記載した経験的確率・相関診断・統計属性は `fit_rolling()` 後にも同様に生成される（`fit_rolling()` は内部で `fit()` と同一の集計部を使用する）。`record_num_*` / `total_cv*` は実効サンプルサイズ（推定の分母）で、`fit_rolling()` では全ロール集計後の**延べ合算値**となる（重なるロールで物理行が複数回計数される）。データセットの実規模（論文記載用）は物理ユニーク件数 `n_obs_rows_` / `n_gt_events_` / `n_users_` / `n_items_` を参照する（`fit()` では両者は一致、`fit_rolling()` で初めて乖離する）。`observation_end_` は最新ロールの分割点（anchor）、`observation_start_` は最古ロールの観測開始日。正解期間は `observation_end_ + 1` 〜 `observation_end_ + gt_days_`。`anchor` / `end_date` は別属性として保持せず、`observation_end_` と `gt_days_` から導出する。
+> **タイミング欄の補足**: 「`fit()` 後」と記載した経験的確率・相関診断・統計属性は `fit_rolling()` 後にも同様に生成される（`fit_rolling()` は内部で `fit()` と同一の集計部を使用する）。`record_num_*` / `total_cv*` は実効サンプルサイズ（推定の分母）で、`fit_rolling()` では全ロール集計後の**延べ合算値**となる（重なるロールで物理行が複数回計数される）。データセットの実規模（論文記載用）は物理ユニーク件数 `n_obs_rows_` / `n_gt_events_` / `n_users_` / `n_items_` を参照する（`fit()` では両者は一致、`fit_rolling()` で初めて乖離する）。`observation_end_` は最新ロールの分割点（anchor）、`observation_start_` は最古ロールの観測開始日（観測和集合 `[observation_start_, observation_end_]`）。正解和集合は `observation_end_ - roll_days_ + 2` 〜 `observation_end_ + gt_days_`（`show()` の ground truth 行・`n_gt_events_` の計数範囲はこれ）。`anchor` / `end_date` は別属性として保持せず、`observation_end_` と `gt_days_` / `roll_days_` から導出する。
 
 ## ユーティリティ
 

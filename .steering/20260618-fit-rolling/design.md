@@ -344,7 +344,7 @@ def _set_dataset_stats(self, obs_df, gt_df):
   dataset          : obs {n_obs_rows_} rows, gt {n_gt_events_} events
                      (users: {n_users_}, items: {n_items_})
   observation      : {start} → {end=anchor}
-  ground truth     : {anchor+1} → {end_int}            ← fit_rolling 時のみ
+  ground truth     : {anchor-roll_days+2} → {end_int}  ← fit_rolling 時のみ（正解和集合・n_gt_events_ と整合）
   rolling          : roll_days={roll_days_}, obs_window={observation_days_}, gt_window={gt_days_}  ← fit_rolling 時のみ
   user×item pairs  : {target_org} → {target}   (before → after limits; pooled over R rolls)
   target events    : {total_cv_org} → {total_cv}  (before → after limits; pooled over R rolls)
