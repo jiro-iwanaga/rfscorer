@@ -104,6 +104,7 @@ Each surface reflects different assumptions about **recency** (time since a user
 
 - [examples/tutorial_beginner_en.ipynb](examples/tutorial_beginner_en.ipynb) — end-to-end walkthrough: load data, fit, optimize, visualize, transform, and evaluate recommendation quality (precision, recall, F1 at each rank cutoff)
 - [examples/tutorial_practical_en.ipynb](examples/tutorial_practical_en.ipynb) — practical workflow: user-level train/test split, build all 9 models, compare accuracy, and save/load models (pickle and zip archive)
+- [examples/tutorial_advanced_fit_rolling_en.ipynb](examples/tutorial_advanced_fit_rolling_en.ipynb) — advanced workflow: time-series rolling training with `fit_rolling()`, which aggregates over multiple rolling reference dates to stabilize empirical probabilities and reduce reference-date bias.
 
 ## References
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
@@ -264,6 +265,7 @@ scorer.plot_probability_surface(kind="mcc")
 
 - [examples/tutorial_beginner_ja.ipynb](examples/tutorial_beginner_ja.ipynb) — データロードからモデル構築、最適化、可視化、推薦スコア算出、推薦品質の評価までのコードを紹介します。
 - [examples/tutorial_practical_ja.ipynb](examples/tutorial_practical_ja.ipynb) — 実践的なワークフロー：ユーザー単位の訓練・テスト分割、全9種のモデル構築と精度比較、モデルの保存・ロード（pickle・zip アーカイブ）までを紹介します。
+- [examples/tutorial_advanced_fit_rolling_ja.ipynb](examples/tutorial_advanced_fit_rolling_ja.ipynb) — 応用編：`fit_rolling()` による時系列ローリング学習を紹介します。複数の基準日でローリング集計することで経験的商品選択確率を安定させ、基準日固有のバイアスを軽減します。
 
 ## 参考文献
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, "Estimating product-choice probabilities from recency and frequency of page views," Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
