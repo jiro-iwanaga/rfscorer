@@ -37,7 +37,7 @@
 | RF スコアリング | RF scoring | 最新度と頻度から商品選択確率を推定する解釈可能な推薦スコアリング手法 |
 | ローリング集計 | rolling aggregation | 分割点（基準日）を1日ずつ過去にずらしながら複数基準日で $n_{r,f}$・$N_{r,f}$ を積み増す集計。サンプル増による経験的確率の安定化と基準日バイアスの平滑化を目的とする。`fit_rolling()` が実装 |
 | 最新度 | recency / $r$ | 最後の接触からの経過時間を整数化したもの。1 が最も直近。$r \in R$ |
-| 頻度 | frequency / $f$ | 観測期間における閲覧回数。$f \in F$ |
+| 頻度 | frequency / $f$ | 観測期間における接触回数。$f \in F$ |
 | 実効サンプルサイズ（延べ） | effective / pooled sample size | 経験的確率の分母となる延べ件数。`fit_rolling()` では重なるロールで物理行が複数回計数される。属性: `record_num*`・`total_cv*` |
 | データセット規模（物理ユニーク） | physical / unique dataset size | 和集合区間で重複なく数えた実件数。論文記載用のデータ数。属性: `n_obs_rows_`・`n_gt_events_`・`n_users_`・`n_items_` |
 
