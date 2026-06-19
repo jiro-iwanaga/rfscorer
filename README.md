@@ -30,8 +30,7 @@ pip install rfscorer
 
 ## Usage
 
-Below is a minimal example of building a model and scoring recommendations from a behavior history.
-For complete, working code, see [Examples](#examples).
+Below is a minimal example of building a model and scoring recommendations from a behavior history (for complete, runnable code, see [Examples](#examples)).
 
 ### Minimal Example
 
@@ -192,10 +191,9 @@ pip install rfscorer
 
 ## 使い方
 
-以下は、行動履歴からモデル構築と推薦スコア（商品選択確率）の算出までを行う最小限の例です。
-動作するコードについては、[サンプル](#サンプル)を参照してください。
+以下は、行動履歴からモデル構築と推薦スコア（商品選択確率）算出までを行う最小限の例です（実行可能な完全版は[サンプル](#サンプル)を参照）。
 
-### 最小実行
+### 最小限の例
 
 ```python
 import pandas as pd
