@@ -10,7 +10,7 @@
 
 It estimates recommendation scores (product-choice probabilities) for items a user has interacted with, based on two signals: **recency** (time since last interaction) and **frequency** (number of interactions). You can choose any event as the prediction target (revisits, purchases, conversions, etc.).
 
-The package is useful not only for interpretable product recommendations, but also as input to downstream systems — as a rating matrix for collaborative filtering or as features for ML models.
+The package is useful not only for recommending items a user has interacted with in natural order based on product-choice probabilities, but also as input to downstream systems — as a rating matrix for collaborative filtering or as features for ML models.
 
 > Note: In this package, **RF** stands for **Recency-Frequency**, not Random Forest.
 
@@ -21,7 +21,6 @@ The package is useful not only for interpretable product recommendations, but al
 - **Explainable** — probabilities are optimized under RF monotonicity constraints; 3D visualization for intuitive understanding
 - **Calibration-free** — probabilities are computed directly from recency and frequency, no calibration needed
 - **Probabilistic output** — expected value calculations (e.g., revenue) are straightforward
-- **Extensible** — scores can be used as a rating matrix for collaborative filtering or as ML features
 
 ## Installation
 
@@ -171,7 +170,7 @@ MIT License
 
 ユーザーの行動履歴から、ユーザーが過去に接触した商品の推薦スコア（商品選択確率）を推定します。スコアは、**最新度（recency）**（ユーザーが商品に最後に接触してからの経過時間）と **頻度（frequency）**（接触の回数）に基づいて計算されます。予測対象のイベント（再閲覧、購買、コンバージョンなど）は自由に設定できます。
 
-本パッケージは、解釈可能な商品推薦ができるだけでなく、後段に続く推薦システムの入力（協調フィルタリングの評価値行列や機械学習モデルの特徴量）に有用です。
+本パッケージは、ユーザーが過去に接触した商品を商品選択確率に基づく自然な順序で推薦できるだけでなく、推薦システムの入力（協調フィルタリングの評価値行列や機械学習モデルの特徴量）にも有用です。
 
 > 注：本パッケージにおいて **RF** は **Recency-Frequency（最新度・頻度）** を意味し、Random Forest（ランダムフォレスト）ではありません。
 
@@ -182,7 +181,6 @@ MIT License
 - **説明可能性** — RF単調性制約のもとで最適化された商品選択確率は説明が容易。可視化により直感的な理解を支援
 - **キャリブレーション不要** — 一般的な機械学習と異なり、商品選択確率がRecencyとFrequencyから直接計算されるため補正が不要
 - **確率的な出力** — 商品選択確率を用いるため収益などの期待値計算が容易
-- **応用性** — 推薦スコア（商品選択確率）は、協調フィルタリングの評価値行列や機械学習モデルの特徴量として直接利用可能
 
 ## インストール
 
