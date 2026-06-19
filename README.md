@@ -102,9 +102,9 @@ Each surface reflects different assumptions about **recency** (time since a user
 
 ## Examples
 
-- [examples/tutorial_beginner_en.ipynb](examples/tutorial_beginner_en.ipynb) — end-to-end walkthrough: load data, fit, optimize, visualize, transform, and evaluate recommendation quality (precision, recall, F1 at each rank cutoff)
-- [examples/tutorial_practical_en.ipynb](examples/tutorial_practical_en.ipynb) — practical workflow: user-level train/test split, build all 9 models, compare accuracy, and save/load models (pickle and zip archive)
-- [examples/tutorial_advanced_fit_rolling_en.ipynb](examples/tutorial_advanced_fit_rolling_en.ipynb) — advanced workflow: time-series rolling training with `fit_rolling()`, which aggregates over multiple rolling reference dates to stabilize empirical probabilities and reduce reference-date bias.
+- [examples/tutorial_beginner_en.ipynb](examples/tutorial_beginner_en.ipynb) — end-to-end walkthrough: load data, fit, optimize, visualize, transform, and evaluate
+- [examples/tutorial_practical_en.ipynb](examples/tutorial_practical_en.ipynb) — practical workflow: chronological train/test split, build all 9 models, compare accuracy, and save/load the model
+- [examples/tutorial_advanced_fit_rolling_en.ipynb](examples/tutorial_advanced_fit_rolling_en.ipynb) — advanced workflow: time-series rolling training with `fit_rolling()` to stabilize empirical probabilities across multiple reference dates
 
 ## References
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
@@ -169,20 +169,20 @@ MIT License
 
 `rfscorer` は、Recency-Frequency（最新度・頻度）に基づく商品推薦スコアリングを提供する Python パッケージです。
 
-ユーザーとアイテムのペアごとの選好スコア（**商品選択確率**による評価値行列と等価）を、ユーザーの行動履歴から推定します。スコアは、**最新度（recency）**（ユーザーがアイテムに最後に接触してからの経過時間）と **頻度（frequency）**（接触の回数）に基づいて計算されます。予測対象のイベント（再閲覧、購買、コンバージョンなど）は評価データを通じて自由に設定できます。
+ユーザーの行動履歴から、ユーザーが過去に閲覧した商品の推薦スコア（商品選択確率）を推定します。スコアは、**最新度（recency）**（ユーザーが商品に最後に接触してからの経過時間）と **頻度（frequency）**（接触の回数）に基づいて計算されます。予測対象のイベント（再閲覧、購買、コンバージョンなど）は自由に設定できます。
 
-本パッケージは、商品推薦を目的としており、特に「ブラックボックスなモデルではなく、行動履歴に基づく解釈可能な商品推薦」を重視する場合に有用です。
+本パッケージは、解釈可能な商品推薦ができるだけでなく、後段に続く推薦システムの入力（協調フィルタリングの評価値行列や機械学習モデルの特徴量）に有用です。
 
 > 注：本パッケージにおいて **RF** は **Recency-Frequency（最新度・頻度）** を意味し、Random Forest（ランダムフォレスト）ではありません。
 
 ## 特徴
 
-- **scikit-learn ライクの API** — 一般的な機械学習パッケージが提供する`fit()` / `transform()` によるインターフェースを提供します。
-- **最小限のデータ要件** — `user`、`item`、`datetime` の3列があればどんな行動履歴でも動作します。明示的フィードバックも設定可能です。
-- **説明可能な推薦スコア** — 商品選択確率は Recency-Frequency 単調性制約のもとで最適化された値のため説明が容易です。さらに3Dサーフェスによる可視化により直感的な理解を支援します。
-- **確率的な出力** — 商品選択確率を推薦スコアとして利用でき、期待値計算や確率に基づく推薦順序付けが可能です。
-- **拡張性** — 各種モデルが予測する商品選択確率は、協調フィルタリングの評価値行列や機械学習モデルの特徴量として直接利用できます。
-- **キャリブレーション不要の確率値** — 商品選択確率は最新度と頻度から直接計算されるため、一般的な機械学習モデルと異なりキャリブレーション不要で、信頼性が高く解釈しやすい値となります。
+- **scikit-learn ライク** — 一般的な機械学習ライブラリが提供する`fit()` / `transform()` によるインターフェースを提供
+- **最小のデータ要件** — `user`、`item`、`datetime` の３カラムをもつ行動履歴で動作
+- **説明可能性** — RF単調性制約のもとで最適化された商品選択確率は説明が容易。可視化により直感的な理解を支援
+- **キャリブレーション不要** — 一般的な機械学習と異なり、商品選択確率がRecencyとFrequencyから直接計算されるため補正が不要
+- **確率的な出力** — 商品選択確率を用いるため収益などの期待値計算が容易
+- **応用性** — 推薦スコア（商品選択確率）は、協調フィルタリングの評価値行列や機械学習モデルの特徴量として直接利用可能
 
 ## インストール
 
@@ -227,7 +227,7 @@ df_scores = scorer.transform(df_test_obs, target_date, kind="mono")
 | u_002  | i_011  |       1 |         2 |      0.0621 |     1 |
 | u_002  | i_058  |       4 |         1 |      0.0182 |     2 |
 
-`probability` スコアが推薦順位を決定します。各ユーザーに対して、商品選択確率の高い順にアイテムを推薦します。各スコアが確率値であるため、期待値計算(例：推薦結果に対する期待収益の計算)も可能です。`order` 列を使えば、業務ルール(例：「各ユーザーに上位2個の商品を推薦する」)を簡単に実装できます。
+各ユーザーに対して、商品選択確率（`probability` ）の高い順に商品を推薦します。推薦スコアが確率値であるため、期待値計算(例：推薦結果に対する期待収益の計算)が容易です。`order` 列を使えば、業務ルール(例：「各ユーザーに上位2個の商品を推薦する」)を簡単に実装できます。
 
 ### 可視化：最適化手法の比較
 本パッケージは多くの最適化アプローチをサポートしています。ここでは代表的な3つの手法を可視化します。
@@ -255,17 +255,17 @@ scorer.plot_probability_surface(kind="mcc")
   </tr>
 </table>
 
-各グラフ、**最新度（recency）**（ユーザーが商品に接触してからの経過時間）と **頻度（frequency）**（接触回数）について、それぞれ異なる仮定を反映しています：
+各グラフの**最新度（recency）**（ユーザーが商品に接触してからの経過時間）と **頻度（frequency）**（接触回数）は次の仮定を反映しています：
 
-- **Empirical（生データによる集計）**: 制約なしの生の商品選択確率。ノイズを含み、単調性を満たさない場合があり、商品を不自然な順序で推薦してしまうことがあります。
-- **Monotonicity（単調性）**: 単調性制約を適用し、商品が自然で安定した順序で推薦されることを保証します。
-- **Monotonicity-Convex-Concave（単調性＋凸凹）**: 最新度に対して傾きが単調に減少する平滑性制約を追加し、最も滑らかなグラフを生成します。注意：制約が強くなるほど学習データに過剰適合するリスクがあるため、テストデータでの検証が重要です。
+- **Empirical（生データ）**: 制約なしの商品選択確率。ノイズにより単調性を満たさず、不自然な順序で商品推薦する場合がある。
+- **Monotonicity（単調性）**: RF単調性制約を課した商品選択確率。商品を自然な順序で推薦することを保証する。
+- **Monotonicity-Convex-Concave（単調性＋凸凹）**: RF単調性制約と凹凸性制約を課した商品選択確率。最も滑らかなグラフを生成する
 
 ## サンプル
 
-- [examples/tutorial_beginner_ja.ipynb](examples/tutorial_beginner_ja.ipynb) — データロードからモデル構築、最適化、可視化、推薦スコア算出、推薦品質の評価までのコードを紹介します。
-- [examples/tutorial_practical_ja.ipynb](examples/tutorial_practical_ja.ipynb) — 実践的なワークフロー：ユーザー単位の訓練・テスト分割、全9種のモデル構築と精度比較、モデルの保存・ロード（pickle・zip アーカイブ）までを紹介します。
-- [examples/tutorial_advanced_fit_rolling_ja.ipynb](examples/tutorial_advanced_fit_rolling_ja.ipynb) — 応用編：`fit_rolling()` による時系列ローリング学習を紹介します。複数の基準日でローリング集計することで経験的商品選択確率を安定させ、基準日固有のバイアスを軽減します。
+- [examples/tutorial_beginner_ja.ipynb](examples/tutorial_beginner_ja.ipynb) — 初級編：データロード、モデル構築・最適化・可視化、推薦スコア算出、精度評価までのコードを紹介します。
+- [examples/tutorial_practical_ja.ipynb](examples/tutorial_practical_ja.ipynb) — 実践編：時系列での訓練・テスト分割、全9種のモデル構築と精度比較、モデルの保存・ロードを紹介します。
+- [examples/tutorial_advanced_fit_rolling_ja.ipynb](examples/tutorial_advanced_fit_rolling_ja.ipynb) — 応用編：`fit_rolling()` で複数の基準日にわたるローリング集計を行うことで経験的商品選択確率を安定させます。全9種モデルの精度比較も含みます。
 
 ## 参考文献
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, "Estimating product-choice probabilities from recency and frequency of page views," Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
@@ -301,7 +301,7 @@ scorer.plot_probability_surface(kind="mcc")
 }
 ```
 
-さらに、商品選択確率行列を協調フィルタリングモデルの入力として利用する場合は、以下の文献も併せて引用してください：
+さらに、商品選択確率行列を協調フィルタリングモデルの入力として利用する場合や機械学習の特徴量として利用する場合には、以下の文献も併せて引用してください：
 
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, "Improving collaborative filtering recommendations by estimating user preferences from clickstream data," Electronic Commerce Research and Applications, Volume 37, Article 100877, 2019.](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)
 
