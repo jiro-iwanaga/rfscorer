@@ -45,7 +45,7 @@ df = ...  # columns: user, item, datetime
 
 # Split by target date
 target_date = "2026-07-07"
-df_obs, df_gt = split_by_date(df, target_date)  # default: obs=28 days, gt=7 days
+df_obs, df_gt = split_by_date(df, target_date, 7, 1)  # observation: 7 days, ground truth: 1 day
 
 # Fit and optimize
 scorer = RecencyFrequencyScorer()
@@ -54,7 +54,7 @@ scorer.optimize(kind="mono")
 
 # Score recommendations (on test data)
 df_test = ...  # test data (columns: user, item, datetime)
-df_test_obs, _ = split_by_date(df_test, target_date)
+df_test_obs, _ = split_by_date(df_test, target_date, 7, 1)
 df_scores = scorer.transform(df_test_obs, target_date, kind="mono")
 ```
 
@@ -205,7 +205,7 @@ df = ...  # カラム: user, item, datetime
 
 # 基準日で観測データ・正解データに分割
 target_date = "2026-07-07"
-df_obs, df_gt = split_by_date(df, target_date)  # デフォルト：観測28日、正解7日
+df_obs, df_gt = split_by_date(df, target_date, 7, 1) # 観測データ7日間・正解データ1日間
 
 # モデル構築と最適化
 scorer = RecencyFrequencyScorer()
@@ -214,7 +214,7 @@ scorer.optimize(kind="mono")
 
 # 推薦スコアを算出(テストデータ)
 df_test = ...  # テストデータ（カラム: user, item, datetime）
-df_test_obs, _ = split_by_date(df_test, target_date)
+df_test_obs, _ = split_by_date(df_test, target_date, 7, 1)
 df_scores = scorer.transform(df_test_obs, target_date, kind="mono")
 ```
 

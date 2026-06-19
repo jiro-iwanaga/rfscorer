@@ -1672,7 +1672,7 @@ if __name__ == "__main__":
     target_date = "2015-07-07"
 
     # split_by_date を使用して観測期間・正解期間に分割
-    df_train_obs, df_train_gt = split_by_date(df_train, target_date)
+    df_train_obs, df_train_gt = split_by_date(df_train, target_date, observation_days=7, gt_days=1)
     scorer.fit(df_train_obs, df_train_gt)
 
     scorer.plot_probability_surface("empirical").savefig("surf_emp_prob.png")
@@ -1706,7 +1706,7 @@ if __name__ == "__main__":
     # scorer_loaded_zip = RecencyFrequencyScorer.load_zip("scorer.zip")
     # print("load_zip ok:", scorer_loaded_zip.predict(1, 1, kind="mono"))
 
-    df_test_obs, df_test_gt = split_by_date(df_test, target_date)
+    df_test_obs, df_test_gt = split_by_date(df_test, target_date, observation_days=7, gt_days=1)
 
     for kind in ("emp", "er", "ef", "mr", "mf", "mono", "mrc", "mfc", "mcc"):
         print(f"--- {kind} ---")
