@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-06-19
+
+Documentation and examples only; no library code or public API changes.
+
+### Added
+
+- Advanced tutorial notebooks:
+  - `examples/tutorial_advanced_int_time_col_en.ipynb` / `_ja.ipynb`: using an integer `time_col`
+    (session / period / week numbers) instead of date strings, for time-series data without a
+    calendar. The timeline is mapped to consecutive integers and the standard
+    `split_by_date → fit → transform` flow runs unchanged.
+  - `examples/tutorial_advanced_day_freq_en.ipynb` / `_ja.ipynb`: aggregating frequency by the
+    number of days an item was viewed (instead of every view) to cap its upper bound at the
+    observation window, then comparing model accuracy with `evaluate()`.
+- `examples/README.md`: a bilingual tutorial index (Beginner → Practical → Advanced) cataloging
+  all tutorial notebooks with short descriptions, linked from the README Examples / サンプル sections.
+
+### Changed
+
+- README: collapsed the Minimal Example intro to a single sentence with an inline link to the
+  Examples section, and added a pointer from the Examples / サンプル sections to `examples/` for
+  the full tutorial list.
+- Beginner tutorial notebooks (`tutorial_beginner_en` / `tutorial_beginner_ja`): Google Colab
+  setup guidance moved into the intro cell to match the other tutorials, replacing the previous
+  end-of-notebook section and the commented install line in the import cell.
+- Tone and terminology aligned across all tutorial notebooks (consistent title format, section
+  headings, and Colab setup wording).
+
 ## [0.5.0] - 2026-06-19
 
 ### Changed
