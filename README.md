@@ -105,6 +105,8 @@ Each surface shows different assumptions about **recency** (time since last inte
 - [examples/tutorial_practical_en.ipynb](examples/tutorial_practical_en.ipynb) — practical workflow: chronological train/test split, build all 9 models, compare accuracy, and save/load the model
 - [examples/tutorial_advanced_fit_rolling_en.ipynb](examples/tutorial_advanced_fit_rolling_en.ipynb) — advanced workflow: time-series rolling training with `fit_rolling()` to stabilize empirical probabilities across multiple reference dates
 
+For the complete list of tutorials, see [examples/](examples/).
+
 ## References
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
 
@@ -264,6 +266,8 @@ scorer.plot_probability_surface(kind="mcc")
 - [examples/tutorial_beginner_ja.ipynb](examples/tutorial_beginner_ja.ipynb) — 初級編：データロード、モデル構築・最適化・可視化、推薦スコア算出、精度評価までのコードを紹介します。
 - [examples/tutorial_practical_ja.ipynb](examples/tutorial_practical_ja.ipynb) — 実践編：時系列での訓練・テスト分割、全9種のモデル構築と精度比較、モデルの保存・ロードを紹介します。
 - [examples/tutorial_advanced_fit_rolling_ja.ipynb](examples/tutorial_advanced_fit_rolling_ja.ipynb) — 応用編：`fit_rolling()` で複数の基準日にわたるローリング集計を行うことで経験的商品選択確率を安定させます。全9種モデルの精度比較も含みます。
+
+全チュートリアルの一覧は [examples/](examples/) を参照してください。
 
 ## 参考文献
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, "Estimating product-choice probabilities from recency and frequency of page views," Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
