@@ -8,20 +8,20 @@
 
 `rfscorer` is a Python package for Recency-Frequency based recommendation scoring.
 
-It estimates **product-choice probabilities** — the preference score for each user-item pair, forming a matrix equivalent to a rating matrix — from interaction history using two key signals: **recency** (how recently a user interacted with an item) and **frequency** (how often). You can configure which events to predict (revisits, purchases, conversions, etc.) using your evaluation data.
+It estimates recommendation scores (product-choice probabilities) for items a user has interacted with, based on two signals: **recency** (time since last interaction) and **frequency** (number of interactions). You can choose any event as the prediction target (revisits, purchases, conversions, etc.).
 
-The package is designed for product recommendation, especially when you prefer interpretable recommendations based on interaction history over black-box models.
+The package is useful not only for interpretable product recommendations, but also as input to downstream systems — as a rating matrix for collaborative filtering or as features for ML models.
 
 > Note: In this package, **RF** stands for **Recency-Frequency**, not Random Forest.
 
 ## Features
 
-- **scikit-learn-style API** — familiar `fit()` / `transform()` interface makes it easy to integrate into existing data science workflows
-- **Minimal data requirements** — works with any behavior history with three columns: user, item, and timestamp; no ratings or explicit feedback required
-- **Explainable scoring** — probabilities are computed using optimization with Recency-Frequency monotonicity constraints, making every score fully traceable and auditable; 3D surface visualization further supports intuitive understanding
-- **Probabilistic output** — product-choice probabilities work as preference scores, enabling expected value calculations and probabilistic ranking of recommendations
-- **Extensible** — the probability matrix from `transform()` can be directly used as input to collaborative filtering or other downstream recommendation models
-- **Calibration-free probabilities** — unlike typical ML models, probabilities are computed directly from interaction frequency without requiring calibration, making them reliable and easy to interpret.
+- **scikit-learn style** — `fit()` / `transform()` interface
+- **Minimal data** — works with any behavior history with three columns: `user`, `item`, `datetime`
+- **Explainable** — probabilities are optimized under RF monotonicity constraints; 3D visualization for intuitive understanding
+- **Calibration-free** — probabilities are computed directly from recency and frequency, no calibration needed
+- **Probabilistic output** — expected value calculations (e.g., revenue) are straightforward
+- **Extensible** — scores can be used as a rating matrix for collaborative filtering or as ML features
 
 ## Installation
 
@@ -32,7 +32,7 @@ pip install rfscorer
 ## Usage
 
 Below is a minimal example of building a model and scoring recommendations from a behavior history.
-For complete, working code with data loading and evaluation, see [examples/tutorial_beginner_en.ipynb](examples/tutorial_beginner_en.ipynb).
+For complete, working code, see [Examples](#examples).
 
 ### Minimal Example
 
@@ -66,10 +66,10 @@ df_scores = scorer.transform(df_test_obs, target_date, kind="mono")
 | u_002  | i_011  |       1 |         2 |      0.0621 |     1 |
 | u_002  | i_058  |       4 |         1 |      0.0182 |     2 |
 
-The `probability` score determines recommendation rank. For each user, recommend items from highest to lowest probability. Because each score is a probability, you can also calculate expected values (e.g., expected revenue per recommendation). The `order` column makes it easy to implement business rules (e.g., "recommend top 2 items per user").     
+Recommend items to each user from highest to lowest `probability`. Since scores are probabilities, expected value calculations are straightforward (e.g., expected revenue per recommendation). Use the `order` column to apply business rules (e.g., recommend the top 2 items per user).
 
 ### Visualization: Comparing Optimization Approaches
-While the package supports many optimization approaches, here we visualize three representative methods: 
+The package supports many optimization approaches. Here we visualize three representative methods:
 
 ```python
 scorer.plot_probability_surface(kind="emp")  # empirical (raw rates)
@@ -94,11 +94,11 @@ scorer.plot_probability_surface(kind="mcc")
   </tr>
 </table>
 
-Each surface reflects different assumptions about **recency** (time since a user interacted with an item) and **frequency** (number of interactions):
+Each surface shows different assumptions about **recency** (time since last interaction) and **frequency** (number of interactions):
 
-- **Empirical**: Raw product-choice probabilities without constraints; noisy and may violate monotonicity, sometimes recommending products in unnatural order.                  
-- **Monotonicity**: Enforces monotonic relationships, ensuring products are recommended in natural and stable order.
-- **Monotonicity-Convex-Concave**: Adds smoothness constraints with monotonically decreasing slopes in recency, producing the smoothest surface. Note: stronger constraints may overfit to training data; validate on test data.                            
+- **Empirical**: Raw probabilities without constraints. Noisy and may violate monotonicity, sometimes recommending items in unnatural order.
+- **Monotonicity**: Probabilities with RF monotonicity constraints. Guarantees items are recommended in natural order.
+- **Monotonicity-Convex-Concave**: Probabilities with RF monotonicity and convexity-concavity constraints. Produces the smoothest surface.
 
 ## Examples
 
@@ -140,7 +140,7 @@ The full reference is:
 }
 ```
 
-If you additionally use the probability matrix as input to a collaborative filtering model, please also cite:
+If you also use the probability matrix as input to a collaborative filtering model or as ML features, please also cite:
 
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Improving collaborative filtering recommendations by estimating user preferences from clickstream data,” Electronic Commerce Research and Applications, Volume 37, Article 100877, 2019.](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)
 
@@ -169,7 +169,7 @@ MIT License
 
 `rfscorer` は、Recency-Frequency（最新度・頻度）に基づく商品推薦スコアリングを提供する Python パッケージです。
 
-ユーザーの行動履歴から、ユーザーが過去に閲覧した商品の推薦スコア（商品選択確率）を推定します。スコアは、**最新度（recency）**（ユーザーが商品に最後に接触してからの経過時間）と **頻度（frequency）**（接触の回数）に基づいて計算されます。予測対象のイベント（再閲覧、購買、コンバージョンなど）は自由に設定できます。
+ユーザーの行動履歴から、ユーザーが過去に接触した商品の推薦スコア（商品選択確率）を推定します。スコアは、**最新度（recency）**（ユーザーが商品に最後に接触してからの経過時間）と **頻度（frequency）**（接触の回数）に基づいて計算されます。予測対象のイベント（再閲覧、購買、コンバージョンなど）は自由に設定できます。
 
 本パッケージは、解釈可能な商品推薦ができるだけでなく、後段に続く推薦システムの入力（協調フィルタリングの評価値行列や機械学習モデルの特徴量）に有用です。
 
@@ -193,7 +193,7 @@ pip install rfscorer
 ## 使い方
 
 以下は、行動履歴からモデル構築と推薦スコア（商品選択確率）の算出までを行う最小限の例です。
-データロードから評価までを含む動作コードについては、[examples/tutorial_beginner_ja.ipynb](examples/tutorial_beginner_ja.ipynb) を参照してください。
+動作するコードについては、[サンプル](#サンプル)を参照してください。
 
 ### 最小限の例
 
@@ -257,7 +257,7 @@ scorer.plot_probability_surface(kind="mcc")
 
 各グラフの**最新度（recency）**（ユーザーが商品に接触してからの経過時間）と **頻度（frequency）**（接触回数）は次の仮定を反映しています：
 
-- **Empirical（生データ）**: 制約なしの商品選択確率。ノイズにより単調性を満たさず、不自然な順序で商品推薦する場合がある。
+- **Empirical（生データ）**: 制約なしの商品選択確率。ノイズにより単調性を満たさず、不自然な順序で商品を推薦する場合がある。
 - **Monotonicity（単調性）**: RF単調性制約を課した商品選択確率。商品を自然な順序で推薦することを保証する。
 - **Monotonicity-Convex-Concave（単調性＋凸凹）**: RF単調性制約と凹凸性制約を課した商品選択確率。最も滑らかなグラフを生成する
 
