@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-19
+
+### Changed
+
+- `split_by_date()`: `observation_days` and `gt_days` are now required arguments with no
+  defaults (previously `observation_days=28, gt_days=7`). The `time_col="datetime"` default
+  is preserved. **Breaking**: callers omitting these arguments
+  (e.g. `split_by_date(df, target_date)`) will now receive a `TypeError`. Pass both arguments
+  explicitly: `split_by_date(df, target_date, observation_days=N, gt_days=M)`.
+- All tutorial notebooks updated to pass `observation_days` / `gt_days` as explicit keyword
+  arguments (`tutorial_beginner_en/ja`, `tutorial_practical_en/ja`,
+  `tutorial_advanced_fit_rolling_en/ja`).
+- README: English section revised and aligned with the Japanese section — intro rewritten
+  to clarify product-choice probability and downstream uses, Features simplified (Extensible
+  bullet removed), Usage links updated to the Examples section, and advanced tutorials added
+  to the Examples section.
+- Documentation (`docs/`): terminology unified — "閲覧" replaced with "接触" in
+  `functional-design.md`, `glossary.md`, and `product-requirements.md`; `split_by_date`
+  signature corrected to reflect required arguments in `functional-design.md` and
+  `product-requirements.md`; advanced tutorial notebooks added to `repository-structure.md`.
+
 ## [0.4.5] - 2026-06-17
 
 ### Added

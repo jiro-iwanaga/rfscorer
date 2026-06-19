@@ -8,8 +8,8 @@ from ._time_utils import normalize_ref, normalize_sequence_col
 def split_by_date(
     df,
     target_date,
-    observation_days=28,
-    gt_days=7,
+    observation_days,
+    gt_days,
     time_col="datetime",
 ):
     """Split df into observation and ground truth data at target_date.
@@ -22,14 +22,14 @@ def split_by_date(
         Split point. The observation window ends at and includes
         target_date; the ground truth window starts at the next time step.
         Accepts the same types as time_col (datetime or integer).
-    observation_days : int or None, default 28
+    observation_days : int or None
         Number of time units in the observation window ending at target_date
         (inclusive). For example, ``observation_days=7`` covers
         ``[target_date - 6, target_date]`` (7 units). When None, uses df from
         its earliest row. Note: this is in the same time units as time_col
         (days for datetime, integer steps for integer time_col), independent
         of any recency binning unit on the scorer.
-    gt_days : int or None, default 7
+    gt_days : int or None
         Number of time units in the ground truth window starting one step after
         target_date. For example, ``gt_days=7`` covers
         ``[target_date + 1, target_date + 7]`` (7 units). When None, uses df
@@ -58,7 +58,9 @@ def split_by_date(
 
         from rfscorer import RecencyFrequencyScorer, split_by_date
 
-        df_obs, df_gt = split_by_date(df, "2024-01-07")
+        df_obs, df_gt = split_by_date(
+            df, "2024-01-07", observation_days=28, gt_days=7
+        )
         scorer = RecencyFrequencyScorer()
         scorer.fit(df_obs, df_gt)
     """

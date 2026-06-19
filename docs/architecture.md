@@ -4,7 +4,7 @@
 
 | モジュール | クラス・関数 | 役割 |
 |-----------|--------|------|
-| `scorer.py` | `RecencyFrequencyScorer` | 公開 API。fit・predict・transform・optimize・evaluate・plot・export・save・load・save_zip・load_zip の各メソッドを提供する |
+| `scorer.py` | `RecencyFrequencyScorer` | 公開 API。fit・fit_rolling・predict・transform・optimize・evaluate・plot・export・save・load・save_zip・load_zip の各メソッドを提供する |
 | `optimizer.py` | `RecencyFrequencyOptimizer` | 内部モジュール。`optimize()` から委譲された凸2次計画問題を cvxpy で求解する |
 | `utils.py` | `split_by_date()` | 公開ユーティリティ。観測ログと正解データを target_date で自動分割する |
 | `_plotting.py` | `PlottingMixin` | 内部モジュール。`RecencyFrequencyScorer` に Mixin として継承され、`plot_probability_surface()` / `plot_marginal_probability()` を提供する |

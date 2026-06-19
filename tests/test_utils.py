@@ -167,9 +167,15 @@ class TestSplitByDate:
         _, df_gt = split_by_date(df, "2024-01-07", observation_days=7, gt_days=7)
         assert "2024-01-07" not in set(df_gt["datetime"])
 
+    def test_missing_window_args_raises(self):
+        # observation_days / gt_days はデフォルト値を持たない必須引数
+        df = _make_df()
+        with pytest.raises(TypeError):
+            split_by_date(df, "2024-01-07")
+
     def test_returns_tuple_of_dataframes(self):
         df = _make_df()
-        result = split_by_date(df, "2024-01-07")
+        result = split_by_date(df, "2024-01-07", observation_days=28, gt_days=7)
         assert isinstance(result, tuple)
         assert len(result) == 2
         assert isinstance(result[0], pd.DataFrame)
@@ -178,33 +184,35 @@ class TestSplitByDate:
     def test_does_not_mutate_input_df(self):
         df = _make_df()
         original = df.copy()
-        split_by_date(df, "2024-01-07")
+        split_by_date(df, "2024-01-07", observation_days=28, gt_days=7)
         pd.testing.assert_frame_equal(df, original)
 
     def test_preserves_original_columns(self):
         df = _make_df()
-        df_obs, df_gt = split_by_date(df, "2024-01-07")
+        df_obs, df_gt = split_by_date(df, "2024-01-07", observation_days=28, gt_days=7)
         assert list(df_obs.columns) == list(df.columns)
         assert list(df_gt.columns) == list(df.columns)
 
     def test_preserves_original_time_col_type(self):
         df = _make_df()
-        df_obs, _ = split_by_date(df, "2024-01-07")
+        df_obs, _ = split_by_date(df, "2024-01-07", observation_days=28, gt_days=7)
         # 元の datetime 列が string 型のまま保持される
         assert df_obs["datetime"].dtype == df["datetime"].dtype
 
     def test_not_dataframe_raises(self):
         with pytest.raises(TypeError, match="pandas DataFrame"):
-            split_by_date("not_a_df", "2024-01-07")
+            split_by_date("not_a_df", "2024-01-07", observation_days=28, gt_days=7)
 
     def test_missing_time_col_raises(self):
         df = _make_df().drop(columns="datetime")
         with pytest.raises(ValueError, match="Missing required column"):
-            split_by_date(df, "2024-01-07")
+            split_by_date(df, "2024-01-07", observation_days=28, gt_days=7)
 
     def test_custom_time_col(self):
         df = _make_df().rename(columns={"datetime": "date"})
-        df_obs, df_gt = split_by_date(df, "2024-01-07", time_col="date")
+        df_obs, df_gt = split_by_date(
+            df, "2024-01-07", observation_days=28, gt_days=7, time_col="date"
+        )
         assert "2024-01-07" in set(df_obs["date"])
 
     def test_integer_time_col(self):
@@ -212,7 +220,9 @@ class TestSplitByDate:
         df["seq"] = pd.to_datetime(df["datetime"]).map(lambda x: x.toordinal())
         df = df.drop(columns="datetime")
         target_ord = pd.Timestamp("2024-01-07").toordinal()
-        df_obs, df_gt = split_by_date(df, target_ord, time_col="seq")
+        df_obs, df_gt = split_by_date(
+            df, target_ord, observation_days=28, gt_days=7, time_col="seq"
+        )
         assert (df_obs["seq"] <= target_ord).all()
         assert (df_gt["seq"] > target_ord).all()
 
@@ -247,7 +257,7 @@ class TestSplitByDate:
     def test_invalid_target_date_raises(self):
         df = _make_df()
         with pytest.raises(ValueError, match="time value could not be normalized"):
-            split_by_date(df, object())
+            split_by_date(df, object(), observation_days=28, gt_days=7)
 
     def test_chained_with_fit(self):
         df = _make_df()
