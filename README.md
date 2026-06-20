@@ -12,12 +12,9 @@ It estimates recommendation scores (product-choice probabilities) for items a us
 
 In product recommendation, the key question is which of the items a user has previously interacted with should be prioritized. For example, consider the following comparisons:
 
-- **Q1.** Item A viewed once 1 day ago vs. item B viewed twice 1 day ago — which should be recommended? <br>
-  → [Decide by frequency] Recommend item B, which was viewed more often.
-- **Q2.** Item A viewed once 1 day ago vs. item B viewed once 2 days ago — which should be recommended? <br>
-  → [Decide by recency] Recommend item A, which was viewed more recently.
-- **Q3.** Item A viewed once 1 day ago vs. item B viewed twice 2 days ago — which should be recommended? <br>
-  → [Frequency vs. recency] Item A with higher recency or item B with higher frequency — hard to judge by intuition.
+- **[Decide by frequency]** Item A viewed once 🆚 Item B viewed **twice** ▶ recommend **Item B**, viewed more often
+- **[Decide by recency]** Item A viewed **1 day ago** 🆚 Item B viewed 2 days ago ▶ recommend **Item A**, viewed more recently
+- **[Trade-off]** Item A viewed once **1 day ago** 🆚 Item B viewed **twice** 2 days ago ▶ **hard to judge by intuition**
 
 For such non-trivial comparisons, `rfscorer` uses mathematical optimization to estimate recommendation scores that satisfy the natural monotonicity of recency and frequency. This gives a data-driven, natural recommendation order over the items a user has previously interacted with.
 
