@@ -107,6 +107,10 @@ Each surface shows different assumptions about **recency** (time since last inte
 For the complete list of tutorials, see [examples/](examples/).
 
 ## References
+
+<details>
+<summary>Show references</summary>
+
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
 
 - [Jiro Iwanaga, Kyota Ishihara, Naoki Nishimura, and Ikki Tanaka, *Pythonではじめる数理最適化 ―ケーススタディでモデリングのスキルを身につけよう―*(in Japanese), Ohmsha, 2021.](https://www.ohmsha.co.jp/book/9784274231759/)
@@ -114,8 +118,13 @@ For the complete list of tutorials, see [examples/](examples/).
 
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Improving collaborative filtering recommendations by estimating user preferences from clickstream data,” Electronic Commerce Research and Applications, Volume 37, Article 100877, 2019.](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)
 
+</details>
+
 
 ## Citation
+
+<details>
+<summary>Show citation & BibTeX</summary>
 
 If you use `rfscorer` in academic work, you can cite it as follows in the body of your paper:
 
@@ -156,6 +165,8 @@ If you also use the probability matrix as input to a collaborative filtering mod
   url     = {https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547}
 }
 ```
+
+</details>
 
 ## License
 
@@ -282,6 +293,10 @@ scorer.plot_probability_surface(kind="mcc")
 全チュートリアルの一覧は [examples/](examples/) を参照してください。
 
 ## 参考文献
+
+<details>
+<summary>参考文献を表示</summary>
+
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, "Estimating product-choice probabilities from recency and frequency of page views," Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
 
 - [岩永二郎・石原響太・西村直樹・田中一樹『Pythonではじめる数理最適化 ―ケーススタディでモデリングのスキルを身につけよう―』, オーム社, 2021.](https://www.ohmsha.co.jp/book/9784274231759/)
@@ -289,8 +304,13 @@ scorer.plot_probability_surface(kind="mcc")
 
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, "Improving collaborative filtering recommendations by estimating user preferences from clickstream data," Electronic Commerce Research and Applications, Volume 37, Article 100877, 2019.](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)
 
+</details>
+
 
 ## 引用について
+
+<details>
+<summary>引用方法と BibTeX を表示</summary>
 
 学術論文等で `rfscorer` を利用する場合は、論文の引用と本Githubへのリンクを脚注を加え、本文中で以下のように引用できます：
 
@@ -331,6 +351,8 @@ scorer.plot_probability_surface(kind="mcc")
   url     = {https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547}
 }
 ```
+
+</details>
 
 ## ライセンス
 
