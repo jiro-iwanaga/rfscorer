@@ -27,12 +27,14 @@ Beyond serving as a standalone recommendation ranking, `rfscorer`'s scores can a
 
 ## Features
 
-- **scikit-learn style** — `fit()` / `transform()` interface
-- **Minimal data** — works with any behavior history with three columns: `user`, `item`, `datetime`
-- **Explainable** — scores are estimated by mathematical optimization under RF monotonicity, making the reasoning behind each recommendation easy to explain
-- **Stable probability estimation** — product-choice probabilities are estimated directly from recency and frequency, avoiding the instability of converting ML model outputs to a probability scale
-- **Downstream use** — usable not only as a standalone recommendation score but also as a rating matrix for collaborative filtering or as features for ML models
-- **Rich diagnostics & visualization** — extensive statistical outputs and visualization features let practitioners explain results in their work and researchers report them in papers
+| Feature | Description |
+|---------|-------------|
+| **scikit-learn style** | `fit()` / `transform()` interface |
+| **Minimal data** | works with any behavior history with three columns: `user`, `item`, `datetime` |
+| **Explainable** | scores are estimated by mathematical optimization under RF monotonicity, making the reasoning behind each recommendation easy to explain |
+| **Stable probability estimation** | product-choice probabilities are estimated directly from recency and frequency, avoiding the instability of converting ML model outputs to a probability scale |
+| **Downstream use** | usable not only as a standalone recommendation score but also as a rating matrix for collaborative filtering or as features for ML models |
+| **Rich diagnostics & visualization** | extensive statistical outputs and visualization features let practitioners explain results in their work and researchers report them in papers |
 
 ## Installation
 
@@ -214,12 +216,14 @@ MIT License
 
 ## 特徴
 
-- **scikit-learn ライク**  `fit()` / `transform()` によるインターフェースを提供
-- **最小限のデータ要件**  入力データは、`user`、`item`、`datetime` の３カラムをもつ行動履歴
-- **説明可能性** — 数理最適化によりRF単調性を満たすスコアを推定するため、推薦理由を説明しやすい
-- **安定した確率推定** — 最新度と頻度から商品選択確率を直接推定するため、機械学習モデルの出力を確率スケールへ変換する際の不安定さを回避できる
-- **下流モデルへの活用** — 単独の推薦スコアとしてだけでなく、協調フィルタリングの評価値行列や機械学習モデルの特徴量としても利用可能
-- **豊富な診断と可視化** — 各種統計量の出力や可視化機能が充実。実務家は業務で説明しやすく、研究者は分析結果を論文に記載しやすい
+| 特徴 | 説明 |
+|------|------|
+| **scikit-learn ライク** | `fit()` / `transform()` によるインターフェースを提供 |
+| **最小限のデータ要件** | 入力データは、`user`、`item`、`datetime` の３カラムをもつ行動履歴 |
+| **説明可能性** | 数理最適化によりRF単調性を満たすスコアを推定するため、推薦理由を説明しやすい |
+| **安定した確率推定** | 最新度と頻度から商品選択確率を直接推定するため、機械学習モデルの出力を確率スケールへ変換する際の不安定さを回避できる |
+| **下流モデルへの活用** | 単独の推薦スコアとしてだけでなく、協調フィルタリングの評価値行列や機械学習モデルの特徴量としても利用可能 |
+| **豊富な診断と可視化** | 各種統計量の出力や可視化機能が充実。実務家は業務で説明しやすく、研究者は分析結果を論文に記載しやすい |
 
 ## インストール
 
