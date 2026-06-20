@@ -26,12 +26,12 @@ Beyond serving as a standalone recommendation ranking, `rfscorer`'s scores can a
 
 | Feature | Description |
 |---------|-------------|
-| **scikit&#8209;learn&nbsp;style** | `fit()` / `transform()` interface |
-| **Minimal&nbsp;data** | works with any behavior history with three columns: `user`, `item`, `datetime` |
+| **scikit-learn style** | `fit()` / `transform()` interface |
+| **Minimal data** | works with any behavior history with three columns: `user`, `item`, `datetime` |
 | **Explainable** | scores are estimated by mathematical optimization under RF monotonicity, making the reasoning behind each recommendation easy to explain |
-| **Stable&nbsp;probability&nbsp;estimation** | product-choice probabilities are estimated directly from recency and frequency, avoiding the instability of converting ML model outputs to a probability scale |
-| **Downstream&nbsp;use** | usable not only as a standalone recommendation score but also as a rating matrix for collaborative filtering or as features for ML models |
-| **Rich&nbsp;diagnostics&nbsp;&amp;&nbsp;visualization** | extensive statistical outputs and visualization features let practitioners explain results in their work and researchers report them in papers |
+| **Stable probability estimation** | product-choice probabilities are estimated directly from recency and frequency, avoiding the instability of converting ML model outputs to a probability scale |
+| **Downstream use** | usable not only as a standalone recommendation score but also as a rating matrix for collaborative filtering or as features for ML models |
+| **Rich diagnostics & visualization** | extensive statistical outputs and visualization features let practitioners explain results in their work and researchers report them in papers |
 
 ## Installation
 
