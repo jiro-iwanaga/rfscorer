@@ -10,7 +10,18 @@
 
 It estimates recommendation scores (product-choice probabilities) for items a user has interacted with, based on two signals: **recency** (time since last interaction) and **frequency** (number of interactions). You can choose any event as the prediction target (revisits, purchases, conversions, etc.).
 
-The package is useful not only for recommending items a user has interacted with in natural order based on product-choice probabilities, but also as input to downstream systems — as a rating matrix for collaborative filtering or as features for ML models.
+In product recommendation, the key question is which of the items a user has previously interacted with should be prioritized. For example, consider the following comparisons:
+
+- **Q1.** Item A viewed once 1 day ago vs. item B viewed twice 1 day ago — which should be recommended? <br>
+  → [Decide by frequency] Recommend item B, which was viewed more often.
+- **Q2.** Item A viewed once 1 day ago vs. item B viewed once 2 days ago — which should be recommended? <br>
+  → [Decide by recency] Recommend item A, which was viewed more recently.
+- **Q3.** Item A viewed once 1 day ago vs. item B viewed twice 2 days ago — which should be recommended? <br>
+  → [Frequency vs. recency] Item A with higher recency or item B with higher frequency — hard to judge by intuition.
+
+For such non-trivial comparisons, `rfscorer` uses mathematical optimization to estimate recommendation scores that satisfy the natural monotonicity of recency and frequency. This gives a data-driven, natural recommendation order over the items a user has previously interacted with.
+
+Beyond serving as a standalone recommendation ranking, `rfscorer`'s scores can also be used as input to downstream models — for example, as a rating matrix for collaborative filtering or as features for ML models.
 
 > Note: In this package, **RF** stands for **Recency-Frequency**, not Random Forest.
 
@@ -18,9 +29,9 @@ The package is useful not only for recommending items a user has interacted with
 
 - **scikit-learn style** — `fit()` / `transform()` interface
 - **Minimal data** — works with any behavior history with three columns: `user`, `item`, `datetime`
-- **Explainable** — probabilities are optimized under RF monotonicity constraints; 3D visualization for intuitive understanding
-- **Calibration-free** — probabilities are computed directly from recency and frequency, no calibration needed
-- **Probabilistic output** — expected value calculations (e.g., revenue) are straightforward
+- **Explainable** — scores are estimated by mathematical optimization under RF monotonicity, making the reasoning behind each recommendation easy to explain
+- **Stable probability estimation** — product-choice probabilities are estimated directly from recency and frequency, avoiding the instability of converting ML model outputs to a probability scale
+- **Downstream use** — usable not only as a standalone recommendation score but also as a rating matrix for collaborative filtering or as features for ML models
 
 ## Installation
 
@@ -92,7 +103,7 @@ scorer.plot_probability_surface(kind="mcc")
   </tr>
 </table>
 
-Each surface shows different assumptions about **recency** (time since last interaction) and **frequency** (number of interactions):
+Each surface clearly captures how the product-choice probability behaves with respect to **recency** (time since last interaction) and **frequency** (number of interactions):
 
 - **Empirical**: Raw probabilities without constraints. Noisy and may violate monotonicity, sometimes recommending items in unnatural order.
 - **Monotonicity**: Probabilities with RF monotonicity constraints. Guarantees items are recommended in natural order.
@@ -101,7 +112,7 @@ Each surface shows different assumptions about **recency** (time since last inte
 ## Examples
 
 - [examples/tutorial_beginner_en.ipynb](examples/tutorial_beginner_en.ipynb) — end-to-end walkthrough: load data, fit, optimize, visualize, transform, and evaluate
-- [examples/tutorial_practical_en.ipynb](examples/tutorial_practical_en.ipynb) — practical workflow: chronological train/test split, build all 9 models, compare accuracy, and save/load the model
+- [examples/tutorial_practical_en.ipynb](examples/tutorial_practical_en.ipynb) — practical workflow: chronological train/test split, build the various models, compare accuracy, and save/load the model
 - [examples/tutorial_advanced_fit_rolling_en.ipynb](examples/tutorial_advanced_fit_rolling_en.ipynb) — advanced workflow: time-series rolling training with `fit_rolling()` to stabilize empirical probabilities across multiple reference dates
 
 For the complete list of tutorials, see [examples/](examples/).
