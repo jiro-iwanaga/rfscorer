@@ -26,12 +26,12 @@ Beyond serving as a standalone recommendation ranking, `rfscorer`'s scores can a
 
 | Feature | Description |
 |---------|-------------|
-| **scikit-learn style** | `fit()` / `transform()` interface |
-| **Minimal data** | works with any behavior history with three columns: `user`, `item`, `datetime` |
+| **scikit&#8209;learn&nbsp;style** | `fit()` / `transform()` interface |
+| **Minimal&nbsp;data** | works with any behavior history with three columns: `user`, `item`, `datetime` |
 | **Explainable** | scores are estimated by mathematical optimization under RF monotonicity, making the reasoning behind each recommendation easy to explain |
-| **Stable probability estimation** | product-choice probabilities are estimated directly from recency and frequency, avoiding the instability of converting ML model outputs to a probability scale |
-| **Downstream use** | usable not only as a standalone recommendation score but also as a rating matrix for collaborative filtering or as features for ML models |
-| **Rich diagnostics & visualization** | extensive statistical outputs and visualization features let practitioners explain results in their work and researchers report them in papers |
+| **Stable&nbsp;probability&nbsp;estimation** | product-choice probabilities are estimated directly from recency and frequency, avoiding the instability of converting ML model outputs to a probability scale |
+| **Downstream&nbsp;use** | usable not only as a standalone recommendation score but also as a rating matrix for collaborative filtering or as features for ML models |
+| **Rich&nbsp;diagnostics&nbsp;&amp;&nbsp;visualization** | extensive statistical outputs and visualization features let practitioners explain results in their work and researchers report them in papers |
 
 ## Installation
 
@@ -192,7 +192,7 @@ MIT License
 `rfscorer` は、最新度と頻度（Recency-Frequency）に基づいて、ユーザーが過去に接触した商品の推薦スコアを推定する Python パッケージです。
 
 ユーザーの行動履歴から、各商品の **選択されやすさ** を表す推薦スコア（商品選択確率）を推定します。
-スコアは、**最新度（recency）**、つまり商品に最後に接触してからの経過時間と、 **頻度（frequency）**、つまりその商品への接触回数に基づいて計算されます。予測対象は、再閲覧、購買、コンバージョンなど用途に応じて自由に設定できます。
+スコアは、**最新度（recency）**（商品に最後に接触してからの経過時間）と、 **頻度（frequency）**（その商品への接触回数）に基づいて計算されます。予測対象は、再閲覧、購買、コンバージョンなど用途に応じて自由に設定できます。
 
 商品推薦では、ユーザーが過去に接触した商品の中で、どの商品を推薦すべきかが問題になります。
 たとえば、次のような比較です。
@@ -212,12 +212,12 @@ MIT License
 
 | 特徴 | 説明 |
 |------|------|
-| **scikit-learn ライク** | `fit()` / `transform()` によるインターフェースを提供 |
-| **最小限のデータ要件** | 入力データは、`user`、`item`、`datetime` の３カラムをもつ行動履歴 |
-| **説明可能性** | 数理最適化によりRF単調性を満たすスコアを推定するため、推薦理由を説明しやすい |
-| **安定した確率推定** | 最新度と頻度から商品選択確率を直接推定するため、機械学習モデルの出力を確率スケールへ変換する際の不安定さを回避できる |
-| **下流モデルへの活用** | 単独の推薦スコアとしてだけでなく、協調フィルタリングの評価値行列や機械学習モデルの特徴量としても利用可能 |
-| **豊富な診断と可視化** | 各種統計量の出力や可視化機能が充実。実務家は業務で説明しやすく、研究者は分析結果を論文に記載しやすい |
+| **scikit&#8209;learn&nbsp;ラ&#8288;イ&#8288;ク** | `fit()` / `transform()` によるインターフェースを提供 |
+| **最&#8288;小&#8288;限&#8288;の&#8288;デ&#8288;ー&#8288;タ&#8288;要&#8288;件** | 入力データは、`user`、`item`、`datetime` の３カラムをもつ行動履歴 |
+| **説&#8288;明&#8288;可&#8288;能&#8288;性** | 数理最適化によりRF単調性を満たすスコアを推定するため、推薦理由を説明しやすい |
+| **安&#8288;定&#8288;し&#8288;た&#8288;確&#8288;率&#8288;推&#8288;定** | 最新度と頻度から商品選択確率を直接推定するため、機械学習モデルの出力を確率スケールへ変換する際の不安定さを回避できる |
+| **下&#8288;流&#8288;モ&#8288;デ&#8288;ル&#8288;へ&#8288;の&#8288;活&#8288;用** | 単独の推薦スコアとしてだけでなく、協調フィルタリングの評価値行列や機械学習モデルの特徴量としても利用可能 |
+| **豊&#8288;富&#8288;な&#8288;診&#8288;断&#8288;と&#8288;可&#8288;視&#8288;化** | 各種統計量の出力や可視化機能が充実。実務家は業務で説明しやすく、研究者は分析結果を論文に記載しやすい |
 
 ## インストール
 
