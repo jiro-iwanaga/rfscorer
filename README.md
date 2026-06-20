@@ -8,6 +8,8 @@
 
 `rfscorer` is a Python package for Recency-Frequency based recommendation scoring.
 
+> Note: In this package, **RF** stands for **Recency-Frequency**, not Random Forest.
+
 It estimates recommendation scores (product-choice probabilities) for items a user has interacted with, based on two signals: **recency** (time since last interaction) and **frequency** (number of interactions). You can choose any event as the prediction target (revisits, purchases, conversions, etc.).
 
 In product recommendation, the key question is which of the items a user has previously interacted with should be prioritized. For example, consider the following comparisons:
@@ -20,7 +22,7 @@ For such non-trivial comparisons, `rfscorer` uses mathematical optimization to e
 
 Beyond serving as a standalone recommendation ranking, `rfscorer`'s scores can also be used as input to downstream models — for example, as a rating matrix for collaborative filtering or as features for ML models.
 
-> Note: In this package, **RF** stands for **Recency-Frequency**, not Random Forest.
+> 📄 **Based on the paper:** Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” *Knowledge-Based Systems*, Vol. 99, 2016, pp. 157–167. [[paper]](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
 
 ## Features
 
@@ -119,17 +121,12 @@ For the complete list of tutorials, see [examples/](examples/).
 
 ## References
 
-<details>
-<summary>Show references</summary>
-
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
 
 - [Jiro Iwanaga, Kyota Ishihara, Naoki Nishimura, and Ikki Tanaka, *Pythonではじめる数理最適化 ―ケーススタディでモデリングのスキルを身につけよう―*(in Japanese), Ohmsha, 2021.](https://www.ohmsha.co.jp/book/9784274231759/)
   - [Chapter 7: 商品推薦のための興味のスコアリング(in Japanese)](https://github.com/ohmsha/PyOptBook/tree/main/7.recommendation)
 
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Improving collaborative filtering recommendations by estimating user preferences from clickstream data,” Electronic Commerce Research and Applications, Volume 37, Article 100877, 2019.](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)
-
-</details>
 
 
 ## Citation
@@ -189,7 +186,9 @@ MIT License
 
 [English README](#RFscorer)
 
-`rfscorer` は、最新度と頻度（Recency-Frequency）に基づいて、ユーザーが過去に接触した商品の推薦スコアを推定する Python パッケージです。
+`rfscorer` は、最新度（Recency）と頻度（Frequency）に基づいて、ユーザーが過去に接触した商品の推薦スコアを推定する Python パッケージです。
+
+> 本パッケージでは **RF** は **Recency-Frequency（最新度-頻度）** を表します
 
 ユーザーの行動履歴から、各商品の **選択されやすさ** を表す推薦スコア（商品選択確率）を推定します。
 スコアは、**最新度（recency）**（商品に最後に接触してからの経過時間）と、 **頻度（frequency）**（その商品への接触回数）に基づいて計算されます。予測対象は、再閲覧、購買、コンバージョンなど用途に応じて自由に設定できます。
@@ -206,7 +205,7 @@ MIT License
 
 また、`rfscorer` のスコアは、単独で推薦順位として利用できるだけでなく、下流のモデルの入力としても利用できます。たとえば、協調フィルタリングの評価値行列や機械学習モデルの特徴量としても利用できます。
 
-> 注：本パッケージにおいて **RF** は **Recency-Frequency（最新度・頻度）** を意味し、Random Forest（ランダムフォレスト）ではありません。
+> 📄 **Based on the paper:** Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” *Knowledge-Based Systems*, Vol. 99, 2016, pp. 157–167. [[論文]](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
 
 ## パッケージの特徴
 
@@ -305,17 +304,12 @@ scorer.plot_probability_surface(kind="mcc")
 
 ## 参考文献
 
-<details>
-<summary>参考文献を表示</summary>
-
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, "Estimating product-choice probabilities from recency and frequency of page views," Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
 
 - [岩永二郎・石原響太・西村直樹・田中一樹『Pythonではじめる数理最適化 ―ケーススタディでモデリングのスキルを身につけよう―』, オーム社, 2021.](https://www.ohmsha.co.jp/book/9784274231759/)
   - [第7章: 商品推薦のための興味のスコアリング](https://github.com/ohmsha/PyOptBook/tree/main/7.recommendation)
 
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, "Improving collaborative filtering recommendations by estimating user preferences from clickstream data," Electronic Commerce Research and Applications, Volume 37, Article 100877, 2019.](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)
-
-</details>
 
 
 ## 引用について
