@@ -29,6 +29,10 @@ For such non-trivial cases, `rfscorer` uses mathematical optimization to estimat
 
 `rfscorer`'s scores also serve as input to downstream models — a rating matrix for collaborative filtering or features for ML models. These features capture the recency–frequency interaction and can help improve downstream accuracy ([paper](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)).
 
+## Slides
+
+📊 [Overview slides (PDF)](https://github.com/jiro-iwanaga/rfscorer/blob/main/slides/rfscorer_overview_en.pdf)(CC BY 4.0)
+
 ## Features
 
 | Feature | Description |
@@ -123,10 +127,6 @@ Each surface clearly captures how the product-choice probability behaves with re
 - [examples/tutorial_advanced_fit_rolling_en.ipynb](examples/tutorial_advanced_fit_rolling_en.ipynb) — advanced workflow: time-series rolling training with `fit_rolling()` to stabilize empirical probabilities across multiple reference dates
 
 For the complete list of tutorials, see [examples/](examples/).
-
-## Slides
-
-📊 [Overview slides (PDF, in Japanese)](https://github.com/jiro-iwanaga/rfscorer/blob/main/slides/rfscorer_overview_ja.pdf) — concept, features, and math model (CC BY 4.0)
 
 ## References
 
