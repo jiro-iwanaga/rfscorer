@@ -29,6 +29,11 @@ For such non-trivial cases, `rfscorer` uses mathematical optimization to estimat
 
 `rfscorer`'s scores also serve as input to downstream models — a rating matrix for collaborative filtering or features for ML models. These features capture the recency–frequency interaction and can help improve downstream accuracy ([paper](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)).
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/recommendation_system_architecture_using_rfscoring_en.png" width="720"/>
+</p>
+<p align="center"><i>Recommendation system architecture using RF scoring</i></p>
+
 ## Slides
 
 📊 [Overview slides (PDF)](https://github.com/jiro-iwanaga/rfscorer/blob/main/slides/rfscorer_overview_en.pdf)(CC BY 4.0)
