@@ -185,26 +185,39 @@ MIT License
 
 [English README](#RFscorer)
 
-`rfscorer` は、最新度（Recency）と頻度（Frequency）に基づいて、ユーザーが過去に接触した商品の推薦スコアを推定する Python パッケージです。
+`rfscorer` は、最新度（Recency）と頻度（Frequency）に基づいて、ユーザーが過去に接触した商品の推薦スコア（商品選択確率）を推定する Python パッケージです。
 
 > 本パッケージでは **RF** は **Recency-Frequency（最新度-頻度）** を表します
 
-ユーザーの行動履歴から、各商品の **選択されやすさ** を表す推薦スコア（商品選択確率）を推定します。
-スコアは、**最新度（recency）**（商品に最後に接触してからの経過時間）と、 **頻度（frequency）**（その商品への接触回数）に基づいて計算されます。予測対象は、再閲覧、購買、コンバージョンなど用途に応じて自由に設定できます。
+ユーザーの行動履歴から、各商品の **選択されやすさ** を表す推薦スコア（商品選択確率）を推定します。スコアは、次の2つの行動シグナルに基づいて計算されます。
 
-商品推薦では、ユーザーが過去に接触した商品の中で、どの商品を推薦すべきかが問題になります。
+- **最新度（recency）**：最後に接触してからの経過時間。最近接触した商品ほど関心が高い傾向。
+- **頻度（frequency）**：商品への接触回数。何度も接触した商品ほど関心が高い傾向。
+
+予測対象は、再閲覧、購買、コンバージョンなど用途に応じて自由に設定できます。
+
+商品推薦は、過去の行動履歴を用いて、ユーザーが過去に接触した商品の中でどれを優先して推薦するかを決める問題と捉えられます。
 たとえば、次のような比較です。
 
-- **【頻度で判断】** 1回閲覧した商品A　🆚　**2回**閲覧した商品B　▶　閲覧回数が多い **商品B** を推薦
-- **【最新度で判断】** **1日前**に閲覧した商品A　🆚　2日前に閲覧した商品B　▶　より最近閲覧した **商品A** を推薦
-- **【トレードオフ】** **1日前**に1回閲覧した商品A　🆚　2日前に**2回**閲覧した商品B　▶　**直感では判断しにくい**
+- **【頻度で判断】** 1回閲覧した商品A　🆚　**2回**閲覧した商品B　▶　たくさん閲覧した **商品B** を推薦
+- **【最新度で判断】** **1日前**に閲覧した商品A　🆚　2日前に閲覧した商品C　▶　最近閲覧した **商品A** を推薦
+- **【トレードオフ】** **1日前**に1回閲覧した商品A　🆚　2日前に**2回**閲覧した商品D　▶　**直感では判断できない**
 
-`rfscorer` は、このような非自明な比較に対して、数理最適化により、最新度と頻度の自然な単調性を満たす推薦スコアを推定します。
-これにより、ユーザーが過去に接触した商品に対して、データに基づく自然な推薦順序を与えることができます。
-
-また、`rfscorer` のスコアは、単独で推薦順位として利用できるだけでなく、下流のモデルの入力としても利用できます。たとえば、協調フィルタリングの評価値行列や機械学習モデルの特徴量としても利用できます。
+`rfscorer` は、このような非自明な比較に対して、数理最適化により、最新度と頻度の交互作用を考慮しつつ、両者の自然な単調性を満たす推薦スコアを推定します。
+これにより、ユーザーが過去に接触した商品に対して、データに基づく自然な推薦順位を与えることができます。
 
 > 📄 **Based on the paper:** Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” *Knowledge-Based Systems*, Vol. 99, 2016, pp. 157–167. [[論文]](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
+
+また、`rfscorer` が出力する商品選択確率は、下流のモデルの入力（協調フィルタリングの評価値行列・機械学習モデルの特徴量）としても有効です。
+最新度と頻度の交互作用が反映された有用な特徴量によるモデル構築ができます。
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/recommendation_system_architecture_using_rfscoring.png" width="720"/>
+</p>
+<p align="center"><i>RFスコアリングを用いた推薦システム構成</i></p>
+
+> 📄 **Based on the paper:** Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Improving collaborative filtering recommendations by estimating user preferences from clickstream data,” *Electronic Commerce Research and Applications*, Vol. 37, Article 100877, 2019. [[論文]](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)
+
 
 ## パッケージの特徴
 
