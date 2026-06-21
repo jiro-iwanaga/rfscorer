@@ -199,7 +199,7 @@ MIT License
 
 [English README](#rfscorer)
 
-`rfscorer` は、最新度（Recency）と頻度（Frequency）に基づいて、ユーザーが過去に接触した商品の推薦スコア（商品選択確率）を推定する Python パッケージです。
+`rfscorer` は、最新度（Recency）と頻度（Frequency）に基づいて、ユーザーが過去に接触した商品の推薦スコア（商品選択確率）を推定する Python パッケージです。
 
 > 本パッケージでは **RF** は **Recency-Frequency（最新度-頻度）** を表します
 
@@ -217,7 +217,7 @@ MIT License
 - **【最新度で判断】** **1日前**に閲覧した商品A　🆚　2日前に閲覧した商品C　▶　最近閲覧した **商品A** を推薦
 - **【トレードオフ】** **1日前**に1回閲覧した商品A　🆚　2日前に**2回**閲覧した商品D　▶　**直感では判断できない**
 
-`rfscorer` は、このような非自明な比較に対して、数理最適化により、最新度と頻度の交互作用を考慮しつつ、両者の自然な単調性を満たす推薦スコアを推定します。
+`rfscorer` は、このような非自明な比較に対して、数理最適化により、最新度と頻度の交互作用を考慮しつつ、自然な単調性を満たす推薦スコアを推定します。
 これにより、ユーザーが過去に接触した商品に対して、データに基づく自然な推薦順位を与えることができます。
 
 > 📄 **Based on the paper:** Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” *Knowledge-Based Systems*, Vol. 99, 2016, pp. 157–167. [[論文]](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
