@@ -10,19 +10,26 @@
 
 > Note: In this package, **RF** stands for **Recency-Frequency**, not Random Forest.
 
-It estimates recommendation scores (product-choice probabilities) for items a user has interacted with, based on two signals: **recency** (time since last interaction) and **frequency** (number of interactions). You can choose any event as the prediction target (revisits, purchases, conversions, etc.).
+It estimates a recommendation score (product-choice probability) — how likely each previously interacted item is to be chosen — from two behavioral signals:
 
-In product recommendation, the key question is which of the items a user has previously interacted with should be prioritized. For example, consider the following comparisons:
+- **Recency**: time since the last interaction. More recently viewed items tend to attract more interest.
+- **Frequency**: number of interactions. More frequently viewed items tend to attract more interest.
 
-- **[Decide by frequency]** Item A viewed once 🆚 Item B viewed **twice** ▶ recommend **Item B**, viewed more often
-- **[Decide by recency]** Item A viewed **1 day ago** 🆚 Item B viewed 2 days ago ▶ recommend **Item A**, viewed more recently
-- **[Trade-off]** Item A viewed once **1 day ago** 🆚 Item B viewed **twice** 2 days ago ▶ **hard to judge by intuition**
+You can set any event as the prediction target (revisits, purchases, conversions, etc.).
 
-For such non-trivial comparisons, `rfscorer` uses mathematical optimization to estimate recommendation scores that satisfy the natural monotonicity of recency and frequency. This gives a data-driven, natural recommendation order over the items a user has previously interacted with.
+Product recommendation comes down to deciding which previously interacted items to prioritize. For example:
 
-Beyond serving as a standalone recommendation ranking, `rfscorer`'s scores can also be used as input to downstream models — for example, as a rating matrix for collaborative filtering or as features for ML models.
+- **[By frequency]** Item A viewed once 🆚 Item B viewed **twice** ▶ recommend **B**, viewed more often
+- **[By recency]** Item A viewed **1 day ago** 🆚 Item C viewed 2 days ago ▶ recommend **A**, viewed more recently
+- **[Trade-off]** Item A viewed once **1 day ago** 🆚 Item D viewed **twice** 2 days ago ▶ **hard to judge by intuition**
+
+For such non-trivial cases, `rfscorer` uses mathematical optimization to estimate scores that capture the recency–frequency interaction while satisfying their natural monotonicity, giving a data-driven, natural recommendation order over previously interacted items.
 
 > 📄 **Based on the paper:** Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” *Knowledge-Based Systems*, Vol. 99, 2016, pp. 157–167. [[paper]](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
+
+`rfscorer`'s scores also serve as input to downstream models — a rating matrix for collaborative filtering or features for ML models. These features capture the recency–frequency interaction, helping improve downstream accuracy.
+
+> 📄 **Based on the paper:** Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Improving collaborative filtering recommendations by estimating user preferences from clickstream data,” *Electronic Commerce Research and Applications*, Vol. 37, Article 100877, 2019. [[paper]](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)
 
 ## Features
 
