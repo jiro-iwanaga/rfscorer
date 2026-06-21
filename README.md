@@ -4,7 +4,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/rfscorer.svg)](https://pypi.org/project/rfscorer/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/rfscorer.svg)](https://pypi.org/project/rfscorer/)
 
-[日本語 README](#RFscorer-日本語readme)
+[日本語 README](#rfscorer-日本語readme)
 
 `rfscorer` is a Python package for Recency-Frequency based recommendation scoring.
 
@@ -27,9 +27,7 @@ For such non-trivial cases, `rfscorer` uses mathematical optimization to estimat
 
 > 📄 **Based on the paper:** Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” *Knowledge-Based Systems*, Vol. 99, 2016, pp. 157–167. [[paper]](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
 
-`rfscorer`'s scores also serve as input to downstream models — a rating matrix for collaborative filtering or features for ML models. These features capture the recency–frequency interaction, helping improve downstream accuracy.
-
-> 📄 **Based on the paper:** Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Improving collaborative filtering recommendations by estimating user preferences from clickstream data,” *Electronic Commerce Research and Applications*, Vol. 37, Article 100877, 2019. [[paper]](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)
+`rfscorer`'s scores also serve as input to downstream models — a rating matrix for collaborative filtering or features for ML models. These features capture the recency–frequency interaction and can help improve downstream accuracy ([paper](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)).
 
 ## Features
 
@@ -195,7 +193,7 @@ MIT License
 -----
 # RFscorer (日本語README)
 
-[English README](#RFscorer)
+[English README](#rfscorer)
 
 `rfscorer` は、最新度（Recency）と頻度（Frequency）に基づいて、ユーザーが過去に接触した商品の推薦スコア（商品選択確率）を推定する Python パッケージです。
 
@@ -220,15 +218,12 @@ MIT License
 
 > 📄 **Based on the paper:** Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” *Knowledge-Based Systems*, Vol. 99, 2016, pp. 157–167. [[論文]](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
 
-また、`rfscorer` が出力する商品選択確率は、下流のモデルの入力（協調フィルタリングの評価値行列・機械学習モデルの特徴量）としても有効です。
-最新度と頻度の交互作用が反映された有用な特徴量によるモデル構築ができます。
+また、`rfscorer` が出力する商品選択確率は、下流のモデルの入力（協調フィルタリングの評価値行列・機械学習モデルの特徴量）としても有効です。最新度と頻度の交互作用が反映された有用な特徴量によるモデル構築ができます（[論文](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)）。
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/recommendation_system_architecture_using_rfscoring.png" width="720"/>
 </p>
 <p align="center"><i>RFスコアリングを用いた推薦システム構成</i></p>
-
-> 📄 **Based on the paper:** Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Improving collaborative filtering recommendations by estimating user preferences from clickstream data,” *Electronic Commerce Research and Applications*, Vol. 37, Article 100877, 2019. [[論文]](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)
 
 
 ## パッケージの特徴
