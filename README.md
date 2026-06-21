@@ -124,6 +124,10 @@ Each surface clearly captures how the product-choice probability behaves with re
 
 For the complete list of tutorials, see [examples/](examples/).
 
+## Slides
+
+📊 [Overview slides (PDF, in Japanese)](https://github.com/jiro-iwanaga/rfscorer/blob/main/slides/rfscorer_overview_ja.pdf) — concept, features, and math model (CC BY 4.0)
+
 ## References
 
 <details>
@@ -224,6 +228,10 @@ MIT License
   <img src="https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/recommendation_system_architecture_using_rfscoring.png" width="720"/>
 </p>
 <p align="center"><i>RFスコアリングを用いた推薦システム構成</i></p>
+
+## 紹介スライド
+
+📊 [rfscorer 紹介スライド（PDF・日本語）](https://github.com/jiro-iwanaga/rfscorer/blob/main/slides/rfscorer_overview_ja.pdf)（CC BY 4.0）
 
 
 ## パッケージの特徴
