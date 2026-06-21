@@ -232,3 +232,5 @@ examples/*.csv
 examples/*.png
 examples/rfscorer.pkl
 examples/scorer.zip
+
+slides/rfscorer_overview_ja.pptx

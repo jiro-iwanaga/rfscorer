@@ -136,8 +136,7 @@ For the complete list of tutorials, see [examples/](examples/).
 
 If you use `rfscorer` in academic work, you can cite it as follows in the body of your paper:
 
-> We used `rfscorer` (Iwanaga et al., 2016), a Python library for Recency-Frequency
-> based recommendation scoring for product recommendation.¹
+> We used `rfscorer` (Iwanaga et al., 2016), a Python library for Recency-Frequency-based recommendation scoring.¹
 >
 > ¹ https://github.com/jiro-iwanaga/rfscorer
 
@@ -319,8 +318,7 @@ scorer.plot_probability_surface(kind="mcc")
 
 学術論文等で `rfscorer` を利用する場合は、論文の引用と本Githubへのリンクを脚注を加え、本文中で以下のように引用できます：
 
-> We used `rfscorer` (Iwanaga et al., 2016), a Python library for Recency-Frequency
-> based recommendation scoring for product recommendation.¹
+> We used `rfscorer` (Iwanaga et al., 2016), a Python library for Recency-Frequency-based recommendation scoring.¹
 >
 > ¹ https://github.com/jiro-iwanaga/rfscorer
 
