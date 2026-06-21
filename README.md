@@ -128,12 +128,17 @@ For the complete list of tutorials, see [examples/](examples/).
 
 ## References
 
+<details>
+<summary>Show references</summary>
+
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
 
 - [Jiro Iwanaga, Kyota Ishihara, Naoki Nishimura, and Ikki Tanaka, *Pythonではじめる数理最適化 ―ケーススタディでモデリングのスキルを身につけよう―*(in Japanese), Ohmsha, 2021.](https://www.ohmsha.co.jp/book/9784274231759/)
   - [Chapter 7: 商品推薦のための興味のスコアリング(in Japanese)](https://github.com/ohmsha/PyOptBook/tree/main/7.recommendation)
 
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Improving collaborative filtering recommendations by estimating user preferences from clickstream data,” Electronic Commerce Research and Applications, Volume 37, Article 100877, 2019.](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)
+
+</details>
 
 
 ## Citation
@@ -323,12 +328,17 @@ scorer.plot_probability_surface(kind="mcc")
 
 ## 参考文献
 
+<details>
+<summary>参考文献を表示</summary>
+
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, "Estimating product-choice probabilities from recency and frequency of page views," Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
 
 - [岩永二郎・石原響太・西村直樹・田中一樹『Pythonではじめる数理最適化 ―ケーススタディでモデリングのスキルを身につけよう―』, オーム社, 2021.](https://www.ohmsha.co.jp/book/9784274231759/)
   - [第7章: 商品推薦のための興味のスコアリング](https://github.com/ohmsha/PyOptBook/tree/main/7.recommendation)
 
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, "Improving collaborative filtering recommendations by estimating user preferences from clickstream data," Electronic Commerce Research and Applications, Volume 37, Article 100877, 2019.](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)
+
+</details>
 
 
 ## 引用について
