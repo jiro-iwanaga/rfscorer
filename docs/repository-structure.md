@@ -40,7 +40,8 @@ rfscorer/
 │   ├── tutorial_practical_ja.ipynb             # 実践編チュートリアル（日本語）
 │   ├── tutorial_advanced_fit_rolling_en.ipynb  # 応用編チュートリアル（英語）
 │   └── tutorial_advanced_fit_rolling_ja.ipynb  # 応用編チュートリアル（日本語）
-├── img/                              # README 向け画像
+├── img/                              # README 向け画像（確率面・構成図・スライドサムネ等）
+├── slides/                           # 紹介スライド（PDF / PPTX、英語・日本語）
 └── docs/                             # ドキュメント
     ├── product-requirements.md       # プロダクト要求定義書
     ├── functional-design.md          # 機能仕様書
@@ -107,7 +108,18 @@ rfscorer/
 
 ### `img/`
 
-README.md に埋め込む確率面ワイヤーフレームの画像を配置する。
+README.md に埋め込む画像を配置する。確率面ワイヤーフレーム（`surface_*.png`）・推薦システム構成図（`recommendation_system_architecture_using_rfscoring_*.png`）・スライド表紙サムネ（`slide_cover_*.png`）などを含む。
+
+### `slides/`
+
+紹介スライドを配置する。英語版・日本語版それぞれの PDF（README からリンク・サムネイル参照）と、編集元の PPTX を含む。
+
+| パス | 説明 |
+|------|------|
+| `rfscorer_overview_en.pdf` | 紹介スライド（英語、配布用 PDF） |
+| `rfscorer_overview_ja.pdf` | 紹介スライド（日本語、配布用 PDF） |
+| `rfscorer_overview_en.pptx` | 紹介スライドの編集元（英語、PowerPoint） |
+| `rfscorer_overview_ja.pptx` | 紹介スライドの編集元（日本語、PowerPoint） |
 
 ### `docs/`
 

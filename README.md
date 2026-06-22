@@ -36,7 +36,9 @@ For such non-trivial cases, `rfscorer` uses mathematical optimization to estimat
 
 ## Slides
 
-📊 [Overview slides (PDF)](https://github.com/jiro-iwanaga/rfscorer/blob/main/slides/rfscorer_overview_en.pdf)(CC BY 4.0)
+<a href="https://github.com/jiro-iwanaga/rfscorer/blob/main/slides/rfscorer_overview_en.pdf"><img src="https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/slide_cover_en.png" width="480"/></a>
+
+[Overview slides (PDF)](https://github.com/jiro-iwanaga/rfscorer/blob/main/slides/rfscorer_overview_en.pdf) (CC BY 4.0)
 
 ## Features
 
@@ -236,7 +238,9 @@ MIT License
 
 ## 紹介スライド
 
-📊 [rfscorer 紹介スライド（PDF・日本語）](https://github.com/jiro-iwanaga/rfscorer/blob/main/slides/rfscorer_overview_ja.pdf)（CC BY 4.0）
+<a href="https://github.com/jiro-iwanaga/rfscorer/blob/main/slides/rfscorer_overview_ja.pdf"><img src="https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/slide_cover_ja.png" width="480"/></a>
+
+[rfscorer 紹介スライド（PDF・日本語）](https://github.com/jiro-iwanaga/rfscorer/blob/main/slides/rfscorer_overview_ja.pdf)（CC BY 4.0）
 
 
 ## パッケージの特徴
