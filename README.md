@@ -34,7 +34,7 @@ For such non-trivial cases, `rfscorer` uses mathematical optimization to estimat
 
 ## Slides
 
-<a href="https://github.com/jiro-iwanaga/rfscorer/blob/main/slides/rfscorer_overview_en.pdf"><img src="https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/slide_cover_en.png" width="480"/></a>
+<a href="https://github.com/jiro-iwanaga/rfscorer/blob/main/slides/rfscorer_overview_en.pdf"><img src="https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/slide_cover_en.png" width="400"/></a>
 
 [Overview slides (PDF)](https://github.com/jiro-iwanaga/rfscorer/blob/main/slides/rfscorer_overview_en.pdf) (CC BY 4.0)
 
@@ -154,7 +154,18 @@ Each surface clearly captures how the product-choice probability behaves with re
 - **Monotonicity**: Probabilities with RF monotonicity constraints. Guarantees items are recommended in natural order.
 - **Monotonicity-Convex-Concave**: Probabilities with RF monotonicity and convexity-concavity constraints. Produces the smoothest surface.
 
+## Examples
+
+- [examples/tutorial_beginner_en.ipynb](examples/tutorial_beginner_en.ipynb) — end-to-end walkthrough: load data, fit, optimize, visualize, transform, and evaluate
+- [examples/tutorial_practical_en.ipynb](examples/tutorial_practical_en.ipynb) — practical workflow: chronological train/test split, build the various models, compare accuracy, and save/load the model
+- [examples/tutorial_advanced_fit_rolling_en.ipynb](examples/tutorial_advanced_fit_rolling_en.ipynb) — advanced workflow: time-series rolling training with `fit_rolling()` to stabilize empirical probabilities across multiple reference dates
+
+For the complete list of tutorials, see [examples/](examples/).
+
 ## API Reference
+
+<details>
+<summary>Show API reference</summary>
 
 | API | Description |
 |-----|-------------|
@@ -169,13 +180,7 @@ Each surface clearly captures how the product-choice probability behaves with re
 | `.plot_probability_surface(kind)` | Visualize the 3D surface of product-choice probabilities |
 | `.save(path)` / `.load(path)` | Save / load the model |
 
-## Examples
-
-- [examples/tutorial_beginner_en.ipynb](examples/tutorial_beginner_en.ipynb) — end-to-end walkthrough: load data, fit, optimize, visualize, transform, and evaluate
-- [examples/tutorial_practical_en.ipynb](examples/tutorial_practical_en.ipynb) — practical workflow: chronological train/test split, build the various models, compare accuracy, and save/load the model
-- [examples/tutorial_advanced_fit_rolling_en.ipynb](examples/tutorial_advanced_fit_rolling_en.ipynb) — advanced workflow: time-series rolling training with `fit_rolling()` to stabilize empirical probabilities across multiple reference dates
-
-For the complete list of tutorials, see [examples/](examples/).
+</details>
 
 ## References
 
@@ -278,7 +283,7 @@ MIT License
 
 ## 紹介スライド
 
-<a href="https://github.com/jiro-iwanaga/rfscorer/blob/main/slides/rfscorer_overview_ja.pdf"><img src="https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/slide_cover_ja.png" width="480"/></a>
+<a href="https://github.com/jiro-iwanaga/rfscorer/blob/main/slides/rfscorer_overview_ja.pdf"><img src="https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/slide_cover_ja.png" width="400"/></a>
 
 [rfscorer 紹介スライド（PDF・日本語）](https://github.com/jiro-iwanaga/rfscorer/blob/main/slides/rfscorer_overview_ja.pdf)（CC BY 4.0）
 
@@ -398,7 +403,18 @@ scorer.plot_probability_surface(kind="mcc")
 - **Monotonicity（単調性）**: RF単調性制約を課した商品選択確率。商品を自然な順序で推薦することを保証する。
 - **Monotonicity-Convex-Concave（単調性＋凸凹）**: RF単調性制約と凹凸性制約を課した商品選択確率。最も滑らかなグラフを生成する
 
-## API一覧
+## サンプル
+
+- [examples/tutorial_beginner_ja.ipynb](examples/tutorial_beginner_ja.ipynb) — 初級編では、最小限の利用方法を紹介します。データロード、モデル構築・最適化・可視化、推薦スコア算出、精度評価までのコードを紹介します。
+- [examples/tutorial_practical_ja.ipynb](examples/tutorial_practical_ja.ipynb) — 実践編では、主要機能を紹介します。具体的には、時系列での訓練・テスト分割、各種モデル構築と精度比較、モデルの保存・ロードを紹介します。
+- [examples/tutorial_advanced_fit_rolling_ja.ipynb](examples/tutorial_advanced_fit_rolling_ja.ipynb) — 応用編では、`fit_rolling()` を用いたローリング集計を扱います。複数の基準日にわたって集計することで経験的商品選択確率を安定させる方法を紹介します。
+
+全チュートリアルの一覧は [examples/](examples/) を参照してください。
+
+## APIリファレンス
+
+<details>
+<summary>APIリファレンスを表示</summary>
 
 | API | 説明 |
 |-----|------|
@@ -413,13 +429,7 @@ scorer.plot_probability_surface(kind="mcc")
 | `.plot_probability_surface(kind)` | 商品選択確率の3D曲面を可視化 |
 | `.save(path)` / `.load(path)` | モデルの保存・読み込み |
 
-## サンプル
-
-- [examples/tutorial_beginner_ja.ipynb](examples/tutorial_beginner_ja.ipynb) — 初級編では、最小限の利用方法を紹介します。データロード、モデル構築・最適化・可視化、推薦スコア算出、精度評価までのコードを紹介します。
-- [examples/tutorial_practical_ja.ipynb](examples/tutorial_practical_ja.ipynb) — 実践編では、主要機能を紹介します。具体的には、時系列での訓練・テスト分割、各種モデル構築と精度比較、モデルの保存・ロードを紹介します。
-- [examples/tutorial_advanced_fit_rolling_ja.ipynb](examples/tutorial_advanced_fit_rolling_ja.ipynb) — 応用編では、`fit_rolling()` を用いたローリング集計を扱います。複数の基準日にわたって集計することで経験的商品選択確率を安定させる方法を紹介します。
-
-全チュートリアルの一覧は [examples/](examples/) を参照してください。
+</details>
 
 ## 参考文献
 
