@@ -38,6 +38,19 @@ For such non-trivial cases, `rfscorer` uses mathematical optimization to estimat
 
 [Overview slides (PDF)](https://github.com/jiro-iwanaga/rfscorer/blob/main/slides/rfscorer_overview_en.pdf) (CC BY 4.0)
 
+## Target Users
+
+`rfscorer` is designed for both practitioners and researchers.
+- Practitioners
+  - Data scientists / ML engineers
+  - Marketers / analysts
+  - Recommendation system owners on EC / content platforms
+- Researchers
+  - Recommender systems / information retrieval
+  - Marketing science / consumer behavior
+  - Operations research / mathematical optimization
+  - Cognitive psychology (memory / mere-exposure effect)
+
 ## Features
 
 | Feature | Description |
@@ -83,6 +96,22 @@ df_test_obs, _ = split_by_date(df_test, target_date, 7, 1)
 df_scores = scorer.transform(df_test_obs, target_date, kind="mono")
 ```
 
+**Input data (behavior history)**
+
+The input is a behavior history with three columns: `user`, `item`, `datetime`.
+
+| user  | item  | datetime   |
+|-------|-------|------------|
+| u_001 | i_032 | 2026-07-06 |
+| u_001 | i_032 | 2026-07-05 |
+| u_001 | i_017 | 2026-07-05 |
+| u_002 | i_011 | 2026-07-06 |
+| ...   | ...   | ...        |
+
+**Output data (recommendation scores)**
+
+`transform()` returns a table that adds recency, frequency, product-choice probability, and recommendation order to each `user` × `item`.
+
 | user   | item   | recency | frequency | probability | order |
 |--------|--------|--------:|----------:|------------:|------:|
 | u_001  | i_032  |       1 |         4 |      0.1167 |     1 |
@@ -124,6 +153,21 @@ Each surface clearly captures how the product-choice probability behaves with re
 - **Empirical**: Raw probabilities without constraints. Noisy and may violate monotonicity, sometimes recommending items in unnatural order.
 - **Monotonicity**: Probabilities with RF monotonicity constraints. Guarantees items are recommended in natural order.
 - **Monotonicity-Convex-Concave**: Probabilities with RF monotonicity and convexity-concavity constraints. Produces the smoothest surface.
+
+## API Reference
+
+| API | Description |
+|-----|-------------|
+| `split_by_date(df, date, obs, gt)` | Split a behavior history into observation and ground-truth data chronologically |
+| `RecencyFrequencyScorer()` | Create a scorer |
+| `.fit(df_obs, df_gt)` | Aggregate empirical product-choice probabilities per recency × frequency |
+| `.fit_rolling(...)` | Stabilize empirical probabilities by rolling aggregation over multiple reference dates |
+| `.optimize(kind="mono")` | Estimate scores satisfying constraints such as monotonicity via mathematical optimization |
+| `.transform(df_obs, date, kind)` | Compute recommendation scores (`probability` / `order`) |
+| `.predict(r, f, kind)` | Return the product-choice probability for a given (recency, frequency) |
+| `.evaluate(df_rec, df_gt)` | Evaluate recommendation accuracy |
+| `.plot_probability_surface(kind)` | Visualize the 3D surface of product-choice probabilities |
+| `.save(path)` / `.load(path)` | Save / load the model |
 
 ## Examples
 
