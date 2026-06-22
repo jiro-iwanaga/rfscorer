@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-06-22
+
+Documentation, slides, and images only; no library code or public API changes.
+
+### Added
+
+- Introductory slides under `slides/`: `rfscorer_overview_en.pdf` / `rfscorer_overview_ja.pdf`
+  (distributed under CC BY 4.0), with a new Slides / 紹介スライド section in the README that links
+  to each PDF via a cover thumbnail. The editable PowerPoint sources
+  (`rfscorer_overview_en.pptx` / `_ja.pptx`) are kept locally but git-ignored.
+- README images:
+  - `img/slide_cover_en.png` / `img/slide_cover_ja.png`: slide cover thumbnails used in the Slides
+    section.
+  - `img/recommendation_system_architecture_using_rfscoring_en.png` / `_ja.png`: a recommendation
+    system architecture diagram embedded in the README intro.
+
+### Changed
+
+- README overhaul (English and Japanese sections aligned):
+  - Intro rewritten to explain the **recency** and **frequency** signals individually and to walk
+    through concrete by-frequency / by-recency / trade-off comparison examples motivating the
+    optimization-based scoring; added an inline note citing the source paper.
+  - Features converted from a bullet list to a table and reframed: "Calibration-free" → "Stable
+    probability estimation", plus new "Downstream use" and "Rich diagnostics & visualization" rows.
+  - References and Citation sections collapsed into `<details>` toggles.
+  - Anchor links to the cross-language README lowercased (`#rfscorer` / `#rfscorer-日本語readme`).
+- `docs/repository-structure.md`: documented the new `slides/` directory (PDF distribution +
+  PPTX sources) and expanded the `img/` description to cover the architecture diagrams and slide
+  thumbnails.
+- `.gitignore`: ignore the slide PPTX edit sources (`slides/rfscorer_overview_*.pptx`).
+
 ## [0.5.1] - 2026-06-19
 
 Documentation and examples only; no library code or public API changes.
