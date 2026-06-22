@@ -23,11 +23,9 @@ Product recommendation comes down to deciding which previously interacted items 
 - **[By recency]** Item A viewed **1 day ago** 🆚 Item C viewed 2 days ago ▶ recommend **A**, viewed more recently
 - **[Trade-off]** Item A viewed once **1 day ago** 🆚 Item D viewed **twice** 2 days ago ▶ **hard to judge by intuition**
 
-For such non-trivial cases, `rfscorer` uses mathematical optimization to estimate scores that capture the recency–frequency interaction while satisfying their natural monotonicity, giving a data-driven, natural recommendation order over previously interacted items.
+For such non-trivial cases, `rfscorer` uses mathematical optimization to estimate scores that capture the recency–frequency interaction while satisfying their natural monotonicity, giving a data-driven, natural recommendation order over previously interacted items ([Iwanaga et al., *KBS* (2016)](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)).
 
-> 📄 **Based on the paper:** Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” *Knowledge-Based Systems*, Vol. 99, 2016, pp. 157–167. [[paper]](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
-
-`rfscorer`'s scores also serve as input to downstream models — a rating matrix for collaborative filtering or features for ML models. These features capture the recency–frequency interaction and can help improve downstream accuracy ([paper](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)).
+`rfscorer`'s scores also serve as input to downstream models — a rating matrix for collaborative filtering or features for ML models. These features capture the recency–frequency interaction and can help improve downstream accuracy ([Iwanaga et al., *ECRA* (2019)](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)).
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/recommendation_system_architecture_using_rfscoring_en.png" width="720"/>
@@ -225,11 +223,9 @@ MIT License
 - **【トレードオフ】** **1日前**に1回閲覧した商品A　🆚　2日前に**2回**閲覧した商品D　▶　**直感では判断できない**
 
 `rfscorer` は、このような非自明な比較に対して、数理最適化により、最新度と頻度の交互作用を考慮しつつ、自然な単調性を満たす推薦スコアを推定します。
-これにより、ユーザーが過去に接触した商品に対して、データに基づく自然な推薦順位を与えることができます。
+これにより、ユーザーが過去に接触した商品に対して、データに基づく自然な推薦順位を与えることができます([Iwanaga et al., *KBS* (2016)](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848))。
 
-> 📄 **Based on the paper:** Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” *Knowledge-Based Systems*, Vol. 99, 2016, pp. 157–167. [[論文]](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
-
-また、`rfscorer` が出力する商品選択確率は、下流のモデルの入力（協調フィルタリングの評価値行列・機械学習モデルの特徴量）としても有効です。最新度と頻度の交互作用が反映された有用な特徴量によるモデル構築ができます（[論文](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)）。
+また、`rfscorer` が出力する商品選択確率は、下流のモデルの入力（協調フィルタリングの評価値行列・機械学習モデルの特徴量）としても有効です。最新度と頻度の交互作用が反映された有用な特徴量によるモデル構築ができます([Iwanaga et al., *ECRA* (2019)](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547))。
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/recommendation_system_architecture_using_rfscoring_ja.png" width="720"/>
@@ -242,6 +238,18 @@ MIT License
 
 [rfscorer 紹介スライド（PDF・日本語）](https://github.com/jiro-iwanaga/rfscorer/blob/main/slides/rfscorer_overview_ja.pdf)（CC BY 4.0）
 
+## 想定ユーザー
+
+`rfscorer` は実務家と研究者が利用することを想定しています。
+- 実務家
+  - データサイエンティスト・ML エンジニア
+  - マーケター・アナリスト
+  - EC・コンテンツ基盤の推薦システム担当者
+- 研究者
+  - 推薦システム・情報検索
+  - マーケティングサイエンス・消費者行動論
+  - オペレーションズリサーチ・数理最適化
+  - 認知心理学（記憶・単純接触効果）
 
 ## パッケージの特徴
 
@@ -252,7 +260,7 @@ MIT License
 | **説&#8288;明&#8288;可&#8288;能&#8288;性** | 数理最適化によりRF単調性を満たすスコアを推定するため、推薦理由を説明しやすい |
 | **安&#8288;定&#8288;し&#8288;た&#8288;確&#8288;率&#8288;推&#8288;定** | 最新度と頻度から商品選択確率を直接推定するため、機械学習モデルの出力を確率スケールへ変換する際の不安定さを回避できる |
 | **下&#8288;流&#8288;モ&#8288;デ&#8288;ル&#8288;へ&#8288;の&#8288;活&#8288;用** | 単独の推薦スコアとしてだけでなく、協調フィルタリングの評価値行列や機械学習モデルの特徴量としても利用可能 |
-| **豊&#8288;富&#8288;な&#8288;診&#8288;断&#8288;と&#8288;可&#8288;視&#8288;化** | 各種統計量の出力や可視化機能が充実。実務家は業務で説明しやすく、研究者は分析結果を論文に記載しやすい |
+| **豊&#8288;富&#8288;な&#8288;診&#8288;断&#8288;と&#8288;可&#8288;視&#8288;化** | 各種統計量の出力や可視化機能が充実。実務家は業務で説明しやすく、研究者は分析報告をしやすい |
 
 ## インストール
 
@@ -287,6 +295,22 @@ df_test = ...  # テストデータ（カラム: user, item, datetime）
 df_test_obs, _ = split_by_date(df_test, target_date, 7, 1)
 df_scores = scorer.transform(df_test_obs, target_date, kind="mono")
 ```
+
+**入力データ（行動履歴）**
+
+入力は `user`・`item`・`datetime` の3カラムを持つ行動履歴です。
+
+| user  | item  | datetime   |
+|-------|-------|------------|
+| u_001 | i_032 | 2026-07-06 |
+| u_001 | i_032 | 2026-07-05 |
+| u_001 | i_017 | 2026-07-05 |
+| u_002 | i_011 | 2026-07-06 |
+| ...   | ...   | ...        |
+
+**出力データ（推薦スコア）**
+
+各 `user` × `item` に最新度・頻度・商品選択確率・推薦順位を付与したテーブルを返します。
 
 | user   | item   | recency | frequency | probability | order |
 |--------|--------|--------:|----------:|------------:|------:|
@@ -329,6 +353,21 @@ scorer.plot_probability_surface(kind="mcc")
 - **Empirical（経験確率）**: 制約を課していない商品選択確率。ノイズにより単調性を満たさないため不自然な順序で商品を推薦する場合がある。
 - **Monotonicity（単調性）**: RF単調性制約を課した商品選択確率。商品を自然な順序で推薦することを保証する。
 - **Monotonicity-Convex-Concave（単調性＋凸凹）**: RF単調性制約と凹凸性制約を課した商品選択確率。最も滑らかなグラフを生成する
+
+## API一覧
+
+| API | 説明 |
+|-----|------|
+| `split_by_date(df, date, obs, gt)` | 行動履歴を観測データ・正解データに時系列分割 |
+| `RecencyFrequencyScorer()` | スコアラーを生成 |
+| `.fit(df_obs, df_gt)` | 最新度×頻度ごとに経験的な商品選択確率を集計 |
+| `.fit_rolling(...)` | 複数の基準日でローリング集計し経験的商品選択確率を安定化 |
+| `.optimize(kind="mono")` | 数理最適化で単調性などの制約を満たすスコアを推定 |
+| `.transform(df_obs, date, kind)` | 推薦スコア（`probability` / `order`）を算出 |
+| `.predict(r, f, kind)` | 指定した (recency, frequency) の商品選択確率を返す |
+| `.evaluate(df_rec, df_gt)` | 推薦結果の精度を評価 |
+| `.plot_probability_surface(kind)` | 商品選択確率の3D曲面を可視化 |
+| `.save(path)` / `.load(path)` | モデルの保存・読み込み |
 
 ## サンプル
 
