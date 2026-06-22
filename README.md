@@ -232,7 +232,7 @@ MIT License
 また、`rfscorer` が出力する商品選択確率は、下流のモデルの入力（協調フィルタリングの評価値行列・機械学習モデルの特徴量）としても有効です。最新度と頻度の交互作用が反映された有用な特徴量によるモデル構築ができます（[論文](https://www.sciencedirect.com/science/article/abs/pii/S1567422319300547)）。
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/recommendation_system_architecture_using_rfscoring.png" width="720"/>
+  <img src="https://raw.githubusercontent.com/jiro-iwanaga/rfscorer/main/img/recommendation_system_architecture_using_rfscoring_ja.png" width="720"/>
 </p>
 <p align="center"><i>RFスコアリングを用いた推薦システム構成</i></p>
 
