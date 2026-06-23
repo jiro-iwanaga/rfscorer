@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-06-23
+
+### Fixed
+
+- `split_by_date()` no longer raises `OutOfBoundsDatetime` ("Cannot cast 0001-01-01 ... to
+  unit='ns' without overflow") on `datetime64[ns]` time columns. The internal ordinal
+  conversion (`normalize_sequence_col`) anchored on `0001-01-01`, which is outside the
+  nanosecond-resolution range; subtracting it from an `ns` series forced a resolution alignment
+  that overflowed. The origin is now the Unix epoch (`1970-01-01`) plus its ordinal offset,
+  yielding identical results without overflow. Surfaced with nanosecond datetimes
+  (e.g. `split_by_date(df, "2015-07-06", observation_days=6, gt_days=1)`).
+
 ## [0.5.3] - 2026-06-22
 
 ### Changed
