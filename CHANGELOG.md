@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-06-23
+
+### Fixed
+
+- `plot_marginal_probability()`: the recency and frequency x-axes now use an integer tick
+  locator (`MaxNLocator(integer=True)`), so the ticks no longer show fractional values
+  (e.g. `1.5`, `2.5`) when the value range is small. Applies to all `kind` values
+  (`er`, `ef`, `mr`, `mf`, `rboth`, `fboth`). Mirrors the same fix applied to
+  `plot_probability_surface()` in v0.5.5.
+
 ## [0.5.5] - 2026-06-23
 
 ### Fixed
