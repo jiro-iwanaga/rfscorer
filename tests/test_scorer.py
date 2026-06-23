@@ -1492,6 +1492,16 @@ class TestPlotMarginalProbability:
         fig = scorer_fitted.plot_marginal_probability(probability_label="custom_p")
         assert fig.axes[0].get_ylabel() == "custom_p"
 
+    @pytest.mark.parametrize("kind", ["er", "ef"])
+    def test_x_axis_ticks_are_integers(self, scorer_fitted, kind):
+        # x 軸 (recency / frequency) は整数次元なので、目盛りに小数 (例: 2.5) が出ない
+        fig = scorer_fitted.plot_marginal_probability(kind=kind)
+        axis = fig.axes[0].xaxis
+        lo, hi = sorted(axis.get_view_interval())
+        ticks = [t for t in axis.get_major_locator()() if lo <= t <= hi]
+        assert ticks, "expected at least one tick within the data range"
+        assert all(float(t).is_integer() for t in ticks)
+
     def test_path_directory_saves_default_name(self, scorer_fitted, tmp_path):
         # ディレクトリを渡すと marginal_{kind}_probability.png として保存される
         scorer_fitted.plot_marginal_probability(kind="er", path=str(tmp_path))
