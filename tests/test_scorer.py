@@ -1283,6 +1283,16 @@ class TestPlotProbabilitySurface:
         fig = scorer_fitted.plot_probability_surface(probability_label="custom_p")
         assert fig.axes[0].get_zlabel() == "custom_p"
 
+    def test_recency_frequency_ticks_are_integers(self, scorer_fitted):
+        # recency / frequency 軸は整数次元なので、目盛りに小数 (例: 2.5) が出ない
+        fig = scorer_fitted.plot_probability_surface(kind="emp")
+        ax = fig.axes[0]
+        for axis in (ax.xaxis, ax.yaxis):
+            lo, hi = sorted(axis.get_view_interval())
+            ticks = [t for t in axis.get_major_locator()() if lo <= t <= hi]
+            assert ticks, "expected at least one tick within the data range"
+            assert all(float(t).is_integer() for t in ticks)
+
     def test_path_directory_saves_default_name(self, scorer_fitted, tmp_path):
         # ディレクトリを渡すと surface_{kind}_probability.png として保存される
         scorer_fitted.plot_probability_surface(kind="emp", path=str(tmp_path))

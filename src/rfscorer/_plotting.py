@@ -105,6 +105,7 @@ class PlottingMixin:
             the requested optimization kind.
         """
         import matplotlib.pyplot as plt
+        from matplotlib.ticker import MaxNLocator
 
         kind = self._normalize_kind(kind)
         if kind in ("mr", "mf", "er", "ef"):
@@ -156,6 +157,10 @@ class PlottingMixin:
         ax.set_ylabel(frequency_label, fontsize=fontsize)
         ax.set_zlabel(probability_label, fontsize=fontsize, labelpad=10)
         ax.tick_params(labelsize=fontsize)
+        # recency と frequency は整数次元なので、自動目盛りが小数刻み (例: 2.5) を
+        # 選ばないよう整数ロケータを指定する。
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.yaxis.set_major_locator(MaxNLocator(integer=True))
         for pane in (ax.xaxis.pane, ax.yaxis.pane, ax.zaxis.pane):
             pane.fill = False
         effective_title = self._SURFACE_TITLES[kind] if title is None else title

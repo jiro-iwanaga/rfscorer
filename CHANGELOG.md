@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-06-23
+
+### Fixed
+
+- `plot_probability_surface()`: the recency (x) and frequency (y) axes now use an integer tick
+  locator (`MaxNLocator(integer=True)`), so the ticks no longer show fractional values
+  (e.g. `0.0`, `2.5`) when the value range is small. Both axes are integer dimensions; matplotlib's
+  default locator could otherwise pick non-integer tick steps. The surface itself is unchanged.
+
 ## [0.5.4] - 2026-06-23
 
 ### Fixed
