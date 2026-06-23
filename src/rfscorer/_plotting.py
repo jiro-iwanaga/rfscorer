@@ -246,6 +246,7 @@ class PlottingMixin:
         optimized series is dashed; single-series plots are solid. All black.
         """
         import matplotlib.pyplot as plt
+        from matplotlib.ticker import MaxNLocator
 
         kind = self._normalize_kind(kind)
         valid_kinds = ("er", "ef", "mr", "mf", "rboth", "fboth")
@@ -308,6 +309,9 @@ class PlottingMixin:
         ax.set_xlabel(x_label, fontsize=fontsize)
         ax.set_ylabel(probability_label, fontsize=fontsize)
         ax.tick_params(labelsize=fontsize)
+        # x 軸 (recency / frequency) は整数次元なので、自動目盛りが小数刻み
+        # (例: 2.5) を選ばないよう整数ロケータを指定する。
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
         effective_title = self._MARGINAL_TITLES[kind] if title is None else title
         if effective_title:
             ax.set_title(effective_title, fontsize=fontsize)
