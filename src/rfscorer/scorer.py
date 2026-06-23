@@ -30,6 +30,19 @@ class RecencyFrequencyScorer(PlottingMixin):
         "monotonic_convex_concave": "mcc",
     }
 
+    # Canonical kinds accepted by predict() / transform() (export() also allows "all").
+    _INFERENCE_KINDS = ("emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc")
+
+    # Optimization kinds → the dict attribute proving optimize(kind=...) has run.
+    _OPT_RESULT_ATTR = {
+        "mono": "mono_probability_dict_",
+        "mr": "mr_probability_dict_",
+        "mf": "mf_probability_dict_",
+        "mrc": "mrc_probability_dict_",
+        "mfc": "mfc_probability_dict_",
+        "mcc": "mcc_probability_dict_",
+    }
+
     # ---------------------------------------------------------------------------
     # Initialization
     # ---------------------------------------------------------------------------
@@ -677,7 +690,7 @@ class RecencyFrequencyScorer(PlottingMixin):
         constraints (and optionally convexity/concavity constraints).
         Uses weighted least squares as objective.
 
-        Requires fit() to be called first. Depends on cvxpy.
+        Requires fit() or fit_rolling() to be called first. Depends on cvxpy.
 
         Parameters
         ----------
@@ -696,7 +709,9 @@ class RecencyFrequencyScorer(PlottingMixin):
             constraints.  When 0.0 (default), weak monotonicity is used
             (non-strict inequalities allow ties between adjacent levels).
             When positive, strict monotonicity is enforced, preventing ties
-            between adjacent recency or frequency levels.
+            between adjacent recency or frequency levels. Must be non-negative
+            and not exceed the data-dependent maximum feasible gap; otherwise
+            ValueError is raised.
         verbose : bool, default False
             If True, print optimization solver status information.
 
@@ -707,9 +722,10 @@ class RecencyFrequencyScorer(PlottingMixin):
         Raises
         ------
         ValueError
-            If kind is not one of the accepted values.
+            If kind is not one of the accepted values, or if eps is negative
+            or exceeds the maximum feasible gap given the data.
         RuntimeError
-            If fit() has not been called first.
+            If neither fit() nor fit_rolling() has been called first.
         """
         kind = self._normalize_kind(kind)
         if kind not in ("mono", "mr", "mf", "mrc", "mfc", "mcc"):
@@ -722,8 +738,7 @@ class RecencyFrequencyScorer(PlottingMixin):
         except ImportError:
             from rfscorer.optimizer import RecencyFrequencyOptimizer
 
-        if self.emp_probability_dict_ is None:
-            raise RuntimeError("fit() must be called before optimize().")
+        self._check_fitted("optimize")
 
         optimizer = RecencyFrequencyOptimizer()
         optimizer.set_data(self._R, self._F, self._RF2N, self._RF2Prob)
@@ -818,7 +833,7 @@ class RecencyFrequencyScorer(PlottingMixin):
         ValueError
             If kind is not one of the accepted values.
         RuntimeError
-            If fit() has not been called for
+            If neither fit() nor fit_rolling() has been called for
             emp/er/ef kinds, or if optimize(kind=...) has not been called
             for the requested optimization kind.
         """
@@ -828,25 +843,15 @@ class RecencyFrequencyScorer(PlottingMixin):
             raise TypeError("r must be a positive integer.")
         if not isinstance(f, int) or f < 1:
             raise TypeError("f must be a positive integer.")
-        if kind not in ("emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc"):
+        if kind not in self._INFERENCE_KINDS:
             raise ValueError(
                 f"kind must be 'emp', 'er', 'ef', 'mono', 'mr', 'mf', 'mrc', 'mfc', or 'mcc',"
                 f" got {kind!r}."
             )
-        if kind in ("emp", "er", "ef") and self.emp_probability_dict_ is None:
-            raise RuntimeError("fit() must be called before predict().")
-        if kind == "mono" and self.mono_probability_dict_ is None:
-            raise RuntimeError("optimize(kind='mono') must be called before predict(kind='mono').")
-        if kind == "mr" and self.mr_probability_dict_ is None:
-            raise RuntimeError("optimize(kind='mr') must be called before predict(kind='mr').")
-        if kind == "mf" and self.mf_probability_dict_ is None:
-            raise RuntimeError("optimize(kind='mf') must be called before predict(kind='mf').")
-        if kind == "mrc" and self.mrc_probability_dict_ is None:
-            raise RuntimeError("optimize(kind='mrc') must be called before predict(kind='mrc').")
-        if kind == "mfc" and self.mfc_probability_dict_ is None:
-            raise RuntimeError("optimize(kind='mfc') must be called before predict(kind='mfc').")
-        if kind == "mcc" and self.mcc_probability_dict_ is None:
-            raise RuntimeError("optimize(kind='mcc') must be called before predict(kind='mcc').")
+        if kind in ("emp", "er", "ef"):
+            self._check_fitted("predict")
+        else:
+            self._check_optimized(kind, "predict")
 
         if kind in ("mr", "er"):
             r_clipped = min(r, self.recency_limit)
@@ -857,17 +862,7 @@ class RecencyFrequencyScorer(PlottingMixin):
 
         r = min(r, self.recency_limit)
         f = min(f, self.frequency_limit)
-        if kind == "emp":
-            prob = self.emp_probability_dict_.get((r, f), 0.0)
-        elif kind == "mono":
-            prob = self.mono_probability_dict_.get((r, f), 0.0)
-        elif kind == "mrc":
-            prob = self.mrc_probability_dict_.get((r, f), 0.0)
-        elif kind == "mfc":
-            prob = self.mfc_probability_dict_.get((r, f), 0.0)
-        else:
-            prob = self.mcc_probability_dict_.get((r, f), 0.0)
-        return prob
+        return self._probability_dict(kind).get((r, f), 0.0)
 
     def transform(
         self,
@@ -923,31 +918,17 @@ class RecencyFrequencyScorer(PlottingMixin):
             If kind is not one of the accepted values, or if ref cannot be
             normalized.
         RuntimeError
-            If fit() has not been called, or if
+            If neither fit() nor fit_rolling() has been called, or if
             optimize(kind=...) has not been called for the requested kind.
         """
         kind = self._normalize_kind(kind)
-        if kind not in ("emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc"):
+        if kind not in self._INFERENCE_KINDS:
             raise ValueError(
                 f"kind must be 'emp', 'er', 'ef', 'mono', 'mr', 'mf', 'mrc', 'mfc', or 'mcc',"
                 f" got {kind!r}."
             )
-        if self.emp_probability_dict_ is None:
-            raise RuntimeError("fit() must be called before transform().")
-        if kind == "mono" and self.mono_probability_dict_ is None:
-            raise RuntimeError(
-                "optimize(kind='mono') must be called before transform(kind='mono')."
-            )
-        if kind == "mr" and self.mr_probability_dict_ is None:
-            raise RuntimeError("optimize(kind='mr') must be called before transform(kind='mr').")
-        if kind == "mf" and self.mf_probability_dict_ is None:
-            raise RuntimeError("optimize(kind='mf') must be called before transform(kind='mf').")
-        if kind == "mrc" and self.mrc_probability_dict_ is None:
-            raise RuntimeError("optimize(kind='mrc') must be called before transform(kind='mrc').")
-        if kind == "mfc" and self.mfc_probability_dict_ is None:
-            raise RuntimeError("optimize(kind='mfc') must be called before transform(kind='mfc').")
-        if kind == "mcc" and self.mcc_probability_dict_ is None:
-            raise RuntimeError("optimize(kind='mcc') must be called before transform(kind='mcc').")
+        self._check_fitted("transform")
+        self._check_optimized(kind, "transform")
 
         user_col = user_col or self.user_col
         item_col = item_col or self.item_col
@@ -1123,42 +1104,23 @@ class RecencyFrequencyScorer(PlottingMixin):
         ValueError
             If kind is not one of the accepted values.
         RuntimeError
-            If fit() has not been called for
+            If neither fit() nor fit_rolling() has been called for
             emp/er/ef kinds, or if the required optimize(kind=...) has not been
             called for the requested optimization kind.
         """
         kind = self._normalize_kind(kind)
-        if kind not in ("emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc", "all"):
+        if kind not in (*self._INFERENCE_KINDS, "all"):
             raise ValueError(
                 f"kind must be 'emp', 'er', 'ef', 'mono', 'mr', 'mf', 'mrc', 'mfc', 'mcc',"
                 f" or 'all', got {kind!r}."
             )
-        if kind in ("emp", "er", "ef", "all") and self.emp_probability_ is None:
-            raise RuntimeError("fit() must be called before export_probability_csv().")
-        if kind in ("mono", "all") and self.mono_probability_ is None:
-            raise RuntimeError(
-                "optimize(kind='mono') must be called before export_probability_csv(kind='mono')."
-            )
-        if kind in ("mr", "all") and self.mr_probability_ is None:
-            raise RuntimeError(
-                "optimize(kind='mr') must be called before export_probability_csv(kind='mr')."
-            )
-        if kind in ("mf", "all") and self.mf_probability_ is None:
-            raise RuntimeError(
-                "optimize(kind='mf') must be called before export_probability_csv(kind='mf')."
-            )
-        if kind in ("mrc", "all") and self.mrc_probability_ is None:
-            raise RuntimeError(
-                "optimize(kind='mrc') must be called before export_probability_csv(kind='mrc')."
-            )
-        if kind in ("mfc", "all") and self.mfc_probability_ is None:
-            raise RuntimeError(
-                "optimize(kind='mfc') must be called before export_probability_csv(kind='mfc')."
-            )
-        if kind in ("mcc", "all") and self.mcc_probability_ is None:
-            raise RuntimeError(
-                "optimize(kind='mcc') must be called before export_probability_csv(kind='mcc')."
-            )
+        if kind in ("emp", "er", "ef", "all"):
+            self._check_fitted("export_probability_csv")
+        if kind == "all":
+            for k in self._OPT_RESULT_ATTR:
+                self._check_optimized(k, "export_probability_csv")
+        else:
+            self._check_optimized(kind, "export_probability_csv")
 
         from pathlib import Path
 
@@ -1467,7 +1429,25 @@ class RecencyFrequencyScorer(PlottingMixin):
     # ---------------------------------------------------------------------------
 
     def show(self):
-        """Print a diagnostic summary of fit() results."""
+        """Print a structured diagnostic report of the fitted state.
+
+        Available after fit() or fit_rolling(). The report has four sections:
+
+        - **Data**: physical (de-duplicated) dataset sizes (observation rows,
+          ground truth events, users, items), the observation span, user-item
+          pair counts, and target-event counts (before/after applying limits).
+          After fit_rolling() additional lines report the ground truth span,
+          the rolling configuration, and the pooled (over rolls) row counts.
+        - **Model**: recency_limit and frequency_limit.
+        - **Correlation**: Spearman rho (equal-weight and N-weighted) for
+          recency and frequency, their p-values, and per-slice correlations.
+        - **Empirical Probability Table**: the empirical product-choice
+          probabilities in wide form.
+
+        Returns
+        -------
+        None
+        """
 
         def sec(title=""):
             pad = max(0, 54 - len(title) - 4)
@@ -1630,6 +1610,22 @@ class RecencyFrequencyScorer(PlottingMixin):
 
     def _normalize_kind(self, kind):
         return self._KIND_ALIASES.get(kind, kind)
+
+    def _check_fitted(self, method):
+        """Raise RuntimeError if fit()/fit_rolling() has not produced empirical results."""
+        if self.emp_probability_dict_ is None:
+            raise RuntimeError(f"fit() or fit_rolling() must be called before {method}().")
+
+    def _check_optimized(self, kind, method):
+        """Raise RuntimeError if optimize(kind=...) has not run for an optimization kind.
+
+        No-op for empirical kinds (emp/er/ef), which carry no optimize() state.
+        """
+        attr = self._OPT_RESULT_ATTR.get(kind)
+        if attr is not None and getattr(self, attr) is None:
+            raise RuntimeError(
+                f"optimize(kind={kind!r}) must be called before {method}(kind={kind!r})."
+            )
 
     def _probability_dict(self, kind):
         if kind == "mono":

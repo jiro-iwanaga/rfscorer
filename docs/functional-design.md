@@ -339,8 +339,8 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 | `frequency_corr_pvalue_` | `float \| None` | `frequency_corr_` の p 値（両側検定） | `fit()` 後 |
 | `recency_corr_weighted_` | `float \| None` | $N_r$ 重み付きスピアマン ρ（最新度 $r$ と周辺確率 $p_r$ の加重相関） | `fit()` 後 |
 | `frequency_corr_weighted_` | `float \| None` | $N_f$ 重み付きスピアマン ρ（頻度 $f$ と周辺確率 $p_f$ の加重相関） | `fit()` 後 |
-| `recency_slice_corr_` | `dict[int, float] \| None` | スライス別スピアマン ρ（固定 $r$ ごとに corr($f$, $p_{r,f}$) を算出）。期待符号: 正 | `fit()` 後 |
-| `frequency_slice_corr_` | `dict[int, float] \| None` | スライス別スピアマン ρ（固定 $f$ ごとに corr($r$, $p_{r,f}$) を算出）。期待符号: 負 | `fit()` 後 |
+| `recency_slice_corr_` | `dict[int, float] \| None` | スライス別 $N$ 重み付きスピアマン ρ（固定 $r$ ごとに corr($f$, $p_{r,f}$) を $N_{r,f}$ 重みで算出）。期待符号: 正 | `fit()` 後 |
+| `frequency_slice_corr_` | `dict[int, float] \| None` | スライス別 $N$ 重み付きスピアマン ρ（固定 $f$ ごとに corr($r$, $p_{r,f}$) を $N_{r,f}$ 重みで算出）。期待符号: 負 | `fit()` 後 |
 | `er_probability_` | `pd.DataFrame` | er モデル1次元経験的商品選択確率（最新度のみ。ブロードキャストなし）（カラム: `recency`, `probability`） | `fit()` 後 |
 | `er_probability_dict_` | `dict` | er モデル1次元経験的商品選択確率（キー: `r`（int）、値: `probability`） | `fit()` 後 |
 | `ef_probability_` | `pd.DataFrame` | ef モデル1次元経験的商品選択確率（頻度のみ。ブロードキャストなし）（カラム: `frequency`, `probability`） | `fit()` 後 |
