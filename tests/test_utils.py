@@ -93,6 +93,20 @@ class TestNormalizeSequenceCol:
         with pytest.raises(ValueError, match="time_col must be datetime or integer type"):
             normalize_sequence_col(s)
 
+    def test_matches_scalar_toordinal_for_datetime64_ns(self):
+        # ベクトル化した ordinal がスカラ .toordinal() と一致すること。
+        dates = pd.to_datetime(["2015-07-06", "2024-01-07", "1999-12-31"])
+        series = pd.Series(dates).astype("datetime64[ns]")
+        result = normalize_sequence_col(series)
+        expected = [pd.Timestamp(d).toordinal() for d in dates]
+        assert list(result) == expected
+
+    def test_string_and_datetime64_agree(self):
+        # 文字列列と datetime64 列で同じ ordinal を返すこと。
+        str_series = pd.Series(["2015-07-06", "2024-01-07"])
+        dt_series = pd.to_datetime(str_series)
+        assert list(normalize_sequence_col(str_series)) == list(normalize_sequence_col(dt_series))
+
 
 # ---------------------------------------------------------------------------
 # split_by_date
@@ -266,3 +280,20 @@ class TestSplitByDate:
         scorer.fit(df_obs, df_gt, recency_limit=7, frequency_limit=3)
         # 例外なく fit が完了し、属性が設定されている
         assert scorer.emp_probability_dict_ is not None
+
+    def test_datetime64_ns_does_not_overflow(self):
+        # 回帰テスト: datetime64[ns] 列で解像度合わせの OutOfBoundsDatetime が
+        # 発生しないこと（原点を年1にしていた際のバグ）。
+        df = _make_df().copy()
+        # 環境の既定解像度に依らず ns を強制し、解像度合わせの経路を確実に通す。
+        df["datetime"] = pd.to_datetime(df["datetime"]).astype("datetime64[ns]")
+        assert df["datetime"].dtype == "datetime64[ns]"
+        df_obs, df_gt = split_by_date(df, "2024-01-07", observation_days=6, gt_days=1)
+        # target - 6 + 1 = Jan02 ... Jan07 が観測期間
+        assert set(df_obs["datetime"]) == {
+            pd.Timestamp("2024-01-03"),
+            pd.Timestamp("2024-01-05"),
+            pd.Timestamp("2024-01-07"),
+        }
+        # 正解期間は Jan08 のみ → 該当データなし
+        assert df_gt.empty

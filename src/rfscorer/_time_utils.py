@@ -17,9 +17,15 @@ from pandas.api.types import (
 )
 
 # Origin for the vectorized ordinal computation in normalize_sequence_col.
-# (series - _ORDINAL_ORIGIN).dt.days + 1 yields the same proleptic Gregorian
-# ordinal as scalar .toordinal() used in normalize_ref.
-_ORDINAL_ORIGIN = pd.Timestamp("0001-01-01")
+# (series - _ORDINAL_ORIGIN).dt.days + _ORDINAL_ORIGIN_OFFSET yields the same
+# proleptic Gregorian ordinal as scalar .toordinal() used in normalize_ref.
+#
+# The origin must stay inside the datetime64[ns] range (about 1677-2262);
+# using year 1 (0001-01-01) triggers an OutOfBoundsDatetime overflow when
+# pandas aligns resolutions against a nanosecond series. We therefore anchor
+# on the Unix epoch and add its ordinal offset back.
+_ORDINAL_ORIGIN = pd.Timestamp("1970-01-01")
+_ORDINAL_ORIGIN_OFFSET = _ORDINAL_ORIGIN.toordinal()  # 719163
 
 
 def normalize_ref(value) -> int:
@@ -43,9 +49,9 @@ def normalize_ref(value) -> int:
 def normalize_sequence_col(series: pd.Series) -> pd.Series:
     """Normalize a time column (datetime, string, or integer) to an integer Series."""
     if is_datetime64_any_dtype(series):
-        return (series - _ORDINAL_ORIGIN).dt.days + 1
+        return (series - _ORDINAL_ORIGIN).dt.days + _ORDINAL_ORIGIN_OFFSET
     elif is_string_dtype(series):
-        return (pd.to_datetime(series) - _ORDINAL_ORIGIN).dt.days + 1
+        return (pd.to_datetime(series) - _ORDINAL_ORIGIN).dt.days + _ORDINAL_ORIGIN_OFFSET
     elif is_integer_dtype(series) or is_float_dtype(series):
         return series.astype(int)
     else:
