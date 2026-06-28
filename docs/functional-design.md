@@ -102,7 +102,7 @@ $$\sum_{r\in R, f\in F} N_{r,f} \cdot(p_{r,f} - x_{r,f})^2$$
 #### コンストラクタ
 
 ```python
-RecencyFrequencyScorer(user_col="user", item_col="item", time_col="datetime", unit=1)
+RecencyFrequencyScorer(user_col="user", item_col="item", time_col="datetime", unit=1, recency_mode="day")
 ```
 
 | パラメータ | 型 | デフォルト | 説明 |
@@ -110,7 +110,14 @@ RecencyFrequencyScorer(user_col="user", item_col="item", time_col="datetime", un
 | `user_col` | `str` | `"user"` | ユーザー識別子のカラム名 |
 | `item_col` | `str` | `"item"` | 商品識別子のカラム名 |
 | `time_col` | `str` | `"datetime"` | 時点カラムのカラム名（`datetime64`・文字列・整数いずれも可） |
-| `unit` | `int` | `1` | 最新度の粒度（正の整数）。`unit=7` で週単位、`unit=30` で月単位（近似） |
+| `unit` | `int` | `1` | 最新度（recency 軸）のビン幅（正の整数）。`unit=7` で週単位、`unit=30` で月単位（近似）。`recency_mode="view"` 時は無視 |
+| `recency_mode` | `str` | `"day"` | 最新度の算出方式。`"day"`: 基準日からの経過日数ビン `(ref - last_view) // unit + 1`。`"view"`: ユーザー内で最終閲覧 timestamp が新しい順の 1 起算ランク（1 = 最新）。`ref`・`unit` は無視 |
+
+##### `recency_mode` の補足
+
+- **`"view"`（view recency）** は **timestamp の完全な解像度**で順位付けする（同一日内の時・分・秒も区別）。内部表現の日序数は同一日を区別できないため、view モードでは時刻を保持した高解像度キーを併走させて順位付けする。同一キー（完全一致）の場合のみ入力データ上の初出順でタイブレークする。
+- recency/frequency の計算ロジックは `_recency.py`（`build_day_rf` / `build_view_rf`）に分離され、`fit()` / `fit_rolling()` / `transform()` のいずれでも `recency_mode` に従う。`fit_rolling()` の観測窓・正解窓フィルタは日単位のまま（窓選択は日、view 順位は各窓内でフル解像度キーから算出）。
+- **将来拡張**: `recency_mode="session"`（セッション単位順位）、`frequency_mode="day"`（閲覧日数 = 日序数の `nunique`。`recency_mode`・高解像度キーと直交）、ビン幅の軸別指定 `recency_unit` / `frequency_unit` を想定。
 
 #### メソッド
 
@@ -291,7 +298,7 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 `fit()` / `optimize()` 後のインスタンスを zip アーカイブとして保存する。zip 内には以下が含まれる。
 
 - `rfscorer.pkl` — モデル本体（`load_zip()` はここから復元）
-- `metadata.json` — バージョン・パラメータ・統計情報（`rfscorer_version`, `user_col`, `item_col`, `time_col`, `unit`, `recency_limit`, `frequency_limit`, `observation_start`, `observation_end`, `fit_method`, `roll_days`, `observation_days`, `gt_days`, `n_obs_rows`, `n_gt_events`, `n_users`, `n_items`, `record_num`, `total_cv`, `optimized_kinds`）
+- `metadata.json` — バージョン・パラメータ・統計情報（`rfscorer_version`, `user_col`, `item_col`, `time_col`, `unit`, `recency_mode`, `recency_limit`, `frequency_limit`, `observation_start`, `observation_end`, `fit_method`, `roll_days`, `observation_days`, `gt_days`, `n_obs_rows`, `n_gt_events`, `n_users`, `n_items`, `record_num`, `total_cv`, `optimized_kinds`）
 - `probabilities/` — 計算済みの各モデルの確率テーブル CSV（`emp_probability.csv`, `er_probability.csv`, `ef_probability.csv`, および `optimize()` 済みのモデル分）
 - `plots/` — 計算済みの各モデルの確率グラフ PNG（2D モデルは `plot_probability_surface()` の出力、1D モデルは `plot_marginal_probability()` の出力）
 
@@ -318,7 +325,7 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 `fit()` / `fit_rolling()` 後の状態を構造化された診断レポートとして標準出力に表示する。以下の4セクションで構成される。
 
 - **Data**: データセット規模（物理ユニーク: 観測行数・正解イベント数・ユーザ数・商品数）・観測期間・user×item ペア数・対象イベント数（フィルタ前後）。`fit_rolling()` 後は正解期間・ローリング構成・延べレコード数（pooled）の行を追加表示し、user×item ペア数・対象イベント数には「pooled over rolls」を明示
-- **Model**: `recency_limit`・`frequency_limit`
+- **Model**: `recency_mode`・`recency_limit`・`frequency_limit`
 - **Correlation**: スピアマン相関係数・p 値・重み付き相関係数・スライス別相関係数
 - **Empirical Probability Table**: 経験的商品選択確率の横持ちテーブル
 

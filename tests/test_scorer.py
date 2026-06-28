@@ -2361,3 +2361,112 @@ class TestRefitInvalidatesOptimize:
         assert s.mono_probability_ is None
         assert s.mono_probability_table_ is None
         assert s.mono_probability_dict_ is None
+
+
+class TestViewRecency:
+    def _ranks(self, scorer, df):
+        out = scorer.transform(df)
+        return {(r.user, r.item): r.recency for r in out.itertuples()}
+
+    def test_intraday_resolution_datetime(self):
+        # Same calendar day, different times -> ranked by timestamp (newest = 1).
+        df = pd.DataFrame(
+            {
+                "user": ["u", "u", "u"],
+                "item": ["A", "B", "C"],
+                "datetime": pd.to_datetime(
+                    ["2026-06-28 17:00", "2026-06-28 16:50", "2026-06-28 16:40"]
+                ),
+            }
+        )
+        s = RecencyFrequencyScorer(recency_mode="view").fit(df, df)
+        assert self._ranks(s, df) == {("u", "A"): 1, ("u", "B"): 2, ("u", "C"): 3}
+
+    def test_multi_user_intraday(self):
+        df = pd.DataFrame(
+            {
+                "user": ["U1", "U1", "U2", "U2"],
+                "item": ["P", "Q", "P", "Q"],
+                "datetime": pd.to_datetime(
+                    [
+                        "2026-06-28 17:00",
+                        "2026-06-28 16:00",
+                        "2026-06-28 16:00",
+                        "2026-06-28 17:00",
+                    ]
+                ),
+            }
+        )
+        s = RecencyFrequencyScorer(recency_mode="view").fit(df, df)
+        assert self._ranks(s, df) == {
+            ("U1", "P"): 1,
+            ("U1", "Q"): 2,
+            ("U2", "Q"): 1,
+            ("U2", "P"): 2,
+        }
+
+    def test_integer_time_col_view(self):
+        df = pd.DataFrame(
+            {"user": ["u", "u", "u"], "item": ["A", "B", "C"], "datetime": [5, 30, 12]}
+        )
+        s = RecencyFrequencyScorer(recency_mode="view").fit(df, df)
+        assert self._ranks(s, df) == {("u", "B"): 1, ("u", "C"): 2, ("u", "A"): 3}
+
+    def test_day_mode_unchanged(self):
+        df = pd.DataFrame(
+            {
+                "user": ["u", "u", "u"],
+                "item": ["A", "B", "C"],
+                "datetime": pd.to_datetime(["2024-01-01", "2024-01-03", "2024-01-05"]),
+            }
+        )
+        default = RecencyFrequencyScorer().fit(df, df).transform(df)
+        explicit = RecencyFrequencyScorer(recency_mode="day").fit(df, df).transform(df)
+        pd.testing.assert_frame_equal(default, explicit)
+
+    def test_fit_predict_transform_work(self):
+        df = pd.DataFrame(
+            {
+                "user": ["u", "u", "v"],
+                "item": ["A", "B", "A"],
+                "datetime": pd.to_datetime(
+                    ["2026-06-28 17:00", "2026-06-28 16:00", "2026-06-28 15:00"]
+                ),
+            }
+        )
+        s = RecencyFrequencyScorer(recency_mode="view").fit(df, df)
+        assert isinstance(s.predict(1, 1), float)
+        assert "recency" in s.transform(df).columns
+
+    def test_fit_rolling_view(self):
+        df = _make_rolling_df()
+        s = RecencyFrequencyScorer(recency_mode="view").fit_rolling(
+            df, df, 7, 3, roll_days=2, recency_limit=7, frequency_limit=5
+        )
+        assert s.emp_probability_ is not None
+        assert s.recency_mode == "view"
+
+    def test_invalid_recency_mode_raises(self):
+        with pytest.raises(ValueError, match="recency_mode"):
+            RecencyFrequencyScorer(recency_mode="bogus")
+
+    def test_show_and_save_zip_recency_mode(self, tmp_path, capsys):
+        df = pd.DataFrame(
+            {
+                "user": ["u", "u"],
+                "item": ["A", "B"],
+                "datetime": pd.to_datetime(["2026-06-28 17:00", "2026-06-28 16:00"]),
+            }
+        )
+        s = RecencyFrequencyScorer(recency_mode="view").fit(df, df)
+        s.show()
+        assert "recency_mode" in capsys.readouterr().out
+
+        import json
+        import zipfile
+
+        path = tmp_path / "model.zip"
+        s.save_zip(path)
+        with zipfile.ZipFile(path) as zf:
+            meta = json.loads(zf.read("metadata.json"))
+        assert meta["recency_mode"] == "view"
