@@ -282,7 +282,11 @@ class RecencyFrequencyScorer(PlottingMixin):
         return self
 
     def _to_internal(self, df, time_col=None):
-        """Convert a user-facing DataFrame to internal column names and types."""
+        """Convert a user-facing DataFrame to internal column names and types.
+
+        In ``recency_mode="view"`` a high-resolution time key column (``_VIEW_KEY_COL``)
+        is added alongside the day-ordinal sequence column for view-recency ranking.
+        """
         tc = time_col if time_col is not None else self.time_col
         result = df[[self.user_col, self.item_col, tc]].copy()
         result.columns = [self._USER_COL, self._ITEM_COL, self._SEQUENCE_COL]
@@ -897,10 +901,11 @@ class RecencyFrequencyScorer(PlottingMixin):
     ):
         """Add recency, frequency, and product-choice probability columns to a DataFrame.
 
-        Computes recency rank and frequency for each user-item pair relative to
-        ref, then appends the corresponding product-choice probability from fit() or
-        optimize() results.  Does not filter df; pre-filter the DataFrame
-        manually (e.g., ``df[df[time_col] <= target_date]``) before calling
+        Computes recency and frequency for each user-item pair according to
+        ``recency_mode`` (``"day"``: elapsed-days bin relative to ref; ``"view"``:
+        view-order rank, ref ignored), then appends the corresponding product-choice
+        probability from fit() or optimize() results.  Does not filter df; pre-filter
+        the DataFrame manually (e.g., ``df[df[time_col] <= target_date]``) before calling
         transform() to score a specific observation window.
         Recency values above recency_limit and frequency values above
         frequency_limit are clamped to their respective limits before lookup.
@@ -1464,7 +1469,7 @@ class RecencyFrequencyScorer(PlottingMixin):
           pair counts, and target-event counts (before/after applying limits).
           After fit_rolling() additional lines report the ground truth span,
           the rolling configuration, and the pooled (over rolls) row counts.
-        - **Model**: recency_limit and frequency_limit.
+        - **Model**: recency_mode, recency_limit and frequency_limit.
         - **Correlation**: Spearman rho (equal-weight and N-weighted) for
           recency and frequency, their p-values, and per-slice correlations.
         - **Empirical Probability Table**: the empirical product-choice
