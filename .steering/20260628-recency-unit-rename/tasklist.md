@@ -4,9 +4,9 @@
 
 ### Phase 1: `__init__` の改名・並べ替え
 
-- [ ] **T01** `__init__` 署名を変更する（`scorer.py` 53–60 行付近）
-  - `unit=1` を削除し、末尾を `recency_mode="day", recency_unit=1` の順にする
-  - 署名: `def __init__(self, user_col="user", item_col="item", time_col="datetime", recency_mode="day", recency_unit=1)`
+- [ ] **T01** `__init__` 署名を変更する（`scorer.py` 53–60 行付近、現状は複数行署名）
+  - `unit=1` を削除し、末尾を `recency_mode="day"`, `recency_unit=1` の順にする
+  - 既存の**複数行（1 引数 1 行）形式を維持**する（インライン1行は 100 桁超で `ruff` E501 になる）
 
 - [ ] **T02** バリデーションと属性を変更する（`scorer.py` 86–93 行付近）
   - `recency_mode` チェック → `recency_unit` チェックの順に並べる
@@ -57,10 +57,11 @@
 ### Phase 4: ドキュメント更新
 
 - [ ] **T12** `docs/functional-design.md` を更新する
-  - コンストラクタ署名行・パラメータ表（`unit` 行 → `recency_unit` 行、`recency_mode` を前に）
-  - `recency_mode` 補足・式 `// unit + 1` → `// recency_unit + 1`
-  - metadata 一覧 `unit` → `recency_unit`
-  - `fit`/`transform` の `ref` 行（`unit` 記述があれば）・将来メモ（`frequency_unit` 既定方針）
+  - コンストラクタ署名行（line 105）・パラメータ表（line 113 の `unit` 行 → `recency_unit` 行、`recency_mode` を前に）
+  - `recency_mode` 補足（line 114）の式 `// unit + 1` → `// recency_unit + 1`
+  - metadata 一覧（line 301）の `unit` → `recency_unit`
+  - **将来拡張メモ（line 120）の修正**: 「ビン幅の軸別指定 `recency_unit` / `frequency_unit` を想定」から `recency_unit` を**外す**（本タスクで実現済み）。将来は `frequency_mode`（既定 `"view"`）/ `frequency_unit` のみとし、既定非対称の根拠を1行添える
+  - `fit`/`transform` の `ref` 行は `unit` 記述なし（変更不要）
 
 - [ ] **T13** `docs/glossary.md` を更新する
   - day recency 式 `// unit + 1` → `// recency_unit + 1`

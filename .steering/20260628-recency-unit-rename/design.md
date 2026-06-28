@@ -6,7 +6,7 @@
 |----------|----------|------|
 | `src/rfscorer/scorer.py` | 修正 | `__init__` 署名・バリデーション・`self.recency_unit`・docstring、`fit`/`_build_ui_rf_df` docstring、metadata、ディスパッチャ |
 | `src/rfscorer/_recency.py` | 修正 | `build_day_rf` の引数 `unit`→`recency_unit`・docstring |
-| `tests/test_scorer.py` | 修正 | `TestUnit` の `unit=`→`recency_unit=`、エラーメッセージ `match` |
+| `tests/test_scorer.py` | 修正 | `TestUnit`→`TestRecencyUnit` 改名、`unit=`→`recency_unit=`、エラーメッセージ `match` |
 | `tests/test_recency.py` | 修正 | `build_day_rf` 呼び出しのコメントのみ（位置引数なので実コード変更不要） |
 | `docs/functional-design.md` | 修正 | コンストラクタ表・`recency_mode` 補足・metadata・式中の `unit` |
 | `docs/glossary.md` | 修正 | day recency 式・API 表 |
@@ -46,6 +46,8 @@ def __init__(self, user_col="user", item_col="item", time_col="datetime", recenc
 - 引数順: `... time_col, recency_mode, recency_unit`（`recency_mode` を前に）。
 - バリデーション順も `recency_mode` → `recency_unit` に揃える（任意だが署名順と一致させ可読性向上）。
 - `self.unit` は廃止し `self.recency_unit` のみとする（エイリアス属性も設けない）。
+- `self.recency_mode = recency_mode`（line 94）はそのまま維持する。
+- **署名は実コードどおり複数行（1 引数 1 行）を維持**する。インライン1行は 100 桁超で `ruff` E501 になるため（上のスニペットは説明用）。
 
 ### 2. `__init__` docstring
 
@@ -124,13 +126,14 @@ return build_day_rf(df, self._USER_COL, self._ITEM_COL, self._SEQUENCE_COL, ref_
 
 ### 7. テスト更新（`tests/test_scorer.py`）
 
-`TestUnit` クラス:
-- `RecencyFrequencyScorer(unit=unit)` → `RecencyFrequencyScorer(recency_unit=unit)`
+`TestUnit` クラス（**改名する**方針で確定）:
+- クラス名 `TestUnit` → `TestRecencyUnit`
+- ヘルパー `_make_scorer_with_unit` → `_make_scorer_with_recency_unit`（引数名 `unit` → `recency_unit`）
+- `RecencyFrequencyScorer(unit=unit)` → `RecencyFrequencyScorer(recency_unit=recency_unit)`
 - `RecencyFrequencyScorer(unit=0)` / `unit=-1` → `recency_unit=0` / `recency_unit=-1`
 - `pytest.raises(ValueError, match="unit must be a positive integer")` →
   `match="recency_unit must be a positive integer"`
-- クラス名・ヘルパー名（`TestUnit` / `_make_scorer_with_unit`）はリネーム任意。
-  本タスクでは**実害がないため最小変更**とし、内部の `unit` 変数名・コメントのみ調整（クラス名は `TestRecencyUnit`、ヘルパーは `_make_scorer_with_recency_unit` に改名して意図を明確化することを推奨）。
+- テストメソッド名・docstring・コメント中の `unit` も `recency_unit` に揃える
 
 `tests/test_recency.py`:
 - `build_day_rf(df, USER, ITEM, SEQ, 110, 7)` 等は**位置引数**で呼んでおり、引数名改名の影響を受けない。
@@ -142,7 +145,7 @@ return build_day_rf(df, self._USER_COL, self._ITEM_COL, self._SEQUENCE_COL, ref_
   - コンストラクタ署名行・パラメータ表（`unit` 行 → `recency_unit` 行、`recency_mode` を前に）
   - `recency_mode` 補足・式 `(ref - last_view) // unit + 1` → `recency_unit`
   - metadata 一覧の `unit` → `recency_unit`
-  - `ref` 行・将来メモ（`frequency_unit` 既定方針）
+  - **将来拡張メモの修正**（現状 line 120 付近）: 「ビン幅の軸別指定 `recency_unit` / `frequency_unit` を想定」から **`recency_unit` を外す**（本タスクで実現済みのため）。将来は `frequency_mode`（既定 `"view"`）/ `frequency_unit` のみ。既定非対称（recency=`"day"` / frequency=`"view"`）の根拠を1行添える
 - `docs/glossary.md`: day recency 式 `(ref - last_view) // unit + 1` → `recency_unit`、API 表の「粒度 `unit`」→「`recency_unit`」
 - `docs/product-requirements.md`: コンストラクタ入力の `unit` 箇条 → `recency_unit`
 
