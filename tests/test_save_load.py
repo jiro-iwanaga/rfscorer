@@ -162,6 +162,30 @@ class TestSaveZipLoadZip:
         assert loaded.predict(1, 1, kind="mono") == optimized_scorer.predict(1, 1, kind="mono")
         assert loaded.predict(3, 2, kind="mono") == optimized_scorer.predict(3, 2, kind="mono")
 
+    def test_observation_bounds_and_dates_round_trip(self, fitted_scorer, tmp_path):
+        # load_zip restores from the pickle (it ignores metadata.json); the date fields
+        # are derived from observation_start_/end_, so verify those survive the round trip
+        # and that re-saving the loaded model reproduces consistent date metadata.
+        path = tmp_path / "model.zip"
+        fitted_scorer.save_zip(path)
+        loaded = RecencyFrequencyScorer.load_zip(path)
+
+        assert loaded.observation_start_ == fitted_scorer.observation_start_
+        assert loaded.observation_end_ == fitted_scorer.observation_end_
+
+        repath = tmp_path / "model_resaved.zip"
+        loaded.save_zip(repath)
+        with zipfile.ZipFile(repath, "r") as zf:
+            meta = json.loads(zf.read("metadata.json"))
+        assert meta["observation_start"] == fitted_scorer.observation_start_
+        assert meta["observation_end"] == fitted_scorer.observation_end_
+        assert meta["observation_start_date"] == str(
+            pd.Timestamp.fromordinal(meta["observation_start"]).date()
+        )
+        assert meta["observation_end_date"] == str(
+            pd.Timestamp.fromordinal(meta["observation_end"]).date()
+        )
+
     def test_save_zip_path_none(self, fitted_scorer, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         fitted_scorer.save_zip()
