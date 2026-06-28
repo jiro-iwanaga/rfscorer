@@ -192,6 +192,10 @@ class TestInit:
         assert s.item_col == "iid"
         assert s.time_col == "ts"
 
+    def test_default_recency_mode_and_unit(self, scorer):
+        assert scorer.recency_mode == "day"
+        assert scorer.recency_unit == 1
+
     def test_initial_state(self, scorer):
         assert scorer._R == []
         assert scorer._F == []
@@ -1746,6 +1750,25 @@ class TestRecencyUnit:
         # Hard rename: the old `unit` keyword no longer exists.
         with pytest.raises(TypeError):
             RecencyFrequencyScorer(unit=1)
+
+    def test_recency_unit_ignored_in_view_mode(self):
+        # In view mode recency is a rank, so recency_unit must have no effect even when
+        # items span many days (where day mode would bin differently).
+        df = pd.DataFrame(
+            {
+                "user": ["u", "u", "u"],
+                "item": ["A", "B", "C"],
+                "datetime": pd.to_datetime(
+                    ["2026-06-28 17:00", "2026-06-20 16:00", "2026-06-10 15:00"]
+                ),
+            }
+        )
+        r1 = RecencyFrequencyScorer(recency_mode="view", recency_unit=1).fit(df, df).transform(df)
+        r99 = RecencyFrequencyScorer(recency_mode="view", recency_unit=99).fit(df, df).transform(df)
+        pd.testing.assert_frame_equal(
+            r1.sort_values(["user", "item"]).reset_index(drop=True),
+            r99.sort_values(["user", "item"]).reset_index(drop=True),
+        )
 
 
 # ---------------------------------------------------------------------------

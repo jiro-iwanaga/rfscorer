@@ -235,6 +235,9 @@ class TestSaveZipLoadZip:
         assert meta["user_col"] == "user"
         assert meta["item_col"] == "item"
         assert meta["time_col"] == "datetime"
+        assert meta["recency_mode"] == "day"
+        assert meta["recency_unit"] == 1
+        assert "unit" not in meta  # old key removed by the unit -> recency_unit rename
         assert meta["recency_limit"] == 7
         assert meta["frequency_limit"] == 3
         assert meta["observation_start"] is not None
