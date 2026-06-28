@@ -4,10 +4,18 @@
 
 | ファイル | 変更種別 | 内容 |
 |----------|----------|------|
+| `src/rfscorer/_recency.py` | 追加 | `build_day_rf()` / `build_view_rf()`（recency/frequency ビルダーの純粋関数。scorer 非依存） |
 | `src/rfscorer/_time_utils.py` | 追加 | `normalize_view_key()`（時刻を保持する高解像度キー生成） |
-| `src/rfscorer/scorer.py` | 修正 | `__init__`, `_to_internal`, `transform`, `_build_ui_rf_df`（実装＋docstring）, `show`, `save_zip`, `fit`/`transform` docstring |
+| `src/rfscorer/scorer.py` | 修正 | `__init__`, `_to_internal`, `transform`, `_build_ui_rf_df`（ディスパッチャ化＋docstring）, `show`, `save_zip`, `fit`/`transform` docstring |
 | `tests/test_scorer.py` | 修正 | view recency のテスト追加 |
+| `tests/test_recency.py` | 追加 | `_recency.py` ビルダーの単体テスト |
 | `docs/functional-design.md` | 修正 | `recency_mode` パラメータの記述追加 |
+
+> **設計の核**: recency/frequency の計算ロジックを `_recency.py` の純粋関数（`build_day_rf` /
+> `build_view_rf`）に**外出し**し、`_build_ui_rf_df` は `recency_mode` で振り分ける薄い
+> ディスパッチャにする。データ供給は高解像度キー（K）方式で、`fit_rolling` の日窓フィルタと
+> 両立する。day/view とも独立した小関数なので単体テスト・保守が容易で、将来の
+> `recency_mode="session"` / `frequency_mode` も同じ場所への追加で済む。
 
 ## 実装アプローチ
 
@@ -82,85 +90,105 @@ result[self._SEQUENCE_COL] = normalize_sequence_col(result[self._SEQUENCE_COL])
 ```
 
 - `_VIEW_KEY_COL = "_view_key"` をクラス定数（内部列名）として追加する。
-- この列は行フィルタ（`fit_rolling` の窓抽出）でも保持され、`_build_ui_rf_df` まで到達する。
-- 下流は `_build_ui_rf_df` が列を明示選択して返すため、`_VIEW_KEY_COL` は最終出力に漏れない。
+- この列は行フィルタ（`fit_rolling` の窓抽出）でも保持され、`build_view_rf` まで到達する。
+- `build_view_rf` が `[user, item, recency, frequency]` を明示選択して返すため、`_VIEW_KEY_COL` は最終出力に漏れない。
 
-### 3. `_build_ui_rf_df()` のリファクタリング
+### 3. recency/frequency ビルダーの外出し（`_recency.py`）と `_build_ui_rf_df` のディスパッチャ化
 
-現行の実装はイベント行ごとに recency を計算してから groupby min を取っている。
-リファクタリング後は **先に (user, item) 単位で集計し、その後 `recency_mode` で分岐**する。
-これにより recency 軸・frequency 軸それぞれの計算ロジックが独立し、将来の `frequency_mode` 追加も同じパターンで行える。
+現行の `_build_ui_rf_df` はイベント行ごとに recency を計算してから groupby min を取っている。
+これを **`_recency.py` の純粋関数に外出し**し、`_build_ui_rf_df` は `recency_mode` で
+振り分けるだけの薄いディスパッチャにする。day/view が独立した小関数になり、単体テストと
+将来拡張（`session` / `frequency_mode`）が容易になる。
 
-**現行:**
+#### `_recency.py`（新規・純粋関数）
+
 ```python
-def _build_ui_rf_df(self, df, ref_int):
-    tmp = df[[self._USER_COL, self._ITEM_COL]].copy()
-    tmp["recency"] = (ref_int - df[self._SEQUENCE_COL]) // self.unit + 1
-    return (
-        tmp.groupby([self._USER_COL, self._ITEM_COL], sort=False)
-        .agg(recency=("recency", "min"), frequency=("recency", "count"))
+"""(user, item) ごとの recency / frequency を構築するビルダー群（scorer 非依存）。
+
+day モードは日単位序数 seq_col を、view モードは高解像度キー key_col を recency 源に使う。
+frequency は両モードとも seq_col の件数（view freq）。いずれも列 user, item, recency,
+frequency を返す。
+"""
+
+def build_day_rf(df, user_col, item_col, seq_col, ref_int, unit):
+    ui = (
+        df.groupby([user_col, item_col], sort=False)[seq_col]
+        .agg(last_ts="max", frequency="count")
         .reset_index()
     )
-```
+    ui["recency"] = (ref_int - ui["last_ts"]) // unit + 1
+    return ui[[user_col, item_col, "recency", "frequency"]]
 
-**リファクタリング後:**
-```python
-def _build_ui_rf_df(self, df, ref_int):
+
+def build_view_rf(df, user_col, item_col, key_col, seq_col):
     df = df.reset_index(drop=True)
-    # day モードは日単位序数、view モードは高解像度キーで last_ts を集約する
-    ts_col = self._VIEW_KEY_COL if self.recency_mode == "view" else self._SEQUENCE_COL
     ui = (
         df.assign(_row_idx=df.index)
-        .groupby([self._USER_COL, self._ITEM_COL], sort=False)
+        .groupby([user_col, item_col], sort=False)
         .agg(
-            last_ts=(ts_col, "max"),
-            frequency=(self._SEQUENCE_COL, "count"),
-            first_idx=("_row_idx", "min"),
+            last_key=(key_col, "max"),       # 最新閲覧（高解像度）
+            frequency=(seq_col, "count"),    # view freq（件数）
+            first_idx=("_row_idx", "min"),   # 同値タイブレーク用（初出行）
         )
         .reset_index()
     )
-    if self.recency_mode == "day":
-        ui["recency"] = (ref_int - ui["last_ts"]) // self.unit + 1
-    elif self.recency_mode == "view":
-        # Rank items per user by most-recent view (newest first), breaking ties
-        # by first appearance in the input (smaller row index first). cumcount on
-        # the sorted frame yields a 1-indexed rank (same pattern as transform()).
-        ui = ui.sort_values(
-            [self._USER_COL, "last_ts", "first_idx"],
-            ascending=[True, False, True],
-        )
-        ui["recency"] = ui.groupby(self._USER_COL, sort=False).cumcount() + 1
-    else:
-        raise ValueError(
-            f"recency_mode must be 'day' or 'view', got {self.recency_mode!r}."
-        )
-    # last_ts and first_idx are intermediate columns; excluded by explicit column selection
-    return ui[[self._USER_COL, self._ITEM_COL, "recency", "frequency"]]
+    # user 内で「最新閲覧 降順, 初出行 昇順」に並べ、1 起算ランクを付与
+    ui = ui.sort_values([user_col, "last_key", "first_idx"], ascending=[True, False, True])
+    ui["recency"] = ui.groupby(user_col, sort=False).cumcount() + 1
+    return ui[[user_col, item_col, "recency", "frequency"]]
 ```
 
-> `frequency` のカウント源は両モードとも `_SEQUENCE_COL`（行数カウントなので列の選択は結果に影響しない）。
-> `last_ts` の集約源のみモードで切り替える。
+#### ディスパッチャ（`scorer._build_ui_rf_df`）
 
-> 戻り値の行順は view モードで user 昇順に変わるが、下流（`_aggregate_empirical` の recency/frequency 集約、`transform()` の再ソート）は行順に依存しないため影響しない。
-
-**等価性の確認（day モード）:**
-
-現行は `min((ref - ts) // unit + 1)` を groupby で計算しており、
-リファクタリング後は `(ref - max(ts)) // unit + 1` を直接計算する。
-`(ref - ts) // unit` は ts が大きいほど小さくなるため、`min = max(ts)` 対応の値となり、数学的に等価。
-
-**将来 `frequency_mode` を追加するときのパターン:**
 ```python
-# frequency_mode="day" が追加される場合のイメージ（本タスクでは実装しない）
-if self.frequency_mode == "view":
-    pass  # frequency = count（現行のまま）
-elif self.frequency_mode == "day":
-    ui["frequency"] = (
-        df.groupby([self._USER_COL, self._ITEM_COL])[self._SEQUENCE_COL]
-        .nunique()  # ユニーク日付数
-        .values
-    )
+def _build_ui_rf_df(self, df, ref_int):
+    if self.recency_mode == "view":
+        return build_view_rf(
+            df, self._USER_COL, self._ITEM_COL, self._VIEW_KEY_COL, self._SEQUENCE_COL
+        )
+    if self.recency_mode == "day":
+        return build_day_rf(
+            df, self._USER_COL, self._ITEM_COL, self._SEQUENCE_COL, ref_int, self.unit
+        )
+    raise ValueError(f"recency_mode must be 'day' or 'view', got {self.recency_mode!r}.")
 ```
+
+#### 等価性（day モード）
+
+現行は `min((ref - ts) // unit + 1)` を groupby で計算、`build_day_rf` は
+`(ref - max(ts)) // unit + 1` を直接計算する。`(ref - ts) // unit` は ts が大きいほど小さく
+なるため `min = max(ts)` 対応の値となり、数学的に等価。frequency も両者とも行数カウントで一致。
+よって day モードの数値・既存テストは完全保存。
+
+#### view モードの行順について
+
+`build_view_rf` の戻り値は user 昇順になるが、下流（`_aggregate_empirical` の recency/frequency
+集約、`transform()` の再ソート）は行順に依存しないため影響しない。
+
+#### `fit_rolling` との両立（最頻メソッド優先）
+
+`fit_rolling` の観測窓・正解窓フィルタは**日単位序数 `_SEQUENCE_COL` のまま**（`observation_days`
+は日単位なので当然）。窓フィルタはブールマスクなので `_VIEW_KEY_COL` 列も保持され、各窓の
+`build_view_rf` にフル解像度キーが届く。view recency は**窓ごとに 1 から振り直し**（ローリングの
+正しい意味論）。`_to_internal` のキー生成は O(n) のベクトル演算1回のみで、全件ソートは発生しない。
+
+#### 将来 `frequency_mode` を追加するときのパターン（本タスクでは実装しない）
+
+frequency は `recency_mode` および高解像度キーと**直交**する。day freq は
+**日序数 `seq_col` の `nunique`（閲覧日数）**であり、日序数は両モードで常に存在するため
+高解像度キーは不要。ビルダー内の frequency 集約エントリを切り替えるだけでよく、**groupby を
+増やさず単一集約のまま**追加できる。
+
+```python
+# build_*_rf 内の frequency 集約をモードで切り替えるイメージ
+#   frequency_mode="view": ("<count対象列>", "count")   # 現行
+#   frequency_mode="day" : (seq_col, "nunique")          # 閲覧日数
+```
+
+> **将来メモ（本タスクでは実装しない）**: ビン幅を軸ごとに指定できるよう、`unit` を将来
+> `recency_unit` / `frequency_unit` に分割する案。frequency のビン化はビルダー末尾の純粋後処理
+> `frequency = (frequency - 1) // frequency_unit + 1` で足せ、`recency_mode` / `frequency_mode`
+> と直交する。今回は構造（frequency を後処理を挟める形で返す）だけ確保し、パラメータは追加しない。
 
 ### 4. `ref` / `ref_int` の扱い（`fit` / `transform`）
 
@@ -215,7 +243,7 @@ recency_mode : str, default "day"
              (sub-day order is preserved). ``ref`` and ``unit`` are ignored.
 ```
 
-**`_build_ui_rf_df()`**: 現行 docstring は day 固定（`Recency is (ref_int - value) // unit + 1`）。day / view 両モードの recency 定義に書き換える。
+**`_build_ui_rf_df()`**: 現行 docstring は day 固定（`Recency is (ref_int - value) // unit + 1`）。`recency_mode` に応じて `_recency.py` の `build_day_rf` / `build_view_rf` に委譲する旨へ書き換える（各モードの定義はビルダー側の docstring に記述）。
 
 **`fit()`**: `ref` パラメータの説明に `recency_mode="view"` 時は無視される旨を追記。
 
@@ -225,14 +253,15 @@ recency_mode : str, default "day"
 
 | 対象 | 変更内容 | 変更種別 |
 |------|----------|----------|
+| `_recency.py`（新規） | `build_day_rf()` / `build_view_rf()` ビルダーを外出し | 機能追加 |
 | `_time_utils.normalize_view_key()` | 高解像度時刻キー生成関数を追加 | 機能追加 |
 | `__init__` | `recency_mode` パラメータ追加・バリデーション・`_VIEW_KEY_COL` 定数 | 機能追加 |
 | `_to_internal()` | view モード時に `_VIEW_KEY_COL` 列を併走生成 | 機能追加 |
 | `transform()` | view モード時に `_VIEW_KEY_COL` 列を併走生成 ＋ docstring | 機能追加 |
-| `_build_ui_rf_df` | 先に groupby →`recency_mode` で `last_ts` 集約源を切替・分岐 ＋ docstring | リファクタリング＋機能追加 |
+| `_build_ui_rf_df` | `_recency.py` ビルダーへのディスパッチャ化 ＋ docstring | リファクタリング |
 | `fit()` | docstring のみ | ドキュメント |
 | `show()` | `recency_mode` 表示追加 | 機能追加 |
 | `save_zip()` | metadata.json に `recency_mode` 追加 | 機能追加 |
 | `save()` / `load()` / `load_zip()` | 変更なし（pickle 復元で自動対応） | — |
-| テスト | view recency のテスト追加 | テスト追加 |
+| テスト | `_recency.py` の単体テスト＋ view recency のテスト追加 | テスト追加 |
 | `docs/functional-design.md` | `recency_mode` の記述追加 | ドキュメント |
