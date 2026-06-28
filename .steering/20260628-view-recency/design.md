@@ -36,7 +36,8 @@ def __init__(self, user_col="user", item_col="item", time_col="datetime", unit=1
 ```
 
 - 型は `str`（`Literal` は使わない）。将来 mode が増えても `_VALID_RECENCY_MODES` の追加だけで対応できる。
-- `_VALID_RECENCY_MODES` はクラス変数として定義し、`_build_ui_rf_df` の防御的ガードとも共有する。
+- `_VALID_RECENCY_MODES` はクラス変数として定義し、`__init__` のバリデーションで使う。`_build_ui_rf_df`（ディスパッチャ）の `else: raise` は防御的ガード（`__init__` で弾くため通常到達しない）。
+- `recency_mode` は `__init__` で常に設定される。本変更**以前**に保存した pickle には属性が無いため、旧モデルを新コードで `show()`/`transform()` 等に通すと `AttributeError` になりうる（pickle は版間非互換であり、既存の追加属性 `fit_method_` 等と同じ既知の制約。本タスクのスコープ外）。
 
 ### 2. 高解像度時刻キーの併走（view モードの核心）
 
