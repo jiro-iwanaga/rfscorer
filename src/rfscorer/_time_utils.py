@@ -56,3 +56,21 @@ def normalize_sequence_col(series: pd.Series) -> pd.Series:
         return series.astype(int)
     else:
         raise ValueError(f"time_col must be datetime or integer type, got {series.dtype}")
+
+
+def normalize_view_key(series: pd.Series) -> pd.Series:
+    """Normalize a time column to an order-preserving integer key (sub-day resolution kept).
+
+    Unlike normalize_sequence_col (which truncates datetime to whole days), this keeps
+    full timestamp resolution so view recency can rank events within the same day.
+    Used only in view mode. The absolute value is irrelevant; only the per-user ordering
+    is used, so mixing nanosecond keys (datetime) and raw integers is fine.
+    """
+    if is_datetime64_any_dtype(series):
+        return (series - _ORDINAL_ORIGIN) // pd.Timedelta("1ns")
+    elif is_string_dtype(series):
+        return (pd.to_datetime(series) - _ORDINAL_ORIGIN) // pd.Timedelta("1ns")
+    elif is_integer_dtype(series) or is_float_dtype(series):
+        return series.astype("int64")  # ユーザー指定の粒度をそのまま使う
+    else:
+        raise ValueError(f"time_col must be datetime or integer type, got {series.dtype}")

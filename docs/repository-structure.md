@@ -27,10 +27,12 @@ rfscorer/
 │       ├── optimizer.py              # RecencyFrequencyOptimizer
 │       ├── utils.py                  # 公開ユーティリティ（split_by_date）
 │       ├── _plotting.py              # 可視化 Mixin（内部用）
+│       ├── _recency.py               # 最新度・頻度ビルダー（内部用）
 │       └── _time_utils.py            # 時間軸の正規化（内部用）
 ├── tests/
 │   ├── test_scorer.py
 │   ├── test_optimizer.py
+│   ├── test_recency.py
 │   ├── test_utils.py
 │   └── test_save_load.py
 ├── examples/
@@ -83,6 +85,7 @@ rfscorer/
 | `optimizer.py` | `RecencyFrequencyOptimizer` クラスを実装する。RF 単調性制約付き凸2次計画問題のモデル構築・求解を担う |
 | `utils.py` | `split_by_date()` など、データ準備用の公開ユーティリティを提供する |
 | `_plotting.py` | `PlottingMixin` を実装する。`RecencyFrequencyScorer` に Mixin として継承され、可視化メソッドを提供する（内部用） |
+| `_recency.py` | (user, item) ごとの最新度・頻度を構築するビルダー（`build_day_rf()` / `build_view_rf()`）。`recency_mode` で `scorer.py` から振り分けて使用する（内部用） |
 | `_time_utils.py` | 時間軸の正規化・変換など、内部用のヘルパー関数（プライベート） |
 
 ### `tests/`
@@ -91,6 +94,7 @@ rfscorer/
 |------|------|
 | `test_scorer.py` | `RecencyFrequencyScorer` のユニットテスト |
 | `test_optimizer.py` | `RecencyFrequencyOptimizer` のユニットテスト |
+| `test_recency.py` | `_recency.py` のビルダー（`build_day_rf()` / `build_view_rf()`）のユニットテスト |
 | `test_utils.py` | `split_by_date()` など、ユーティリティのユニットテスト |
 | `test_save_load.py` | `save()` / `load()` / `save_zip()` / `load_zip()` のユニットテスト |
 

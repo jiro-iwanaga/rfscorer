@@ -8,7 +8,8 @@
 | `optimizer.py` | `RecencyFrequencyOptimizer` | 内部モジュール。`optimize()` から委譲された凸2次計画問題を cvxpy で求解する |
 | `utils.py` | `split_by_date()` | 公開ユーティリティ。観測ログと正解データを target_date で自動分割する |
 | `_plotting.py` | `PlottingMixin` | 内部モジュール。`RecencyFrequencyScorer` に Mixin として継承され、`plot_probability_surface()` / `plot_marginal_probability()` を提供する |
-| `_time_utils.py` | `normalize_ref()`, `normalize_sequence_col()` | 内部用。時間軸の正規化・変換（プライベート） |
+| `_recency.py` | `build_day_rf()`, `build_view_rf()` | 内部用。(user, item) ごとの最新度・頻度を構築するビルダー（`recency_mode` で `_build_ui_rf_df` から振り分け。day = 経過日数ビン、view = 閲覧順位ランク）（プライベート） |
+| `_time_utils.py` | `normalize_ref()`, `normalize_sequence_col()`, `normalize_view_key()` | 内部用。時間軸の正規化・変換。`normalize_view_key()` は view recency 用に時刻を保持した高解像度キーを生成（プライベート） |
 | `__init__.py` | — | `RecencyFrequencyScorer` と `split_by_date` を公開 API としてエクスポートする |
 
 ## 遅延インポート方針

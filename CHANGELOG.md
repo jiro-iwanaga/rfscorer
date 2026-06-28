@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-28
+
+### Added
+
+- `recency_mode` parameter to `RecencyFrequencyScorer.__init__()` (default `"day"`): selects how
+  recency is computed for each (user, item) pair. Applies to `fit()`, `fit_rolling()`, and
+  `transform()`.
+  - `"day"` (default): the existing elapsed-days bin `(ref - last_view) // recency_unit + 1`.
+  - `"view"`: a 1-indexed rank within each user ordered by the most-recent view timestamp
+    (1 = latest), independent of the elapsed date gap. Full timestamp resolution is used, so views
+    on the same calendar day are ordered by time; exactly-equal timestamps are broken by input
+    order. `ref` and `recency_unit` are ignored in this mode.
+- `save_zip()` `metadata.json`: added `observation_start_date` / `observation_end_date`, the
+  human-readable ISO date (`"YYYY-MM-DD"`) for the corresponding ordinal fields. They are `null`
+  for integer `time_col` values that do not map to a calendar date.
+
+### Changed
+
+- **Breaking**: `RecencyFrequencyScorer.__init__()` parameter `unit` renamed to `recency_unit`,
+  and the signature reordered to
+  `(user_col, item_col, time_col, recency_mode="day", recency_unit=1)`. Passing `unit=...` now
+  raises `TypeError`; use `recency_unit=...` instead. The `metadata.json` key written by
+  `save_zip()` changed from `unit` to `recency_unit` accordingly. The default (`recency_unit=1`)
+  is numerically identical to the previous `unit=1`, so day-mode results are unchanged.
+- Internal refactor: the per-(user, item) recency/frequency builders were extracted to a new
+  private module `src/rfscorer/_recency.py` (`build_day_rf` / `build_view_rf`), with
+  `_build_ui_rf_df()` dispatching by `recency_mode`. No public API change beyond the items above.
+- Documentation (`docs/`) and README updated to cover `recency_mode` (day / view) and the
+  `recency_unit` rename.
+
 ## [0.5.6] - 2026-06-23
 
 ### Fixed

@@ -36,8 +36,10 @@
 | RF | Recency-Frequency | 最新度と頻度の2つの行動シグナル。Random Forest ではない |
 | RF スコアリング | RF scoring | 最新度と頻度から商品選択確率を推定する解釈可能な推薦スコアリング手法 |
 | ローリング集計 | rolling aggregation | 分割点（基準日）を1日ずつ過去にずらしながら複数基準日で $n_{r,f}$・$N_{r,f}$ を積み増す集計。サンプル増による経験的確率の安定化と基準日バイアスの平滑化を目的とする。`fit_rolling()` が実装 |
-| 最新度 | recency / $r$ | 最後の接触からの経過時間を整数化したもの。1 が最も直近。$r \in R$ |
-| 頻度 | frequency / $f$ | 観測期間における接触回数。$f \in F$ |
+| 最新度 | recency / $r$ | 接触の新しさを整数化したもの。1 が最も直近。算出方式は `recency_mode` で選択する。$r \in R$ |
+| day recency | day recency | `recency_mode="day"`（デフォルト）の最新度。基準日からの経過日数ビン `(ref - last_view) // recency_unit + 1` |
+| view recency | view recency | `recency_mode="view"` の最新度。ユーザー内で最終閲覧 timestamp が新しい順に振る 1 起算ランク（1 = 最新）。日付差ではなく閲覧順位を表し、timestamp の完全解像度で順位付けする。同一 timestamp は入力上の初出順でタイブレーク |
+| 頻度 | frequency / $f$ | 観測期間における接触回数（view freq）。$f \in F$。（将来: 閲覧日数で数える day freq を `frequency_mode` で選択可能にする想定） |
 | 実効サンプルサイズ（延べ） | effective / pooled sample size | 経験的確率の分母となる延べ件数。`fit_rolling()` では重なるロールで物理行が複数回計数される。属性: `record_num*`・`total_cv*` |
 | データセット規模（物理ユニーク） | physical / unique dataset size | 和集合区間で重複なく数えた実件数。論文記載用のデータ数。属性: `n_obs_rows_`・`n_gt_events_`・`n_users_`・`n_items_` |
 
@@ -86,7 +88,7 @@
 
 | 用語 | 説明 |
 |------|------|
-| `RecencyFrequencyScorer` | RF スコアリングの主クラス。コンストラクタで列名・粒度 `unit` を指定 |
+| `RecencyFrequencyScorer` | RF スコアリングの主クラス。コンストラクタで列名・最新度の算出方式 `recency_mode`（`"day"` / `"view"`）・recency 軸のビン幅 `recency_unit` を指定 |
 | `fit(df_obs, df_gt, ref, recency_limit, frequency_limit)` | 観測データと正解データから経験的商品選択確率を推定する |
 | `fit_rolling(df_obs, df_gt, observation_days, gt_days, roll_days, end_date)` | 基準日を1日ずつ過去にずらしながら複数基準日で集計を積み増し、経験的商品選択確率を推定する（ローリング集計） |
 | `transform(df, ref, kind)` | 行動履歴 DataFrame に最新度・頻度・確率・順位を付与する |

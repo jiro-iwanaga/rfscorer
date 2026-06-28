@@ -2,7 +2,8 @@ import pandas as pd
 from pandas.api.types import is_string_dtype
 
 from ._plotting import PlottingMixin
-from ._time_utils import normalize_ref, normalize_sequence_col
+from ._recency import build_day_rf, build_view_rf
+from ._time_utils import normalize_ref, normalize_sequence_col, normalize_view_key
 
 
 class RecencyFrequencyScorer(PlottingMixin):
@@ -15,6 +16,8 @@ class RecencyFrequencyScorer(PlottingMixin):
     _USER_COL = "user"
     _ITEM_COL = "item"
     _SEQUENCE_COL = "datetime"
+    _VIEW_KEY_COL = "_view_key"  # view モードの高解像度時刻キー（内部列名）
+    _VALID_RECENCY_MODES = frozenset({"day", "view"})
     _FREQUENCY_LIMIT_RATE = 0.95  # 頻度上限値自動計算の際に利用する割合
     _RECENCY_LIMIT_RATE = 0.95  # 最新度上限値自動計算の際に利用する割合
 
@@ -47,7 +50,14 @@ class RecencyFrequencyScorer(PlottingMixin):
     # Initialization
     # ---------------------------------------------------------------------------
 
-    def __init__(self, user_col="user", item_col="item", time_col="datetime", unit=1):
+    def __init__(
+        self,
+        user_col="user",
+        item_col="item",
+        time_col="datetime",
+        recency_mode="day",
+        recency_unit=1,
+    ):
         """Initialize the scorer with column name mappings.
 
         Parameters
@@ -61,18 +71,35 @@ class RecencyFrequencyScorer(PlottingMixin):
             datetime (datetime64, str) or integer columns. Datetime values are
             converted to ordinal integers internally; integer values are used
             as-is.
-        unit : int, default 1
-            Number of days (or integer steps) per recency bin. Recency is
-            computed as ``(ref - value) // unit + 1``. Must be a positive
-            integer. Use ``unit=7`` for weekly, ``unit=30`` for approximate
-            monthly granularity.
+        recency_mode : str, default "day"
+            How recency is computed for each (user, item) pair.
+            "day"  : elapsed-days bin relative to ref: ``(ref - last_view) // recency_unit + 1``.
+            "view" : 1-indexed rank within each user ordered by most-recent view
+                     timestamp (1 = latest). Full timestamp resolution is used
+                     (sub-day order is preserved). ``ref`` and ``recency_unit`` are ignored.
+        recency_unit : int, default 1
+            Number of days (or integer steps) per recency bin (recency-axis bin
+            width). Recency is ``(ref - last_view) // recency_unit + 1``. Must be a
+            positive integer. Use ``recency_unit=7`` for weekly, ``recency_unit=30``
+            for approximate monthly granularity. Ignored when ``recency_mode="view"``.
+
+        Notes
+        -----
+        A frequency axis counterpart (``frequency_mode`` defaulting to ``"view"`` =
+        view-event count, plus ``frequency_unit``) is planned for the future. The
+        default asymmetry (recency defaults to ``"day"``, frequency to ``"view"``)
+        follows the classic RF definition: recency is time-based, frequency is
+        count-based.
         """
-        if unit <= 0:
-            raise ValueError(f"unit must be a positive integer, got {unit}.")
+        if recency_mode not in self._VALID_RECENCY_MODES:
+            raise ValueError(f"recency_mode must be 'day' or 'view', got {recency_mode!r}.")
+        if recency_unit <= 0:
+            raise ValueError(f"recency_unit must be a positive integer, got {recency_unit}.")
         self.user_col = user_col
         self.item_col = item_col
         self.time_col = time_col
-        self.unit = unit
+        self.recency_mode = recency_mode
+        self.recency_unit = recency_unit
 
         self.observation_start_ = None
         self.observation_end_ = None
@@ -194,9 +221,9 @@ class RecencyFrequencyScorer(PlottingMixin):
             etc.). Must already be filtered to the ground truth period by the caller.
         ref : str, datetime, or int, optional
             Reference value for recency computation. Recency of each
-            user-item pair is ``(ref - value) // unit + 1``, where the
+            user-item pair is ``(ref - value) // recency_unit + 1``, where the
             minimum across behavior records is taken. When None, defaults to the
-            maximum value in df_obs time_col.
+            maximum value in df_obs time_col. Ignored when ``recency_mode="view"``.
         recency_limit : int, optional
             Maximum recency rank to include. If None, automatically set to
             the recency rank covering 95% of cumulative events.
@@ -263,7 +290,11 @@ class RecencyFrequencyScorer(PlottingMixin):
         return self
 
     def _to_internal(self, df, time_col=None):
-        """Convert a user-facing DataFrame to internal column names and types."""
+        """Convert a user-facing DataFrame to internal column names and types.
+
+        In ``recency_mode="view"`` a high-resolution time key column (``_VIEW_KEY_COL``)
+        is added alongside the day-ordinal sequence column for view-recency ranking.
+        """
         tc = time_col if time_col is not None else self.time_col
         result = df[[self.user_col, self.item_col, tc]].copy()
         result.columns = [self._USER_COL, self._ITEM_COL, self._SEQUENCE_COL]
@@ -271,6 +302,9 @@ class RecencyFrequencyScorer(PlottingMixin):
             result[self._USER_COL] = result[self._USER_COL].astype(str)
         if not is_string_dtype(result[self._ITEM_COL]):
             result[self._ITEM_COL] = result[self._ITEM_COL].astype(str)
+        # view モードは時刻を保持した高解像度キーを併走（normalize_sequence_col の上書き前に生成）
+        if self.recency_mode == "view":
+            result[self._VIEW_KEY_COL] = normalize_view_key(result[self._SEQUENCE_COL])
         result[self._SEQUENCE_COL] = normalize_sequence_col(result[self._SEQUENCE_COL])
         return result
 
@@ -875,10 +909,11 @@ class RecencyFrequencyScorer(PlottingMixin):
     ):
         """Add recency, frequency, and product-choice probability columns to a DataFrame.
 
-        Computes recency rank and frequency for each user-item pair relative to
-        ref, then appends the corresponding product-choice probability from fit() or
-        optimize() results.  Does not filter df; pre-filter the DataFrame
-        manually (e.g., ``df[df[time_col] <= target_date]``) before calling
+        Computes recency and frequency for each user-item pair according to
+        ``recency_mode`` (``"day"``: elapsed-days bin relative to ref; ``"view"``:
+        view-order rank, ref ignored), then appends the corresponding product-choice
+        probability from fit() or optimize() results.  Does not filter df; pre-filter
+        the DataFrame manually (e.g., ``df[df[time_col] <= target_date]``) before calling
         transform() to score a specific observation window.
         Recency values above recency_limit and frequency values above
         frequency_limit are clamped to their respective limits before lookup.
@@ -890,7 +925,7 @@ class RecencyFrequencyScorer(PlottingMixin):
             observation window before calling.
         ref : str, datetime, or int, optional
             Reference value for computing recency. When None, defaults to the
-            maximum value in df time_col.
+            maximum value in df time_col. Ignored when ``recency_mode="view"``.
         kind : {"emp", "er", "ef", "mono", "mr", "mf", "mrc", "mfc", "mcc"}, default "emp"
             Which probability to use. "emp", "er", and "ef" use fit()
             results; others use optimize() results.
@@ -941,6 +976,9 @@ class RecencyFrequencyScorer(PlottingMixin):
             df_log[self._USER_COL] = df_log[self._USER_COL].astype(str)
         if not is_string_dtype(df_log[self._ITEM_COL]):
             df_log[self._ITEM_COL] = df_log[self._ITEM_COL].astype(str)
+        # view モードは時刻を保持した高解像度キーを併走（normalize_sequence_col の上書き前に生成）
+        if self.recency_mode == "view":
+            df_log[self._VIEW_KEY_COL] = normalize_view_key(df_log[self._SEQUENCE_COL])
         df_log[self._SEQUENCE_COL] = normalize_sequence_col(df_log[self._SEQUENCE_COL])
 
         if ref is None:
@@ -1314,11 +1352,14 @@ class RecencyFrequencyScorer(PlottingMixin):
             "user_col": self.user_col,
             "item_col": self.item_col,
             "time_col": self.time_col,
-            "unit": _to_python(self.unit),
+            "recency_mode": self.recency_mode,
+            "recency_unit": _to_python(self.recency_unit),
             "recency_limit": _to_python(self.recency_limit),
             "frequency_limit": _to_python(self.frequency_limit),
             "observation_start": _to_python(self.observation_start_),
+            "observation_start_date": self._ordinal_to_date(self.observation_start_),
             "observation_end": _to_python(self.observation_end_),
+            "observation_end_date": self._ordinal_to_date(self.observation_end_),
             "fit_method": self.fit_method_,
             "roll_days": _to_python(self.roll_days_),
             "observation_days": _to_python(self.observation_days_),
@@ -1438,7 +1479,7 @@ class RecencyFrequencyScorer(PlottingMixin):
           pair counts, and target-event counts (before/after applying limits).
           After fit_rolling() additional lines report the ground truth span,
           the rolling configuration, and the pooled (over rolls) row counts.
-        - **Model**: recency_limit and frequency_limit.
+        - **Model**: recency_mode, recency_limit and frequency_limit.
         - **Correlation**: Spearman rho (equal-weight and N-weighted) for
           recency and frequency, their p-values, and per-slice correlations.
         - **Empirical Probability Table**: the empirical product-choice
@@ -1503,6 +1544,7 @@ class RecencyFrequencyScorer(PlottingMixin):
 
         print()
         print(sec("Model"))
+        print(f"  recency_mode     : {self.recency_mode}")
         print(f"  recency_limit    : {self.recency_limit}")
         print(f"  frequency_limit  : {self.frequency_limit}")
 
@@ -1543,14 +1585,23 @@ class RecencyFrequencyScorer(PlottingMixin):
     # Internal helpers
     # ---------------------------------------------------------------------------
 
-    def _fmt_ordinal(self, v):
+    def _ordinal_to_date(self, v):
+        """Return an ISO date string (``"YYYY-MM-DD"``) for a Gregorian-ordinal value.
+
+        Returns None when ``v`` is missing or does not map to a plausible calendar date
+        (e.g. integer time_col values), so the field stays null in that case rather than
+        showing a misleading date.
+        """
+        if v is None:
+            return None
         try:
             ts = pd.Timestamp.fromordinal(int(v))
-            if 1900 <= ts.year <= 2200:
-                return str(ts.date())
-        except (ValueError, OverflowError, AttributeError):
-            pass
-        return str(int(v))
+        except (ValueError, OverflowError, TypeError):
+            return None
+        return ts.date().isoformat() if 1900 <= ts.year <= 2200 else None
+
+    def _fmt_ordinal(self, v):
+        return self._ordinal_to_date(v) or str(int(v))
 
     def _fmt_slice_lines(self, d, prefix):
         import math
@@ -1596,17 +1647,25 @@ class RecencyFrequencyScorer(PlottingMixin):
     def _build_ui_rf_df(self, df, ref_int):
         """Compute recency and frequency for each (user, item) pair.
 
-        Recency is ``(ref_int - value) // unit + 1`` (1-indexed; most recent
-        behavior at ref_int has recency 1). Frequency is the behavior
-        count. Uses pandas groupby.
+        Dispatches to the ``_recency`` builders by ``recency_mode``:
+
+        - "day"  : ``build_day_rf`` — elapsed-days bin
+          ``(ref_int - last_view) // recency_unit + 1``.
+        - "view" : ``build_view_rf`` — 1-indexed rank within each user by most-recent view
+          (using the high-resolution ``_VIEW_KEY_COL``); ``ref_int`` and ``recency_unit``
+          are ignored.
+
+        Returns a DataFrame with columns: user, item, recency, frequency.
         """
-        tmp = df[[self._USER_COL, self._ITEM_COL]].copy()
-        tmp["recency"] = (ref_int - df[self._SEQUENCE_COL]) // self.unit + 1
-        return (
-            tmp.groupby([self._USER_COL, self._ITEM_COL], sort=False)
-            .agg(recency=("recency", "min"), frequency=("recency", "count"))
-            .reset_index()
-        )
+        if self.recency_mode == "view":
+            return build_view_rf(
+                df, self._USER_COL, self._ITEM_COL, self._VIEW_KEY_COL, self._SEQUENCE_COL
+            )
+        if self.recency_mode == "day":
+            return build_day_rf(
+                df, self._USER_COL, self._ITEM_COL, self._SEQUENCE_COL, ref_int, self.recency_unit
+            )
+        raise ValueError(f"recency_mode must be 'day' or 'view', got {self.recency_mode!r}.")
 
     def _normalize_kind(self, kind):
         return self._KIND_ALIASES.get(kind, kind)

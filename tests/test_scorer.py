@@ -12,7 +12,7 @@ from rfscorer import RecencyFrequencyScorer
 # 観測期間: 2024-01-01 〜 2024-01-07 (obs_end = Jan07)
 # 正解期間: 2024-01-08 〜 2024-01-14
 #
-# obs_end 基準の Recency (unit=1) = (ordinal(obs_end) - ordinal(datetime)) + 1
+# obs_end 基準の Recency (recency_unit=1) = (ordinal(obs_end) - ordinal(datetime)) + 1
 #
 # u1-item1: Jan01(7), Jan03(5), Jan05(3) → recency=min=3, freq=3, cv=1
 # u1-item2: Jan02(6)                     → recency=6, freq=1, cv=0
@@ -191,6 +191,10 @@ class TestInit:
         assert s.user_col == "uid"
         assert s.item_col == "iid"
         assert s.time_col == "ts"
+
+    def test_default_recency_mode_and_unit(self, scorer):
+        assert scorer.recency_mode == "day"
+        assert scorer.recency_unit == 1
 
     def test_initial_state(self, scorer):
         assert scorer._R == []
@@ -1698,12 +1702,12 @@ class TestIntegerTimeCol:
 
 
 # ---------------------------------------------------------------------------
-# unit パラメータ — T17
+# recency_unit パラメータ
 # ---------------------------------------------------------------------------
-class TestUnit:
-    def _make_scorer_with_unit(self, unit):
+class TestRecencyUnit:
+    def _make_scorer_with_recency_unit(self, recency_unit):
         df = _make_df()
-        s = RecencyFrequencyScorer(unit=unit)
+        s = RecencyFrequencyScorer(recency_unit=recency_unit)
         s.fit(
             *_split_by_period(df, _OBS_PERIOD, _GT_PERIOD),
             recency_limit=_RECENCY_LIMIT,
@@ -1711,21 +1715,21 @@ class TestUnit:
         )
         return s
 
-    def test_unit_zero_raises(self):
-        with pytest.raises(ValueError, match="unit must be a positive integer"):
-            RecencyFrequencyScorer(unit=0)
+    def test_recency_unit_zero_raises(self):
+        with pytest.raises(ValueError, match="recency_unit must be a positive integer"):
+            RecencyFrequencyScorer(recency_unit=0)
 
-    def test_unit_negative_raises(self):
-        with pytest.raises(ValueError, match="unit must be a positive integer"):
-            RecencyFrequencyScorer(unit=-1)
+    def test_recency_unit_negative_raises(self):
+        with pytest.raises(ValueError, match="recency_unit must be a positive integer"):
+            RecencyFrequencyScorer(recency_unit=-1)
 
-    def test_unit_7_recency_is_floor_div_of_unit_1(self):
-        """unit=7 の Recency が unit=1 の Recency の // 7 になること。"""
+    def test_recency_unit_7_recency_is_floor_div_of_recency_unit_1(self):
+        """recency_unit=7 の Recency が recency_unit=1 の Recency の // 7 になること。"""
         df = _make_df()
         obs = df[pd.to_datetime(df["datetime"]) <= _OBS_PERIOD[1]]
 
-        s1 = self._make_scorer_with_unit(1)
-        s7 = self._make_scorer_with_unit(7)
+        s1 = self._make_scorer_with_recency_unit(1)
+        s7 = self._make_scorer_with_recency_unit(7)
 
         result1 = s1.transform(obs)
         result7 = s7.transform(obs)
@@ -1738,9 +1742,33 @@ class TestUnit:
         for _, row in merged.iterrows():
             assert row["recency_7"] == (row["recency_1"] - 1) // 7 + 1
 
-    def test_unit_1_default(self):
+    def test_recency_unit_1_default(self):
         s = RecencyFrequencyScorer()
-        assert s.unit == 1
+        assert s.recency_unit == 1
+
+    def test_unit_keyword_removed(self):
+        # Hard rename: the old `unit` keyword no longer exists.
+        with pytest.raises(TypeError):
+            RecencyFrequencyScorer(unit=1)
+
+    def test_recency_unit_ignored_in_view_mode(self):
+        # In view mode recency is a rank, so recency_unit must have no effect even when
+        # items span many days (where day mode would bin differently).
+        df = pd.DataFrame(
+            {
+                "user": ["u", "u", "u"],
+                "item": ["A", "B", "C"],
+                "datetime": pd.to_datetime(
+                    ["2026-06-28 17:00", "2026-06-20 16:00", "2026-06-10 15:00"]
+                ),
+            }
+        )
+        r1 = RecencyFrequencyScorer(recency_mode="view", recency_unit=1).fit(df, df).transform(df)
+        r99 = RecencyFrequencyScorer(recency_mode="view", recency_unit=99).fit(df, df).transform(df)
+        pd.testing.assert_frame_equal(
+            r1.sort_values(["user", "item"]).reset_index(drop=True),
+            r99.sort_values(["user", "item"]).reset_index(drop=True),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -2361,3 +2389,112 @@ class TestRefitInvalidatesOptimize:
         assert s.mono_probability_ is None
         assert s.mono_probability_table_ is None
         assert s.mono_probability_dict_ is None
+
+
+class TestViewRecency:
+    def _ranks(self, scorer, df):
+        out = scorer.transform(df)
+        return {(r.user, r.item): r.recency for r in out.itertuples()}
+
+    def test_intraday_resolution_datetime(self):
+        # Same calendar day, different times -> ranked by timestamp (newest = 1).
+        df = pd.DataFrame(
+            {
+                "user": ["u", "u", "u"],
+                "item": ["A", "B", "C"],
+                "datetime": pd.to_datetime(
+                    ["2026-06-28 17:00", "2026-06-28 16:50", "2026-06-28 16:40"]
+                ),
+            }
+        )
+        s = RecencyFrequencyScorer(recency_mode="view").fit(df, df)
+        assert self._ranks(s, df) == {("u", "A"): 1, ("u", "B"): 2, ("u", "C"): 3}
+
+    def test_multi_user_intraday(self):
+        df = pd.DataFrame(
+            {
+                "user": ["U1", "U1", "U2", "U2"],
+                "item": ["P", "Q", "P", "Q"],
+                "datetime": pd.to_datetime(
+                    [
+                        "2026-06-28 17:00",
+                        "2026-06-28 16:00",
+                        "2026-06-28 16:00",
+                        "2026-06-28 17:00",
+                    ]
+                ),
+            }
+        )
+        s = RecencyFrequencyScorer(recency_mode="view").fit(df, df)
+        assert self._ranks(s, df) == {
+            ("U1", "P"): 1,
+            ("U1", "Q"): 2,
+            ("U2", "Q"): 1,
+            ("U2", "P"): 2,
+        }
+
+    def test_integer_time_col_view(self):
+        df = pd.DataFrame(
+            {"user": ["u", "u", "u"], "item": ["A", "B", "C"], "datetime": [5, 30, 12]}
+        )
+        s = RecencyFrequencyScorer(recency_mode="view").fit(df, df)
+        assert self._ranks(s, df) == {("u", "B"): 1, ("u", "C"): 2, ("u", "A"): 3}
+
+    def test_day_mode_unchanged(self):
+        df = pd.DataFrame(
+            {
+                "user": ["u", "u", "u"],
+                "item": ["A", "B", "C"],
+                "datetime": pd.to_datetime(["2024-01-01", "2024-01-03", "2024-01-05"]),
+            }
+        )
+        default = RecencyFrequencyScorer().fit(df, df).transform(df)
+        explicit = RecencyFrequencyScorer(recency_mode="day").fit(df, df).transform(df)
+        pd.testing.assert_frame_equal(default, explicit)
+
+    def test_fit_predict_transform_work(self):
+        df = pd.DataFrame(
+            {
+                "user": ["u", "u", "v"],
+                "item": ["A", "B", "A"],
+                "datetime": pd.to_datetime(
+                    ["2026-06-28 17:00", "2026-06-28 16:00", "2026-06-28 15:00"]
+                ),
+            }
+        )
+        s = RecencyFrequencyScorer(recency_mode="view").fit(df, df)
+        assert isinstance(s.predict(1, 1), float)
+        assert "recency" in s.transform(df).columns
+
+    def test_fit_rolling_view(self):
+        df = _make_rolling_df()
+        s = RecencyFrequencyScorer(recency_mode="view").fit_rolling(
+            df, df, 7, 3, roll_days=2, recency_limit=7, frequency_limit=5
+        )
+        assert s.emp_probability_ is not None
+        assert s.recency_mode == "view"
+
+    def test_invalid_recency_mode_raises(self):
+        with pytest.raises(ValueError, match="recency_mode"):
+            RecencyFrequencyScorer(recency_mode="bogus")
+
+    def test_show_and_save_zip_recency_mode(self, tmp_path, capsys):
+        df = pd.DataFrame(
+            {
+                "user": ["u", "u"],
+                "item": ["A", "B"],
+                "datetime": pd.to_datetime(["2026-06-28 17:00", "2026-06-28 16:00"]),
+            }
+        )
+        s = RecencyFrequencyScorer(recency_mode="view").fit(df, df)
+        s.show()
+        assert "recency_mode" in capsys.readouterr().out
+
+        import json
+        import zipfile
+
+        path = tmp_path / "model.zip"
+        s.save_zip(path)
+        with zipfile.ZipFile(path) as zf:
+            meta = json.loads(zf.read("metadata.json"))
+        assert meta["recency_mode"] == "view"
