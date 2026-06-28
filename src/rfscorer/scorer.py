@@ -55,8 +55,8 @@ class RecencyFrequencyScorer(PlottingMixin):
         user_col="user",
         item_col="item",
         time_col="datetime",
-        unit=1,
         recency_mode="day",
+        recency_unit=1,
     ):
         """Initialize the scorer with column name mappings.
 
@@ -71,27 +71,35 @@ class RecencyFrequencyScorer(PlottingMixin):
             datetime (datetime64, str) or integer columns. Datetime values are
             converted to ordinal integers internally; integer values are used
             as-is.
-        unit : int, default 1
-            Number of days (or integer steps) per recency bin. Recency is
-            computed as ``(ref - value) // unit + 1``. Must be a positive
-            integer. Use ``unit=7`` for weekly, ``unit=30`` for approximate
-            monthly granularity. Ignored when ``recency_mode="view"``.
         recency_mode : str, default "day"
             How recency is computed for each (user, item) pair.
-            "day"  : elapsed-days bin relative to ref: ``(ref - last_view) // unit + 1``.
+            "day"  : elapsed-days bin relative to ref: ``(ref - last_view) // recency_unit + 1``.
             "view" : 1-indexed rank within each user ordered by most-recent view
                      timestamp (1 = latest). Full timestamp resolution is used
-                     (sub-day order is preserved). ``ref`` and ``unit`` are ignored.
+                     (sub-day order is preserved). ``ref`` and ``recency_unit`` are ignored.
+        recency_unit : int, default 1
+            Number of days (or integer steps) per recency bin (recency-axis bin
+            width). Recency is ``(ref - last_view) // recency_unit + 1``. Must be a
+            positive integer. Use ``recency_unit=7`` for weekly, ``recency_unit=30``
+            for approximate monthly granularity. Ignored when ``recency_mode="view"``.
+
+        Notes
+        -----
+        A frequency axis counterpart (``frequency_mode`` defaulting to ``"view"`` =
+        view-event count, plus ``frequency_unit``) is planned for the future. The
+        default asymmetry (recency defaults to ``"day"``, frequency to ``"view"``)
+        follows the classic RF definition: recency is time-based, frequency is
+        count-based.
         """
-        if unit <= 0:
-            raise ValueError(f"unit must be a positive integer, got {unit}.")
         if recency_mode not in self._VALID_RECENCY_MODES:
             raise ValueError(f"recency_mode must be 'day' or 'view', got {recency_mode!r}.")
+        if recency_unit <= 0:
+            raise ValueError(f"recency_unit must be a positive integer, got {recency_unit}.")
         self.user_col = user_col
         self.item_col = item_col
         self.time_col = time_col
-        self.unit = unit
         self.recency_mode = recency_mode
+        self.recency_unit = recency_unit
 
         self.observation_start_ = None
         self.observation_end_ = None
@@ -213,7 +221,7 @@ class RecencyFrequencyScorer(PlottingMixin):
             etc.). Must already be filtered to the ground truth period by the caller.
         ref : str, datetime, or int, optional
             Reference value for recency computation. Recency of each
-            user-item pair is ``(ref - value) // unit + 1``, where the
+            user-item pair is ``(ref - value) // recency_unit + 1``, where the
             minimum across behavior records is taken. When None, defaults to the
             maximum value in df_obs time_col. Ignored when ``recency_mode="view"``.
         recency_limit : int, optional
@@ -1344,8 +1352,8 @@ class RecencyFrequencyScorer(PlottingMixin):
             "user_col": self.user_col,
             "item_col": self.item_col,
             "time_col": self.time_col,
-            "unit": _to_python(self.unit),
             "recency_mode": self.recency_mode,
+            "recency_unit": _to_python(self.recency_unit),
             "recency_limit": _to_python(self.recency_limit),
             "frequency_limit": _to_python(self.frequency_limit),
             "observation_start": _to_python(self.observation_start_),
@@ -1630,9 +1638,11 @@ class RecencyFrequencyScorer(PlottingMixin):
 
         Dispatches to the ``_recency`` builders by ``recency_mode``:
 
-        - "day"  : ``build_day_rf`` — elapsed-days bin ``(ref_int - last_view) // unit + 1``.
+        - "day"  : ``build_day_rf`` — elapsed-days bin
+          ``(ref_int - last_view) // recency_unit + 1``.
         - "view" : ``build_view_rf`` — 1-indexed rank within each user by most-recent view
-          (using the high-resolution ``_VIEW_KEY_COL``); ``ref_int`` and ``unit`` are ignored.
+          (using the high-resolution ``_VIEW_KEY_COL``); ``ref_int`` and ``recency_unit``
+          are ignored.
 
         Returns a DataFrame with columns: user, item, recency, frequency.
         """
@@ -1642,7 +1652,7 @@ class RecencyFrequencyScorer(PlottingMixin):
             )
         if self.recency_mode == "day":
             return build_day_rf(
-                df, self._USER_COL, self._ITEM_COL, self._SEQUENCE_COL, ref_int, self.unit
+                df, self._USER_COL, self._ITEM_COL, self._SEQUENCE_COL, ref_int, self.recency_unit
             )
         raise ValueError(f"recency_mode must be 'day' or 'view', got {self.recency_mode!r}.")
 

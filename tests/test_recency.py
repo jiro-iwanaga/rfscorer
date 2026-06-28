@@ -195,7 +195,8 @@ class TestBuildViewRf:
 
 class TestBuildDayRf:
     def test_matches_legacy_formula(self):
-        # Legacy: recency = min over rows of (ref - seq)//unit + 1 == (ref - max(seq))//unit + 1
+        # Legacy: recency = min over rows of (ref - seq)//recency_unit + 1
+        #                 == (ref - max(seq))//recency_unit + 1
         df = pd.DataFrame(
             {
                 USER: ["u", "u", "u", "v"],
@@ -203,8 +204,8 @@ class TestBuildDayRf:
                 SEQ: [100, 104, 102, 100],
             }
         )
-        ref_int, unit = 110, 2
-        out = build_day_rf(df, USER, ITEM, SEQ, ref_int, unit)
+        ref_int, recency_unit = 110, 2
+        out = build_day_rf(df, USER, ITEM, SEQ, ref_int, recency_unit)
         rank = _rank(out)
         freq = _freq(out)
         # (u, A): last=104 -> (110-104)//2+1 = 4 ; viewed twice
@@ -221,20 +222,20 @@ class TestBuildDayRf:
         out = build_day_rf(df, USER, ITEM, SEQ, 110, 1)
         assert _rank(out) == {("u", "A"): 1}
 
-    def test_unit_one_simple(self):
+    def test_recency_unit_one_simple(self):
         df = pd.DataFrame({USER: ["u", "u"], ITEM: ["A", "B"], SEQ: [109, 105]})
         out = build_day_rf(df, USER, ITEM, SEQ, 110, 1)
         # A: (110-109)//1+1 = 2 ; B: (110-105)//1+1 = 6
         assert _rank(out) == {("u", "A"): 2, ("u", "B"): 6}
 
-    def test_unit_binning_collapses_same_bin(self):
-        # unit=7: last_ts 104 and 105 both fall in the same recency bin as ref 110.
+    def test_recency_unit_binning_collapses_same_bin(self):
+        # recency_unit=7: last_ts 104 and 105 both fall in the same recency bin as ref 110.
         df = pd.DataFrame({USER: ["u", "u"], ITEM: ["A", "B"], SEQ: [104, 105]})
         out = build_day_rf(df, USER, ITEM, SEQ, 110, 7)
         # (110-104)//7+1 = 1 ; (110-105)//7+1 = 1
         assert _rank(out) == {("u", "A"): 1, ("u", "B"): 1}
 
-    def test_unit_binning_separates_different_bins(self):
+    def test_recency_unit_binning_separates_different_bins(self):
         df = pd.DataFrame({USER: ["u", "u"], ITEM: ["A", "B"], SEQ: [109, 100]})
         out = build_day_rf(df, USER, ITEM, SEQ, 110, 7)
         # (110-109)//7+1 = 1 ; (110-100)//7+1 = 2
@@ -295,17 +296,17 @@ class TestBuildDayRf:
                 SEQ: [100 + (i * 7) % 23 for i in rng],
             }
         )
-        ref_int, unit = 130, 3
+        ref_int, recency_unit = 130, 3
 
         tmp = df.copy()
-        tmp["recency"] = (ref_int - tmp[SEQ]) // unit + 1
+        tmp["recency"] = (ref_int - tmp[SEQ]) // recency_unit + 1
         legacy = (
             tmp.groupby([USER, ITEM], sort=False)
             .agg(recency=("recency", "min"), frequency=("recency", "count"))
             .reset_index()
         )
 
-        out = build_day_rf(df, USER, ITEM, SEQ, ref_int, unit)
+        out = build_day_rf(df, USER, ITEM, SEQ, ref_int, recency_unit)
 
         legacy_sorted = legacy.sort_values([USER, ITEM]).reset_index(drop=True)
         out_sorted = out.sort_values([USER, ITEM]).reset_index(drop=True)

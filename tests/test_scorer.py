@@ -12,7 +12,7 @@ from rfscorer import RecencyFrequencyScorer
 # 観測期間: 2024-01-01 〜 2024-01-07 (obs_end = Jan07)
 # 正解期間: 2024-01-08 〜 2024-01-14
 #
-# obs_end 基準の Recency (unit=1) = (ordinal(obs_end) - ordinal(datetime)) + 1
+# obs_end 基準の Recency (recency_unit=1) = (ordinal(obs_end) - ordinal(datetime)) + 1
 #
 # u1-item1: Jan01(7), Jan03(5), Jan05(3) → recency=min=3, freq=3, cv=1
 # u1-item2: Jan02(6)                     → recency=6, freq=1, cv=0
@@ -1698,12 +1698,12 @@ class TestIntegerTimeCol:
 
 
 # ---------------------------------------------------------------------------
-# unit パラメータ — T17
+# recency_unit パラメータ
 # ---------------------------------------------------------------------------
-class TestUnit:
-    def _make_scorer_with_unit(self, unit):
+class TestRecencyUnit:
+    def _make_scorer_with_recency_unit(self, recency_unit):
         df = _make_df()
-        s = RecencyFrequencyScorer(unit=unit)
+        s = RecencyFrequencyScorer(recency_unit=recency_unit)
         s.fit(
             *_split_by_period(df, _OBS_PERIOD, _GT_PERIOD),
             recency_limit=_RECENCY_LIMIT,
@@ -1711,21 +1711,21 @@ class TestUnit:
         )
         return s
 
-    def test_unit_zero_raises(self):
-        with pytest.raises(ValueError, match="unit must be a positive integer"):
-            RecencyFrequencyScorer(unit=0)
+    def test_recency_unit_zero_raises(self):
+        with pytest.raises(ValueError, match="recency_unit must be a positive integer"):
+            RecencyFrequencyScorer(recency_unit=0)
 
-    def test_unit_negative_raises(self):
-        with pytest.raises(ValueError, match="unit must be a positive integer"):
-            RecencyFrequencyScorer(unit=-1)
+    def test_recency_unit_negative_raises(self):
+        with pytest.raises(ValueError, match="recency_unit must be a positive integer"):
+            RecencyFrequencyScorer(recency_unit=-1)
 
-    def test_unit_7_recency_is_floor_div_of_unit_1(self):
-        """unit=7 の Recency が unit=1 の Recency の // 7 になること。"""
+    def test_recency_unit_7_recency_is_floor_div_of_recency_unit_1(self):
+        """recency_unit=7 の Recency が recency_unit=1 の Recency の // 7 になること。"""
         df = _make_df()
         obs = df[pd.to_datetime(df["datetime"]) <= _OBS_PERIOD[1]]
 
-        s1 = self._make_scorer_with_unit(1)
-        s7 = self._make_scorer_with_unit(7)
+        s1 = self._make_scorer_with_recency_unit(1)
+        s7 = self._make_scorer_with_recency_unit(7)
 
         result1 = s1.transform(obs)
         result7 = s7.transform(obs)
@@ -1738,9 +1738,14 @@ class TestUnit:
         for _, row in merged.iterrows():
             assert row["recency_7"] == (row["recency_1"] - 1) // 7 + 1
 
-    def test_unit_1_default(self):
+    def test_recency_unit_1_default(self):
         s = RecencyFrequencyScorer()
-        assert s.unit == 1
+        assert s.recency_unit == 1
+
+    def test_unit_keyword_removed(self):
+        # Hard rename: the old `unit` keyword no longer exists.
+        with pytest.raises(TypeError):
+            RecencyFrequencyScorer(unit=1)
 
 
 # ---------------------------------------------------------------------------

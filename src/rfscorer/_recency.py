@@ -4,7 +4,7 @@ Separated from the scorer so each recency_mode is a small, independently testabl
 unit. Both builders return columns: user, item, recency, frequency.
 
 - ``build_day_rf``  consumes the day-ordinal time column (``seq_col``); recency is the
-  elapsed-days bin ``(ref_int - last_view) // unit + 1`` (1-indexed, 1 = most recent).
+  elapsed-days bin ``(ref_int - last_view) // recency_unit + 1`` (1-indexed, 1 = most recent).
 - ``build_view_rf`` consumes a high-resolution time key (``key_col``) so that sub-day
   order is preserved; recency is a 1-indexed rank within each user by most-recent view
   (newest = 1), ties broken by first appearance in the input.
@@ -15,18 +15,18 @@ the day ordinal) can swap it without adding another groupby.
 """
 
 
-def build_day_rf(df, user_col, item_col, seq_col, ref_int, unit):
+def build_day_rf(df, user_col, item_col, seq_col, ref_int, recency_unit):
     """Build (user, item) -> (recency, frequency) for day recency.
 
-    Recency is ``(ref_int - last_view) // unit + 1`` where last_view is the max day
-    ordinal of the pair. Equivalent to taking the per-row recency minimum.
+    Recency is ``(ref_int - last_view) // recency_unit + 1`` where last_view is the max
+    day ordinal of the pair. Equivalent to taking the per-row recency minimum.
     """
     ui = (
         df.groupby([user_col, item_col], sort=False)[seq_col]
         .agg(last_ts="max", frequency="count")
         .reset_index()
     )
-    ui["recency"] = (ref_int - ui["last_ts"]) // unit + 1
+    ui["recency"] = (ref_int - ui["last_ts"]) // recency_unit + 1
     return ui[[user_col, item_col, "recency", "frequency"]]
 
 
