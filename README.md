@@ -6,14 +6,14 @@
 
 [日本語 README](#rfscorer-日本語readme)
 
-`rfscorer` is a Python package for Recency-Frequency based recommendation scoring.
+`rfscorer` is a Python package for Recency-Frequency-based recommendation scoring.
 
 > Note: In this package, **RF** stands for **Recency-Frequency**, not Random Forest.
 
 It estimates a recommendation score (product-choice probability) — how likely each previously interacted item is to be chosen — from two behavioral signals:
 
-- **Recency**: time since the last interaction. More recently viewed items tend to attract more interest.
-- **Frequency**: number of interactions. More frequently viewed items tend to attract more interest.
+- **Recency**: time since the last interaction. More recently interacted items tend to attract more interest.
+- **Frequency**: number of interactions. More frequently interacted items tend to attract more interest.
 
 You can set any event as the prediction target (revisits, purchases, conversions, etc.).
 
@@ -56,7 +56,7 @@ For such non-trivial cases, `rfscorer` uses mathematical optimization to estimat
 | Feature | Description |
 |---------|-------------|
 | **scikit-learn style** | `fit()` / `transform()` interface |
-| **Minimal data** | works with any behavior history with three columns: `user`, `item`, `datetime` |
+| **Minimal data** | works with any three-column behavior history (`user`, `item`, `datetime`) |
 | **Explainable** | scores are estimated by mathematical optimization under RF monotonicity, making the reasoning behind each recommendation easy to explain |
 | **Stable probability estimation** | product-choice probabilities are estimated directly from recency and frequency, avoiding the instability of converting ML model outputs to a probability scale |
 | **Downstream use** | usable not only as a standalone recommendation score but also as a rating matrix for collaborative filtering or as features for ML models |
@@ -148,24 +148,24 @@ scorer.plot_probability_surface(kind="mcc")
   </tr>
 </table>
 
-Each surface clearly captures how the product-choice probability behaves with respect to **recency** (time since last interaction) and **frequency** (number of interactions):
+Each surface clearly captures how the product-choice probability behaves with respect to **recency** and **frequency**:
 
-- **Empirical**: Raw probabilities without constraints. Noisy and may violate monotonicity, sometimes recommending items in unnatural order.
-- **Monotonicity**: Probabilities with RF monotonicity constraints. Guarantees items are recommended in natural order.
-- **Monotonicity-Convex-Concave**: Probabilities with RF monotonicity and convexity-concavity constraints. Produces the smoothest surface.
+- **Empirical**: Raw probabilities without constraints. Noisy and may violate monotonicity.
+- **Monotonicity**: Probabilities with RF monotonicity constraints.
+- **Monotonicity-Convex-Concave**: Probabilities with RF monotonicity and convexity-concavity constraints.
 
 ## Examples
 
-- [examples/tutorial_beginner_en.ipynb](examples/tutorial_beginner_en.ipynb) — end-to-end walkthrough: load data, fit, optimize, visualize, transform, and evaluate
-- [examples/tutorial_practical_en.ipynb](examples/tutorial_practical_en.ipynb) — practical workflow: chronological train/test split, build the various models, compare accuracy, and save/load the model
-- [examples/tutorial_advanced_fit_rolling_en.ipynb](examples/tutorial_advanced_fit_rolling_en.ipynb) — advanced workflow: time-series rolling training with `fit_rolling()` to stabilize empirical probabilities across multiple reference dates
-
 For the complete list of tutorials, see [examples/](examples/).
+
+- [examples/tutorial_beginner_en.ipynb](examples/tutorial_beginner_en.ipynb) — beginner: a minimal end-to-end walkthrough.
+- [examples/tutorial_practical_en.ipynb](examples/tutorial_practical_en.ipynb) — practical: a comprehensive tour of the main features.
+- [examples/tutorial_advanced_fit_rolling_en.ipynb](examples/tutorial_advanced_fit_rolling_en.ipynb) — advanced: rolling aggregation with `fit_rolling()`.
 
 ## API Reference
 
 <details>
-<summary>Show API reference</summary>
+<summary>Show</summary>
 
 | API | Description |
 |-----|-------------|
@@ -185,7 +185,7 @@ For the complete list of tutorials, see [examples/](examples/).
 ## References
 
 <details>
-<summary>Show references</summary>
+<summary>Show</summary>
 
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, “Estimating product-choice probabilities from recency and frequency of page views,” Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
 
@@ -200,7 +200,7 @@ For the complete list of tutorials, see [examples/](examples/).
 ## Citation
 
 <details>
-<summary>Show citation & BibTeX</summary>
+<summary>Show</summary>
 
 If you use `rfscorer` in academic work, you can cite it as follows in the body of your paper:
 
@@ -397,24 +397,24 @@ scorer.plot_probability_surface(kind="mcc")
   </tr>
 </table>
 
-各グラフは、**最新度（recency）**（ユーザーが商品に接触してからの経過時間）と **頻度（frequency）**（接触回数）に基づく商品選択確率の特徴をよく表しています：
+各グラフは、**最新度（recency）** と **頻度（frequency）** に基づく商品選択確率の特徴をよく表しています：
 
-- **Empirical（経験確率）**: 制約を課していない商品選択確率。ノイズにより単調性を満たさないため不自然な順序で商品を推薦する場合がある。
-- **Monotonicity（単調性）**: RF単調性制約を課した商品選択確率。商品を自然な順序で推薦することを保証する。
-- **Monotonicity-Convex-Concave（単調性＋凸凹）**: RF単調性制約と凹凸性制約を課した商品選択確率。最も滑らかなグラフを生成する
+- **Empirical（経験確率）**: 制約を課していない商品選択確率。ノイズにより単調性を満たさない場合がある。
+- **Monotonicity（単調性）**: RF単調性制約を課した商品選択確率。
+- **Monotonicity-Convex-Concave（単調性＋凸凹）**: RF単調性制約と凹凸性制約を課した商品選択確率。
 
 ## サンプル
-
-- [examples/tutorial_beginner_ja.ipynb](examples/tutorial_beginner_ja.ipynb) — 初級編では、最小限の利用方法を紹介します。データロード、モデル構築・最適化・可視化、推薦スコア算出、精度評価までのコードを紹介します。
-- [examples/tutorial_practical_ja.ipynb](examples/tutorial_practical_ja.ipynb) — 実践編では、主要機能を紹介します。具体的には、時系列での訓練・テスト分割、各種モデル構築と精度比較、モデルの保存・ロードを紹介します。
-- [examples/tutorial_advanced_fit_rolling_ja.ipynb](examples/tutorial_advanced_fit_rolling_ja.ipynb) — 応用編では、`fit_rolling()` を用いたローリング集計を扱います。複数の基準日にわたって集計することで経験的商品選択確率を安定させる方法を紹介します。
-
 全チュートリアルの一覧は [examples/](examples/) を参照してください。
+
+- [examples/tutorial_beginner_ja.ipynb](examples/tutorial_beginner_ja.ipynb) — 初級編では、最小限の利用方法を紹介します。
+- [examples/tutorial_practical_ja.ipynb](examples/tutorial_practical_ja.ipynb) — 実践編では、主要機能を網羅的に紹介します。
+- [examples/tutorial_advanced_fit_rolling_ja.ipynb](examples/tutorial_advanced_fit_rolling_ja.ipynb) — 応用編では、ローリング集計する方法を紹介します。
+
 
 ## APIリファレンス
 
 <details>
-<summary>APIリファレンスを表示</summary>
+<summary>表示</summary>
 
 | API | 説明 |
 |-----|------|
@@ -434,7 +434,7 @@ scorer.plot_probability_surface(kind="mcc")
 ## 参考文献
 
 <details>
-<summary>参考文献を表示</summary>
+<summary>表示</summary>
 
 - [Jiro Iwanaga, Naoki Nishimura, Noriyoshi Sukegawa, and Yuichi Takano, "Estimating product-choice probabilities from recency and frequency of page views," Knowledge-Based Systems, Volume 99, 2016, Pages 157–167.](https://www.sciencedirect.com/science/article/abs/pii/S0950705116000848)
 
@@ -449,7 +449,7 @@ scorer.plot_probability_surface(kind="mcc")
 ## 引用について
 
 <details>
-<summary>引用方法と BibTeX を表示</summary>
+<summary>表示</summary>
 
 学術論文等で `rfscorer` を利用する場合は、論文の引用と本Githubへのリンクを脚注を加え、本文中で以下のように引用できます：
 
