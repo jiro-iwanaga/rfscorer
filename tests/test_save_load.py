@@ -242,6 +242,31 @@ class TestSaveZipLoadZip:
         assert meta["frequency_limit"] == 3
         assert meta["observation_start"] is not None
         assert meta["observation_end"] is not None
+        # Human-readable date counterparts (datetime time_col -> ISO date string)
+        assert meta["observation_start_date"] == str(
+            pd.Timestamp.fromordinal(meta["observation_start"]).date()
+        )
+        assert meta["observation_end_date"] == str(
+            pd.Timestamp.fromordinal(meta["observation_end"]).date()
+        )
+
+    def test_save_zip_metadata_dates_null_for_integer_time_col(self, tmp_path):
+        # Integer time_col values are not calendar ordinals -> date fields are null.
+        df = pd.DataFrame(
+            {
+                "user": ["u", "u", "u"],
+                "item": ["a", "b", "a"],
+                "datetime": [1, 2, 3],
+            }
+        )
+        s = RecencyFrequencyScorer()
+        s.fit(df, df, recency_limit=3, frequency_limit=3)
+        path = tmp_path / "model_int.zip"
+        s.save_zip(path)
+        with zipfile.ZipFile(path, "r") as zf:
+            meta = json.loads(zf.read("metadata.json"))
+        assert meta["observation_start_date"] is None
+        assert meta["observation_end_date"] is None
 
     def test_save_zip_version_mismatch(self, fitted_scorer, tmp_path):
         path = tmp_path / "model.zip"

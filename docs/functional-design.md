@@ -298,7 +298,7 @@ Jupyter Lab / Colab では返り値がそのままインライン描画される
 `fit()` / `optimize()` 後のインスタンスを zip アーカイブとして保存する。zip 内には以下が含まれる。
 
 - `rfscorer.pkl` — モデル本体（`load_zip()` はここから復元）
-- `metadata.json` — バージョン・パラメータ・統計情報（`rfscorer_version`, `user_col`, `item_col`, `time_col`, `recency_mode`, `recency_unit`, `recency_limit`, `frequency_limit`, `observation_start`, `observation_end`, `fit_method`, `roll_days`, `observation_days`, `gt_days`, `n_obs_rows`, `n_gt_events`, `n_users`, `n_items`, `record_num`, `total_cv`, `optimized_kinds`）
+- `metadata.json` — バージョン・パラメータ・統計情報（`rfscorer_version`, `user_col`, `item_col`, `time_col`, `recency_mode`, `recency_unit`, `recency_limit`, `frequency_limit`, `observation_start`, `observation_start_date`, `observation_end`, `observation_end_date`, `fit_method`, `roll_days`, `observation_days`, `gt_days`, `n_obs_rows`, `n_gt_events`, `n_users`, `n_items`, `record_num`, `total_cv`, `optimized_kinds`）。`observation_start_date` / `observation_end_date` は序数を人間可読の ISO 日付（`"YYYY-MM-DD"`）に変換した値。整数 time_col など日付に対応しない場合は `null`
 - `probabilities/` — 計算済みの各モデルの確率テーブル CSV（`emp_probability.csv`, `er_probability.csv`, `ef_probability.csv`, および `optimize()` 済みのモデル分）
 - `plots/` — 計算済みの各モデルの確率グラフ PNG（2D モデルは `plot_probability_surface()` の出力、1D モデルは `plot_marginal_probability()` の出力）
 

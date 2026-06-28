@@ -1357,7 +1357,9 @@ class RecencyFrequencyScorer(PlottingMixin):
             "recency_limit": _to_python(self.recency_limit),
             "frequency_limit": _to_python(self.frequency_limit),
             "observation_start": _to_python(self.observation_start_),
+            "observation_start_date": self._ordinal_to_date(self.observation_start_),
             "observation_end": _to_python(self.observation_end_),
+            "observation_end_date": self._ordinal_to_date(self.observation_end_),
             "fit_method": self.fit_method_,
             "roll_days": _to_python(self.roll_days_),
             "observation_days": _to_python(self.observation_days_),
@@ -1583,14 +1585,23 @@ class RecencyFrequencyScorer(PlottingMixin):
     # Internal helpers
     # ---------------------------------------------------------------------------
 
-    def _fmt_ordinal(self, v):
+    def _ordinal_to_date(self, v):
+        """Return an ISO date string (``"YYYY-MM-DD"``) for a Gregorian-ordinal value.
+
+        Returns None when ``v`` is missing or does not map to a plausible calendar date
+        (e.g. integer time_col values), so the field stays null in that case rather than
+        showing a misleading date.
+        """
+        if v is None:
+            return None
         try:
             ts = pd.Timestamp.fromordinal(int(v))
-            if 1900 <= ts.year <= 2200:
-                return str(ts.date())
-        except (ValueError, OverflowError, AttributeError):
-            pass
-        return str(int(v))
+        except (ValueError, OverflowError, TypeError):
+            return None
+        return ts.date().isoformat() if 1900 <= ts.year <= 2200 else None
+
+    def _fmt_ordinal(self, v):
+        return self._ordinal_to_date(v) or str(int(v))
 
     def _fmt_slice_lines(self, d, prefix):
         import math
